@@ -1,0 +1,26 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Build started on `date`
+
+  build:
+    commands:
+      - echo Building the binary image...
+      - go version
+      - go mod tidy
+      - make
+
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - chmod +x scripts/deploy/aws/*.sh
+      - pwd
+
+artifacts:
+  files:
+    - appspec.yml
+    - build/linux/*
+    - scripts/deploy/aws/**
+  discard-paths: yes
