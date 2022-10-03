@@ -1,0 +1,5 @@
+.idea/
+.tmp/
+.deploy/
+any_test/
+build/
