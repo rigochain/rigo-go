@@ -2,7 +2,7 @@ version: 0.0
 os: linux
 files:
   - source:  /
-    destination: /home/ubuntu/bin/
+    destination: /home/ubuntu/arcanus-deploy
 
 file_exists_behavior: OVERWRITE
 
