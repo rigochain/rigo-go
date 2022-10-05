@@ -6,7 +6,6 @@ import (
 	"github.com/kysee/arcanus/ctrlers/stake"
 	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/xerrors"
-	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/libs/json"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	tmrpccoretypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -18,16 +17,9 @@ import (
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
 func queryAccount(ctx *tmrpctypes.Context, addr string) (types.IAccount, error) {
-	if strings.HasPrefix(addr, "0x") {
-		addr = addr[2:]
-	}
-
-	bzAddr, err := hex.DecodeString(addr)
+	bzAddr, err := types.Hex2Address(addr)
 	if err != nil {
-		return nil, err
-	}
-	if len(bzAddr) != crypto.AddressSize {
-		return nil, xerrors.New("error of address length: address length should be 20 bytes")
+		return nil, xerrors.Wrap(err)
 	}
 
 	qd := &types.QueryData{
@@ -82,16 +74,9 @@ func QueryAcctNonce(ctx *tmrpctypes.Context, addr string) (*ResponseAcctNonce, e
 }
 
 func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.StakeSet, error) {
-	if strings.HasPrefix(addr, "0x") {
-		addr = addr[2:]
-	}
-
-	bzAddr, err := hex.DecodeString(addr)
+	bzAddr, err := types.Hex2Address(addr)
 	if err != nil {
-		return nil, err
-	}
-	if len(bzAddr) != crypto.AddressSize {
-		return nil, xerrors.New("error of address length: address length should be 20 bytes")
+		return nil, xerrors.Wrap(err)
 	}
 
 	qd := &types.QueryData{

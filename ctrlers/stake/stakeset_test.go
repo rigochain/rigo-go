@@ -31,7 +31,7 @@ func newStakesTo(sset *stake.StakeSet, n int) {
 	}
 	stakes := make([]*stake.Stake, n)
 	for i, _ := range stakes {
-		stakes[i] = stake.NewStake(sset.Owner, libs.RandBigIntN(maxAmount), libs.RandInt63n(10_000_0000), libs.RandHexBytes(32))
+		stakes[i] = stake.NewStakeWithAmount(sset.Owner, libs.RandBigIntN(maxAmount), libs.RandInt63n(10_000_0000), libs.RandHexBytes(32))
 	}
 	if err := sset.AppendStake(stakes...); err != nil {
 		panic(err)
@@ -43,10 +43,10 @@ func TestStakeSet(t *testing.T) {
 	addr0 := w0.Address()
 	stakeSet := stake.NewStakeSet(addr0, w0.GetPubKey())
 
-	s0 := stake.NewStake(addr0, big.NewInt(1000), 1, nil)
+	s0 := stake.NewStakeWithAmount(addr0, big.NewInt(1000), 1, nil)
 	require.NoError(t, stakeSet.AppendStake(s0))
 
-	s1 := stake.NewStake(addr0, big.NewInt(1000), 3, nil)
+	s1 := stake.NewStakeWithAmount(addr0, big.NewInt(1000), 3, nil)
 	require.NoError(t, stakeSet.AppendStake(s1))
 
 	require.Equal(t, big.NewInt(2000), stakeSet.TotalAmount)

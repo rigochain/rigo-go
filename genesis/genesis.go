@@ -27,17 +27,21 @@ type GenesisAppState struct {
 	GovRules     *gov.GovRules        `json:"govRules"`
 }
 
-func (ga *GenesisAppState) Hash() []byte {
+func (ga *GenesisAppState) Hash() ([]byte, error) {
+	hasher := sha256.New()
+
 	bzgr, err := ga.GovRules.Encode()
 	if err != nil {
-
+		return nil, err
+	} else {
+		hasher.Write(bzgr)
 	}
-	hasher := sha256.New()
+
 	for _, h := range ga.AssetHolders {
 		hasher.Write(h.Hash())
 	}
 
-	return hasher.Sum(nil)
+	return hasher.Sum(nil), nil
 }
 
 func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []GenesisAssetHolder) (*tmtypes.GenesisDoc, error) {
@@ -48,7 +52,10 @@ func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetH
 	if err != nil {
 		return nil, err
 	}
-	appHash := appState.Hash()
+	appHash, err := appState.Hash()
+	if err != nil {
+		return nil, err
+	}
 
 	return &tmtypes.GenesisDoc{
 		ChainID:     chainID,

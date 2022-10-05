@@ -31,7 +31,7 @@ func TestStakerOrder(t *testing.T) {
 		w0 := client.NewWallet([]byte("1"))
 		val0 := ctrler.AddStakerWith(w0.Address(), w0.GetPubKey())
 		require.NotNil(t, val0)
-		val0.AppendStake(stake.NewStake(w0.Address(), libs.RandBigIntN(maxAmount), int64(i+1), libs.RandBytes(32)))
+		val0.AppendStake(stake.NewStakeWithAmount(w0.Address(), libs.RandBigIntN(maxAmount), int64(i+1), libs.RandBytes(32)))
 
 		vals = append(vals, val0)
 	}

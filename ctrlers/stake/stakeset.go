@@ -13,8 +13,8 @@ type StakeSet struct {
 	Owner       types.Address  `json:"owner"`
 	PubKey      types.HexBytes `json:"pub_key"`
 	Stakes      []*Stake       `json:"stakes"` // ordered by block height
-	TotalPower  int64          `json:"total_vp"`
 	TotalAmount *big.Int       `json:"total_amount"`
+	TotalPower  int64          `json:"total_power"`
 	TotalReward *big.Int       `json:"total_reward"`
 	FeeReward   *big.Int       `json:"fee_reward"`
 
@@ -130,49 +130,68 @@ func (sset *StakeSet) StakesLen() int {
 	return len(sset.Stakes)
 }
 
-func (sset *StakeSet) CalculatePower() int64 {
+func (sset *StakeSet) GetTotalAmount() *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
-	return sset.calculatePower()
+	return sset.TotalAmount
 }
 
-func (sset *StakeSet) calculatePower() int64 {
-	vp := int64(0)
+func (sset *StakeSet) SumAmount() *big.Int {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	return sset.sumAmount()
+}
+
+func (sset *StakeSet) sumAmount() *big.Int {
+	amt := big.NewInt(0)
 	for _, s := range sset.Stakes {
-		vp += s.calculatePower()
+		_ = amt.Add(amt, s.Amount)
 	}
-	return vp
+	return amt
 }
 
-func (sset *StakeSet) CalculateReward() *big.Int {
+func (sset *StakeSet) GetTotalPower() int64 {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
-	return sset.calculateReward()
+	return sset.TotalPower
 }
 
-func (sset *StakeSet) calculateReward() *big.Int {
-	reward := big.NewInt(0)
+func (sset *StakeSet) SumPower() int64 {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	return sset.sumPower()
+}
+
+func (sset *StakeSet) sumPower() int64 {
+	power := int64(0)
 	for _, s := range sset.Stakes {
-		reward.Add(reward, s.calculateReward())
+		power += s.Power
 	}
-	return reward
+	return power
 }
 
-func (sset *StakeSet) CurrentReward() *big.Int {
+func (sset *StakeSet) GetTotalReward() *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
-	// this should be equal to sset.TotalReward
-	//return sset.currentReward()
 	return new(big.Int).Set(sset.TotalReward)
 }
 
-func (sset *StakeSet) currentReward() *big.Int {
+func (sset *StakeSet) SumReward() *big.Int {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	return sset.sumReward()
+}
+
+func (sset *StakeSet) sumReward() *big.Int {
 	reward := big.NewInt(0)
 	for _, s := range sset.Stakes {
-		reward.Add(reward, s.Reward)
+		_ = reward.Add(reward, s.Reward)
 	}
 	return reward
 }
@@ -184,13 +203,6 @@ func (sset *StakeSet) ApplyReward() *big.Int {
 	return sset.applyReward()
 }
 
-func (sset *StakeSet) ApplyFeeReward(fee *big.Int) {
-	sset.mtx.Lock()
-	defer sset.mtx.Unlock()
-
-	sset.FeeReward = new(big.Int).Add(sset.FeeReward, fee)
-}
-
 func (sset *StakeSet) applyReward() *big.Int {
 	reward := big.NewInt(0)
 	for _, s := range sset.Stakes {
@@ -198,4 +210,11 @@ func (sset *StakeSet) applyReward() *big.Int {
 	}
 	sset.TotalReward = new(big.Int).Add(sset.TotalReward, reward)
 	return reward
+}
+
+func (sset *StakeSet) ApplyFeeReward(fee *big.Int) {
+	sset.mtx.Lock()
+	defer sset.mtx.Unlock()
+
+	sset.FeeReward = new(big.Int).Add(sset.FeeReward, fee)
 }

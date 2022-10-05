@@ -2,6 +2,7 @@ package state
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"github.com/kysee/arcanus/cmd/version"
 	"github.com/kysee/arcanus/ctrlers/account"
@@ -9,10 +10,10 @@ import (
 	"github.com/kysee/arcanus/ctrlers/stake"
 	"github.com/kysee/arcanus/genesis"
 	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
@@ -38,10 +39,11 @@ type ChainCtrler struct {
 }
 
 func NewChainCtrler(dbDir string, logger log.Logger) *ChainCtrler {
-	db, err := openStateDB("chain_state", dbDir)
+	stateDB, err := openStateDB("chain_state", dbDir)
 	if err != nil {
 		panic(err)
 	}
+
 	acctCtrler, err := account.NewAccountCtrler(dbDir, logger)
 	if err != nil {
 		panic(err)
@@ -52,10 +54,16 @@ func NewChainCtrler(dbDir string, logger log.Logger) *ChainCtrler {
 		panic(err)
 	}
 
+	govCtrler, err := gov.NewGovCtrler(dbDir, logger)
+	if err != nil {
+		panic(err)
+	}
+
 	return &ChainCtrler{
-		stateDB:     db,
+		stateDB:     stateDB,
 		acctCtrler:  acctCtrler,
 		stakeCtrler: stakeCtrler,
+		govCtrler:   govCtrler,
 		trxExecutor: NewTrxExecutor(logger, acctCtrler, stakeCtrler),
 		logger:      logger,
 	}
@@ -73,6 +81,20 @@ func (ctrler *ChainCtrler) Close() error {
 
 func (ctrler *ChainCtrler) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 	ctrler.logger.Info("Info", "version", tmver.ABCIVersion, "AppVersion", version.String())
+
+	lastBlockHeight := ctrler.stateDB.LastBlockHeight()
+	if lastBlockHeight > 0 {
+		_ = ctrler.govCtrler.ImportRules(func() []byte {
+			_acct := ctrler.acctCtrler.FindAccount(libs.ZeroBytes(crypto.AddressSize), false)
+			if _acct == nil {
+				panic(errors.New("the account of governance rules is not found"))
+			} else if len(_acct.GetCode()) == 0 {
+				panic(errors.New("the account of governance rules has no code"))
+			}
+			return _acct.GetCode()
+		})
+	}
+
 	return abcitypes.ResponseInfo{
 		Data:             "",
 		Version:          tmver.ABCIVersion,
@@ -90,7 +112,26 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 	}
 
 	// todo: check whether 'appHash' is equal to the original hash of the current blockchain network.
-	appHash := appState.Hash()
+	// but how to get the original hash? official web site????
+	appHash, err := appState.Hash()
+	if err != nil {
+		panic(err)
+	}
+
+	govRulesCode, err := appState.GovRules.Encode()
+	if err != nil {
+		panic(err)
+	}
+	if err = ctrler.govCtrler.ImportRules(func() []byte {
+		return govRulesCode
+	}); err != nil {
+		panic(err)
+	}
+
+	// create a new account for govRules
+	govRulesAddr := libs.ZeroBytes(crypto.AddressSize)
+	govRulesAcct := ctrler.acctCtrler.FindOrNewAccount(govRulesAddr, true)
+	govRulesAcct.SetCode(govRulesCode) // will be saved at commit
 
 	for _, validator := range chain.Validators {
 		pubKey := validator.GetPubKey()
@@ -98,7 +139,7 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 		addr := secp256k1.PubKey(pubKeyBytes).Address()
 
 		staker := ctrler.stakeCtrler.AddStakerWith(addr, pubKeyBytes)
-		stake0 := stake.NewStake(addr, types.PowerToAmount(validator.Power), 0, libs.ZeroBytes(32))
+		stake0 := stake.NewStakeWithAmount(addr, appState.GovRules.PowerToAmount(validator.Power), 0, libs.ZeroBytes(32), appState.GovRules)
 		staker.AppendStake(stake0)
 	}
 

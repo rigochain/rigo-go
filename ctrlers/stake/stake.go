@@ -4,17 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/types"
 	"math/big"
 	"sync"
 )
 
 type Stake struct {
-	Owner  types.Address `json:"owner"`
-	Power  int64         `json:"power"`
-	Amount *big.Int      `json:"amount"`
-	Reward *big.Int      `json:"reward"`
+	Owner       types.Address `json:"owner"`
+	Amount      *big.Int      `json:"amount"`
+	Power       int64         `json:"power"`
+	BlockReward *big.Int      `json:"block_reward"`
+	Reward      *big.Int      `json:"received_reward"`
 
 	StartHeight int64          `json:"start_height"`
 	LastHeight  int64          `json:"last_height"`
@@ -23,11 +23,29 @@ type Stake struct {
 	mtx sync.RWMutex
 }
 
-func NewStake(addr types.Address, amt *big.Int, height int64, txhash types.HexBytes) *Stake {
+func NewStakeWithAmount(addr types.Address, amt *big.Int, height int64, txhash types.HexBytes, rules types.IGovRules) *Stake {
+	power := rules.AmountToPower(amt)
+	blockReward := rules.PowerToReward(power)
 	return &Stake{
 		Owner:       addr,
-		Power:       gov.AmountToPower(amt),
 		Amount:      amt,
+		Power:       power,
+		BlockReward: blockReward,
+		Reward:      big.NewInt(0),
+		StartHeight: height,
+		LastHeight:  0,
+		TxHash:      txhash,
+	}
+}
+
+func NewStakeWithPower(addr types.Address, power int64, height int64, txhash types.HexBytes, rules types.IGovRules) *Stake {
+	amt := rules.PowerToAmount(power)
+	blockReward := rules.PowerToReward(power)
+	return &Stake{
+		Owner:       addr,
+		Amount:      amt,
+		Power:       power,
+		BlockReward: blockReward,
 		Reward:      big.NewInt(0),
 		StartHeight: height,
 		LastHeight:  0,
@@ -52,31 +70,37 @@ func (s *Stake) Copy() *Stake {
 	return &Stake{
 		Owner:       s.Owner,
 		Amount:      new(big.Int).Set(s.Amount),
+		Power:       s.Power,
+		BlockReward: new(big.Int).Set(s.BlockReward),
 		Reward:      new(big.Int).Set(s.Reward),
 		StartHeight: s.StartHeight,
 		LastHeight:  s.LastHeight,
 	}
 }
 
-func (s *Stake) calculatePower() int64 {
-	s.mtx.RLock()
-	defer s.mtx.RUnlock()
-
-	return types.AmountToPower(s.Amount)
-}
-
-func (s *Stake) calculateReward() *big.Int {
-	return types.PowerToReward(s.calculatePower())
-}
+//
+//func (s *Stake) calculatePower() int64 {
+//	s.mtx.RLock()
+//	defer s.mtx.RUnlock()
+//
+//	return types.AmountToPower(s.Amount)
+//}
+//
+//func (s *Stake) calculateReward() *big.Int {
+//	return types.PowerToReward(s.calculatePower())
+//}
 
 func (s *Stake) applyReward() *big.Int {
-	_rew := s.calculateReward()
-	s.Reward = new(big.Int).Add(s.Reward, _rew)
-	return _rew
+	s.Reward = new(big.Int).Add(s.Reward, s.BlockReward)
+	return s.BlockReward
 }
 
 func (s *Stake) currentReward() *big.Int {
 	return s.Reward
+}
+
+func (s *Stake) currentBlockReward() *big.Int {
+	return s.BlockReward
 }
 
 func (s *Stake) String() string {

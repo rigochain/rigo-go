@@ -56,7 +56,7 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 			return true
 		}
 
-		sumPower := staker.CalculatePower()
+		sumPower := staker.SumPower()
 		if staker.TotalPower != sumPower {
 			logger.Error("Wrong power", "TotalPower", staker.TotalPower, "Sum of powers of stakes", sumPower)
 			return true
@@ -202,7 +202,7 @@ func (ctrler *StakeCtrler) applyStaking(ctx *trxs.TrxContext) error {
 			staker = ctrler.addStaker(NewStakeSet(ctx.Tx.From, ctx.SenderPubKey))
 		}
 
-		if xerr := staker.AppendStake(NewStake(ctx.Tx.From, ctx.Tx.Amount, ctx.Height, ctx.TxHash)); xerr != nil {
+		if xerr := staker.AppendStake(NewStakeWithAmount(ctx.Tx.From, ctx.Tx.Amount, ctx.Height, ctx.TxHash)); xerr != nil {
 			// Not reachable. AppendStake() does not return error
 			ctrler.logger.Error("Not reachable", "error", xerr)
 			panic(xerr)

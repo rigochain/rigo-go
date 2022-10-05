@@ -2,8 +2,12 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
+	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/tendermint/tendermint/crypto"
 	"math/big"
 	"sort"
+	"strings"
 )
 
 const AddrSize = 20
@@ -21,6 +25,20 @@ func ToAddress(key AcctKey) Address {
 	addr := make([]byte, AddrSize)
 	copy(addr, key[:])
 	return addr
+}
+
+func Hex2Address(_hex string) (Address, error) {
+	if strings.HasPrefix(_hex, "0x") {
+		_hex = _hex[2:]
+	}
+	bzAddr, err := hex.DecodeString(_hex)
+	if err != nil {
+		return nil, xerrors.Wrap(err)
+	}
+	if len(bzAddr) != crypto.AddressSize {
+		return nil, xerrors.New("error of address length: address length should be 20 bytes")
+	}
+	return bzAddr, nil
 }
 
 type AcctKeyList []AcctKey
