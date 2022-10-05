@@ -16,12 +16,12 @@ func newStakeSet() *stake.StakeSet {
 	return stake.NewStakeSet(w0.Address(), w0.GetPubKey())
 }
 
-func newValidatorSet(n int) stake.StakeSetArray {
-	valSet := make(stake.StakeSetArray, 21)
-	for i, _ := range valSet {
-		valSet[i] = newStakeSet()
+func newValidators(n int) stake.StakeSetArray {
+	vals := make(stake.StakeSetArray, n)
+	for i, _ := range vals {
+		vals[i] = newStakeSet()
 	}
-	return valSet
+	return vals
 }
 
 func newStakesTo(sset *stake.StakeSet, n int) {
@@ -115,25 +115,28 @@ func TestReward(t *testing.T) {
 }
 
 func TestStakeSetList(t *testing.T) {
-	valSet := newValidatorSet(21)
-	for _, vset := range valSet {
+	vals := newValidators(21)
+	for _, vset := range vals {
 		newStakesTo(vset, 10000)
 	}
 
-	for i := 0; i < valSet.Len(); i++ {
-		valSet[i].ApplyReward()
+	for i := 0; i < vals.Len(); i++ {
+		vals[i].ApplyReward()
 	}
 
-	// todo: check reward
+	for i := 0; i < vals.Len(); i++ {
+		require.Equal(t, vals[i].TotalPower, vals[i].CalculatePower())
+		require.Equal(t, vals[i].TotalReward, vals[i].CalculateReward())
+	}
 }
 
 func BenchmarkApplyReward(b *testing.B) {
-	validator := newStakeSet()
-	newStakesTo(validator, 10000)
+	val0 := newStakeSet()
+	newStakesTo(val0, 10000)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rewarded := validator.ApplyReward()
+		rewarded := val0.ApplyReward()
 		require.True(b, rewarded.Sign() > 0)
 	}
 }

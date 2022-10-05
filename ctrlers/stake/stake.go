@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/types"
 	"math/big"
 	"sync"
@@ -11,7 +12,7 @@ import (
 
 type Stake struct {
 	Owner  types.Address `json:"owner"`
-	Power  int64         `json:"voting_power"`
+	Power  int64         `json:"power"`
 	Amount *big.Int      `json:"amount"`
 	Reward *big.Int      `json:"reward"`
 
@@ -25,7 +26,7 @@ type Stake struct {
 func NewStake(addr types.Address, amt *big.Int, height int64, txhash types.HexBytes) *Stake {
 	return &Stake{
 		Owner:       addr,
-		Power:       types.AmountToPower(amt),
+		Power:       gov.AmountToPower(amt),
 		Amount:      amt,
 		Reward:      big.NewInt(0),
 		StartHeight: height,
@@ -33,26 +34,6 @@ func NewStake(addr types.Address, amt *big.Int, height int64, txhash types.HexBy
 		TxHash:      txhash,
 	}
 }
-
-//func (s *Stake) IncreaseAmount(amt *big.Int) {
-//	s.mtx.Lock()
-//	defer s.mtx.Unlock()
-//
-//	s.Amount = new(big.Int).Add(s.Amount, amt)
-//	s.Power += 0 // todo: add power
-//}
-//
-//func (s *Stake) DecreaseAmount(amt *big.Int) {
-//	s.mtx.Lock()
-//	defer s.mtx.Unlock()
-//
-//	if s.Amount.Cmp(amt) < 0 {
-//		return
-//	}
-//
-//	s.Amount = new(big.Int).Sub(s.Amount, amt)
-//	s.Power -= 0 // todo: sub power
-//}
 
 func (s *Stake) Equal(o *Stake) bool {
 	s.mtx.RLock()

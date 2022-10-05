@@ -357,3 +357,35 @@ func (vs StakeSetArray) Swap(i, j int) {
 }
 
 var _ sort.Interface = (StakeSetArray)(nil)
+
+func (vs StakeSetArray) TotalAmount() *big.Int {
+	var amt *big.Int
+	for _, val := range vs {
+		amt = new(big.Int).Add(amt, val.TotalAmount)
+	}
+	return amt
+}
+
+func (vs StakeSetArray) TotalReward() *big.Int {
+	var reward *big.Int
+	for _, val := range vs {
+		reward = new(big.Int).Add(reward, val.TotalReward)
+	}
+	return reward
+}
+
+func (vs StakeSetArray) TotalFeeReward() *big.Int {
+	var fee *big.Int
+	for _, val := range vs {
+		fee = new(big.Int).Add(fee, val.FeeReward)
+	}
+	return fee
+}
+
+func (vs StakeSetArray) TotalPower() int64 {
+	power := int64(0)
+	for _, val := range vs {
+		power += val.TotalPower
+	}
+	return power
+}
