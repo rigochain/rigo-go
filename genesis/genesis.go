@@ -3,6 +3,7 @@ package genesis
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/types"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -23,13 +24,19 @@ func (gh *GenesisAssetHolder) Hash() []byte {
 
 type GenesisAppState struct {
 	AssetHolders []GenesisAssetHolder `json:"assetHolders"`
+	GovRules     *gov.GovRules        `json:"govRules"`
 }
 
 func (ga *GenesisAppState) Hash() []byte {
+	bzgr, err := ga.GovRules.Encode()
+	if err != nil {
+
+	}
 	hasher := sha256.New()
 	for _, h := range ga.AssetHolders {
 		hasher.Write(h.Hash())
 	}
+
 	return hasher.Sum(nil)
 }
 

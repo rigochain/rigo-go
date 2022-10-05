@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/kysee/arcanus/cmd/version"
 	"github.com/kysee/arcanus/ctrlers/account"
+	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/ctrlers/stake"
 	"github.com/kysee/arcanus/genesis"
 	"github.com/kysee/arcanus/libs"
@@ -29,6 +30,7 @@ type ChainCtrler struct {
 	stateDB          *StateDB
 	acctCtrler       *account.AccountCtrler
 	stakeCtrler      *stake.StakeCtrler
+	govCtrler        *gov.GovCtrler
 	trxExecutor      *TrxExecutor
 
 	logger log.Logger
@@ -49,6 +51,7 @@ func NewChainCtrler(dbDir string, logger log.Logger) *ChainCtrler {
 	if err != nil {
 		panic(err)
 	}
+
 	return &ChainCtrler{
 		stateDB:     db,
 		acctCtrler:  acctCtrler,

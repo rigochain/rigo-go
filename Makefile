@@ -54,6 +54,7 @@ endif
 pbm:
 	@echo Compile protocol messages
 	@protoc --go_out=$(GOPATH)/src -I./protos/ account.proto
+	@protoc --go_out=$(GOPATH)/src -I./protos/ govrules.proto
 	@protoc --go_out=$(GOPATH)/src -I./protos/ trx.proto
 
 build-deploy:
