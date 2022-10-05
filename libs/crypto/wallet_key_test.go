@@ -62,11 +62,18 @@ func TestLock(t *testing.T) {
 	require.Nil(t, w.PrvKey())
 	require.NotNil(t, w.PubKey())
 
-	w.Unlock([]byte("wrong password"))
+	err := w.Unlock([]byte("wrong password"))
+	require.Error(t, err)
 	require.Nil(t, w.PrvKey())
 	require.NotNil(t, w.PubKey())
 
-	w.Unlock(pass)
+	err = w.Unlock(nil)
+	require.Error(t, err)
+	require.Nil(t, w.PrvKey())
+	require.NotNil(t, w.PubKey())
+
+	err = w.Unlock(pass)
+	require.NoError(t, err)
 	require.NotNil(t, w.PrvKey())
 	require.NotNil(t, w.PubKey())
 
@@ -116,7 +123,8 @@ func TestSig2Addr(t *testing.T) {
 	pass := []byte("abcdef")
 
 	w := crypto.CreateWalletKey(pass)
-	w.Unlock(pass)
+	err := w.Unlock(pass)
+	require.NoError(t, err)
 	require.NotNil(t, w.PrvKey())
 	require.NotNil(t, w.PubKey())
 

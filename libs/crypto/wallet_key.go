@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	ethec "github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/kysee/arcanus/libs"
@@ -185,8 +186,10 @@ func (wk *WalletKey) Unlock(s []byte) error {
 			return err
 		}
 		wk.prvKey = prvKey
-	} else {
+	} else if wk.DKParams == nil {
 		wk.prvKey = append([]byte(nil), wk.CipherTextParams.Text...)
+	} else {
+		return errors.New("wrong passphrase: the passphrase can not be empty")
 	}
 	wk.pubKey = tmsecp256k1.PrivKey(wk.prvKey).PubKey().Bytes()
 
