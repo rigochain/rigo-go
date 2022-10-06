@@ -202,7 +202,7 @@ func (ctrler *StakeCtrler) applyStaking(ctx *trxs.TrxContext) error {
 			staker = ctrler.addStaker(NewStakeSet(ctx.Tx.From, ctx.SenderPubKey))
 		}
 
-		if xerr := staker.AppendStake(NewStakeWithAmount(ctx.Tx.From, ctx.Tx.Amount, ctx.Height, ctx.TxHash)); xerr != nil {
+		if xerr := staker.AppendStake(NewStakeWithAmount(ctx.Tx.From, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovRules)); xerr != nil {
 			// Not reachable. AppendStake() does not return error
 			ctrler.logger.Error("Not reachable", "error", xerr)
 			panic(xerr)

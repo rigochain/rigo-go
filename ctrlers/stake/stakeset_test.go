@@ -2,14 +2,22 @@ package stake_test
 
 import (
 	"fmt"
+	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/ctrlers/stake"
 	"github.com/kysee/arcanus/libs"
 	"github.com/kysee/arcanus/libs/client"
-	"github.com/kysee/arcanus/types"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 )
+
+var govRules = &gov.GovRules{
+	Version:        0,
+	AmountPerPower: big.NewInt(1000),
+	RewardPerPower: big.NewInt(10),
+}
+
+var MAXSTAKEAMT = govRules.MaxStakeAmount()
 
 func newStakeSet() *stake.StakeSet {
 	w0 := client.NewWallet([]byte("1"))
@@ -25,28 +33,39 @@ func newValidators(n int) stake.StakeSetArray {
 }
 
 func newStakesTo(sset *stake.StakeSet, n int) {
-	maxAmount, ok := new(big.Int).SetString(types.MAXSTAKEsau, 10)
-	if !ok {
-		panic("invalid max amount string")
-	}
 	stakes := make([]*stake.Stake, n)
 	for i, _ := range stakes {
-		stakes[i] = stake.NewStakeWithAmount(sset.Owner, libs.RandBigIntN(maxAmount), libs.RandInt63n(10_000_0000), libs.RandHexBytes(32))
+		stakes[i] = stake.NewStakeWithAmount(
+			sset.Owner,
+			libs.RandBigIntN(MAXSTAKEAMT),
+			libs.RandInt63n(10_000_0000),
+			libs.RandHexBytes(32),
+			govRules)
 	}
 	if err := sset.AppendStake(stakes...); err != nil {
 		panic(err)
 	}
 }
 
-func TestStakeSet(t *testing.T) {
+func TestNewStake(t *testing.T) {
 	w0 := client.NewWallet([]byte("1"))
 	addr0 := w0.Address()
 	stakeSet := stake.NewStakeSet(addr0, w0.GetPubKey())
 
-	s0 := stake.NewStakeWithAmount(addr0, big.NewInt(1000), 1, nil)
+	s0 := stake.NewStakeWithAmount(
+		addr0,
+		big.NewInt(1000), 1, nil,
+		govRules)
+	require.True(t, s0.Power > int64(0))
+	require.Equal(t, govRules.AmountToPower(big.NewInt(1000)), s0.Power)
+	require.True(t, s0.BlockReward.Sign() > 0)
+	require.Equal(t, govRules.PowerToReward(s0.Power), s0.BlockReward)
 	require.NoError(t, stakeSet.AppendStake(s0))
 
-	s1 := stake.NewStakeWithAmount(addr0, big.NewInt(1000), 3, nil)
+	s1 := stake.NewStakeWithAmount(
+		addr0,
+		big.NewInt(1000), 3, nil,
+		govRules)
 	require.NoError(t, stakeSet.AppendStake(s1))
 
 	require.Equal(t, big.NewInt(2000), stakeSet.TotalAmount)
@@ -125,8 +144,9 @@ func TestStakeSetList(t *testing.T) {
 	}
 
 	for i := 0; i < vals.Len(); i++ {
-		require.Equal(t, vals[i].TotalPower, vals[i].CalculatePower())
-		require.Equal(t, vals[i].TotalReward, vals[i].CalculateReward())
+		require.Equal(t, vals[i].TotalAmount, vals[i].SumAmount())
+		require.Equal(t, vals[i].TotalPower, vals[i].SumPower())
+		require.Equal(t, vals[i].TotalReward, vals[i].SumReward())
 	}
 }
 

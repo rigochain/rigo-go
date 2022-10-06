@@ -2,8 +2,8 @@ package genesis
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
-	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/types"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -22,21 +22,40 @@ func (gh *GenesisAssetHolder) Hash() []byte {
 	return hasher.Sum(nil)
 }
 
+type GenesisGovRules struct {
+	Version        uint64 `json:"version"`
+	AmountPerPower string `json:"amountPerPower"`
+	RewardPerPower string `json:"rewardPerPower"`
+}
+
+func DefaultGenesisGovRules() *GenesisGovRules {
+	return &GenesisGovRules{
+		Version:        0,
+		AmountPerPower: "1000000000000000000", // 1_000000000000000000
+		RewardPerPower: "1000000000",
+	}
+}
+
+func (gr *GenesisGovRules) Hash() []byte {
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, gr.Version)
+
+	hasher := sha256.New()
+	hasher.Write(buf)
+	hasher.Write([]byte(gr.AmountPerPower))
+	hasher.Write([]byte(gr.RewardPerPower))
+	return hasher.Sum(nil)
+}
+
 type GenesisAppState struct {
-	AssetHolders []GenesisAssetHolder `json:"assetHolders"`
-	GovRules     *gov.GovRules        `json:"govRules"`
+	AssetHolders []*GenesisAssetHolder `json:"assetHolders"`
+	GovRules     *GenesisGovRules      `json:"govRules"`
 }
 
 func (ga *GenesisAppState) Hash() ([]byte, error) {
 	hasher := sha256.New()
 
-	bzgr, err := ga.GovRules.Encode()
-	if err != nil {
-		return nil, err
-	} else {
-		hasher.Write(bzgr)
-	}
-
+	hasher.Write(ga.GovRules.Hash())
 	for _, h := range ga.AssetHolders {
 		hasher.Write(h.Hash())
 	}
@@ -44,9 +63,10 @@ func (ga *GenesisAppState) Hash() ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []GenesisAssetHolder) (*tmtypes.GenesisDoc, error) {
+func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govRules *GenesisGovRules) (*tmtypes.GenesisDoc, error) {
 	appState := GenesisAppState{
 		AssetHolders: assetHolders,
+		GovRules:     govRules,
 	}
 	appStateJsonBlob, err := json.Marshal(appState)
 	if err != nil {

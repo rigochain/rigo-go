@@ -8,12 +8,14 @@ import (
 )
 
 type GovCtrler struct {
+	// to save proposal, voting actions ...
 	govDB  db.DB
 	rules  types.IGovRules
 	logger log.Logger
 }
 
 func NewGovCtrler(dbDir string, logger log.Logger) (*GovCtrler, error) {
+	// todo: use govDB to save governance rules proposal, voting actions, etc.
 	govDB, err := db.NewDB("gov", "goleveldb", dbDir)
 	if err != nil {
 		return nil, err

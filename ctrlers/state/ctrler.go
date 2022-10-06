@@ -84,7 +84,7 @@ func (ctrler *ChainCtrler) Info(info abcitypes.RequestInfo) abcitypes.ResponseIn
 
 	lastBlockHeight := ctrler.stateDB.LastBlockHeight()
 	if lastBlockHeight > 0 {
-		_ = ctrler.govCtrler.ImportRules(func() []byte {
+		err := ctrler.govCtrler.ImportRules(func() []byte {
 			_acct := ctrler.acctCtrler.FindAccount(libs.ZeroBytes(crypto.AddressSize), false)
 			if _acct == nil {
 				panic(errors.New("the account of governance rules is not found"))
@@ -93,13 +93,16 @@ func (ctrler *ChainCtrler) Info(info abcitypes.RequestInfo) abcitypes.ResponseIn
 			}
 			return _acct.GetCode()
 		})
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return abcitypes.ResponseInfo{
 		Data:             "",
 		Version:          tmver.ABCIVersion,
 		AppVersion:       version.Uint64(),
-		LastBlockHeight:  ctrler.stateDB.LastBlockHeight(),
+		LastBlockHeight:  lastBlockHeight,
 		LastBlockAppHash: ctrler.stateDB.LastBlockAppHash(),
 	}
 }
@@ -118,20 +121,27 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 		panic(err)
 	}
 
-	govRulesCode, err := appState.GovRules.Encode()
-	if err != nil {
-		panic(err)
-	}
 	if err = ctrler.govCtrler.ImportRules(func() []byte {
-		return govRulesCode
+		amtPower, _ := new(big.Int).SetString(appState.GovRules.AmountPerPower, 10)
+		rwdPower, _ := new(big.Int).SetString(appState.GovRules.RewardPerPower, 10)
+		govRules := &gov.GovRules{
+			Version:        appState.GovRules.Version,
+			AmountPerPower: amtPower,
+			RewardPerPower: rwdPower,
+		}
+
+		if govRulesCode, err := govRules.Encode(); err != nil {
+			panic(err)
+		} else {
+			// create account for gov rules and save it
+			govRulesAddr := libs.ZeroBytes(crypto.AddressSize)
+			govRulesAcct := ctrler.acctCtrler.FindOrNewAccount(govRulesAddr, true)
+			govRulesAcct.SetCode(govRulesCode) // will be saved at commit
+			return govRulesCode
+		}
 	}); err != nil {
 		panic(err)
 	}
-
-	// create a new account for govRules
-	govRulesAddr := libs.ZeroBytes(crypto.AddressSize)
-	govRulesAcct := ctrler.acctCtrler.FindOrNewAccount(govRulesAddr, true)
-	govRulesAcct.SetCode(govRulesCode) // will be saved at commit
 
 	for _, validator := range chain.Validators {
 		pubKey := validator.GetPubKey()
@@ -139,7 +149,7 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 		addr := secp256k1.PubKey(pubKeyBytes).Address()
 
 		staker := ctrler.stakeCtrler.AddStakerWith(addr, pubKeyBytes)
-		stake0 := stake.NewStakeWithAmount(addr, appState.GovRules.PowerToAmount(validator.Power), 0, libs.ZeroBytes(32), appState.GovRules)
+		stake0 := stake.NewStakeWithPower(addr, validator.Power, 0, libs.ZeroBytes(32), ctrler.govCtrler.GetRules())
 		staker.AppendStake(stake0)
 	}
 
@@ -178,7 +188,8 @@ func (ctrler *ChainCtrler) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respo
 		if txctx, err := trxs.NewTrxContext(req.Tx,
 			ctrler.stateDB.LastBlockHeight()+int64(1),
 			false,
-			ctrler.acctCtrler); err != nil {
+			ctrler.acctCtrler,
+			ctrler.govCtrler.GetRules()); err != nil {
 
 			xerr, ok := err.(xerrors.XError)
 			if !ok {
@@ -229,7 +240,12 @@ func (ctrler *ChainCtrler) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes
 func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	response := abcitypes.ResponseDeliverTx{}
 
-	if txctx, err := trxs.NewTrxContext(req.Tx, ctrler.stateDB.LastBlockHeight()+int64(1), true, ctrler.acctCtrler); err != nil {
+	if txctx, err := trxs.NewTrxContext(req.Tx,
+		ctrler.stateDB.LastBlockHeight()+int64(1),
+		true,
+		ctrler.acctCtrler,
+		ctrler.govCtrler.GetRules()); err != nil {
+
 		xerr, ok := err.(xerrors.XError)
 		if !ok {
 			xerr = xerrors.ErrDeliverTx.Wrap(err)

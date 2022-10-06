@@ -156,12 +156,12 @@ func initFilesWithConfig(config *cfg.Config) error {
 			}}
 
 			walkeys = append(walkeys, pvWalKey)
-			holders := make([]genesis.GenesisAssetHolder, len(walkeys))
+			holders := make([]*genesis.GenesisAssetHolder, len(walkeys))
 			for i, wk := range walkeys {
 				if err := wk.Unlock(s); err != nil {
 					return err
 				}
-				holders[i] = genesis.GenesisAssetHolder{
+				holders[i] = &genesis.GenesisAssetHolder{
 					Address: wk.Address,
 					Balance: "100000000000000000000000000", // 100_000_000_000000000000000000
 				}
@@ -172,7 +172,8 @@ func initFilesWithConfig(config *cfg.Config) error {
 				}
 			}()
 
-			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders)
+			govRules := genesis.DefaultGenesisGovRules()
+			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, govRules)
 			if err != nil {
 				return err
 			}

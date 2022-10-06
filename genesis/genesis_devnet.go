@@ -5,10 +5,10 @@ import (
 )
 
 func DevnetGenesisDoc() (*tmtypes.GenesisDoc, error) {
-	return tmtypes.GenesisDocFromJSON([]byte(jsonBlob))
+	return tmtypes.GenesisDocFromJSON(jsonBlobDevnetGenesis)
 }
 
-var jsonBlob = `{
+var jsonBlobDevnetGenesis = []byte(`{
   "genesis_time": "2021-08-06T08:29:24.827484Z",
   "chain_id": "DEVNET-TY",
   "initial_height": "0",
@@ -84,45 +84,50 @@ var jsonBlob = `{
     "assetHolders": [
       {
         "address": "B9ADC66777A1900A8F5CF22F07E7641CC3C3CF48",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       },
       {
         "address": "82F4C6D5498A2CA1E194E3C5AD9AD1EEEC9E7AF0",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       },
       {
         "address": "51398BA5613C62D2566B523C6E49D94B88F55D54",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       },
       {
         "address": "0EC62329BE52FDB338448C53DDB082A2E0AAF864",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       },
       {
         "address": "D8AEAC7E12BD6488036505262FE71767D3996792",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       },
       {
         "address": "22E94B8CD68867197BBEC78BD5F290E77EB0955E",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       },
       {
         "address": "99F954D4EA8DB0CFB7932404E004C7C5DE35977F",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       },
       {
         "address": "2E8F04F3F5CE9C8EB60586043D16F6D542539A47",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       },
       {
         "address": "CC2A6D5B73D438A282C6C811C5E6837DE40A3CB1",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       },
       {
         "address": "4979E92CFF082C6ADAE085CA51818B70D7754B21",
-        "balance": "100000000000000"
+        "balance": "1000000000000000000000000000"
       }
-    ]
+    ], 
+	"govRules": {
+		"version": "0",
+		"amountPerPower": "1000000000000000000",
+		"rewardPerPower": "1000000000"
+	}
   }
 }
-`
+`)

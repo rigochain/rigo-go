@@ -6,13 +6,30 @@ import (
 	"fmt"
 	"github.com/kysee/arcanus/types"
 	"math/big"
+	"sort"
 	"sync"
 )
+
+type stakeList []*Stake
+
+func (slst stakeList) Len() int {
+	return len(slst)
+}
+
+func (slst stakeList) Less(i, j int) bool {
+	return slst[i].StartHeight < slst[j].StartHeight
+}
+
+func (slst stakeList) Swap(i, j int) {
+	slst[i], slst[j] = slst[j], slst[i]
+}
+
+var _ sort.Interface = (stakeList)(nil)
 
 type StakeSet struct {
 	Owner       types.Address  `json:"owner"`
 	PubKey      types.HexBytes `json:"pub_key"`
-	Stakes      []*Stake       `json:"stakes"` // ordered by block height
+	Stakes      stakeList      `json:"stakes"` // ordered by block height
 	TotalAmount *big.Int       `json:"total_amount"`
 	TotalPower  int64          `json:"total_power"`
 	TotalReward *big.Int       `json:"total_reward"`
@@ -51,6 +68,8 @@ func (sset *StakeSet) AppendStake(stakes ...*Stake) error {
 
 func (sset *StakeSet) appendStake(stakes ...*Stake) error {
 	sset.Stakes = append(sset.Stakes, stakes...)
+	sort.Sort(sset.Stakes)
+
 	for _, s := range stakes {
 		sset.TotalPower += s.Power
 		sset.TotalAmount = new(big.Int).Add(sset.TotalAmount, s.Amount)

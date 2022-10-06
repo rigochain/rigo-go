@@ -23,10 +23,12 @@ type TrxContext struct {
 	Receiver     types.IAccount
 	NeedAmt      *big.Int
 	GasUsed      *big.Int
-	Error        xerrors.XError
+
+	GovRules types.IGovRules
+	Error    xerrors.XError
 }
 
-func NewTrxContext(txbz []byte, height int64, exec bool, finder types.IAccountFinder) (*TrxContext, error) {
+func NewTrxContext(txbz []byte, height int64, exec bool, acctFinder types.IAccountFinder, govRules types.IGovRules) (*TrxContext, error) {
 	tx := &Trx{}
 	if xerr := tx.Decode(txbz); xerr != nil {
 		return nil, xerr
@@ -37,7 +39,7 @@ func NewTrxContext(txbz []byte, height int64, exec bool, finder types.IAccountFi
 	}
 
 	// find sender account
-	acct := finder.FindAccount(tx.From, exec)
+	acct := acctFinder.FindAccount(tx.From, exec)
 	if acct == nil {
 		return nil, xerrors.ErrNotFoundAccount
 	}
@@ -80,5 +82,6 @@ func NewTrxContext(txbz []byte, height int64, exec bool, finder types.IAccountFi
 		SenderPubKey: pubBytes,
 		NeedAmt:      needFund,
 		GasUsed:      big.NewInt(0),
+		GovRules:     govRules,
 	}, nil
 }

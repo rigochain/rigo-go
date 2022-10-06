@@ -3,7 +3,7 @@ package types;
 option go_package = "github.com/kysee/arcanus/ctrlers/gov";
 
 message GovRulesProto {
-  int64 version = 1;
+  uint64 version = 1;
   bytes _amount_per_power = 2;
   bytes _reward_per_power = 3;
 }

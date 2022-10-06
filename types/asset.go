@@ -19,13 +19,6 @@ const (
 	MXCO                 = "1000000000000000000000000"       // 10^24 sau
 	GXCO                 = "1000000000000000000000000000"    // 10^27 sau
 	TXCO                 = "1000000000000000000000000000000" // 10^30 sau
-
-	/*
-	 * MAXSTAKEsau means the max of amount which could be deposited.
-	 * When the type of voting power is `int64`and VP:XCO = 1:1,
-	 * the MAXSTAKEsau becomes `9223372036854775807 000000000000000000` (~= 922경 XCO)
-	 */
-	MAXSTAKEsau = "9223372036854775807000000000000000000" // ~= 922경 XCO
 )
 
 var (
