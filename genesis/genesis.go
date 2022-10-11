@@ -3,8 +3,8 @@ package genesis
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/json"
 	"github.com/kysee/arcanus/types"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -68,7 +68,7 @@ func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetH
 		AssetHolders: assetHolders,
 		GovRules:     govRules,
 	}
-	appStateJsonBlob, err := json.Marshal(appState)
+	appStateJsonBlob, err := tmjson.Marshal(appState)
 	if err != nil {
 		return nil, err
 	}

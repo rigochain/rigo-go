@@ -5,7 +5,7 @@ import (
 	"github.com/kysee/arcanus/libs"
 	"github.com/stretchr/testify/require"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
-	"github.com/tendermint/tendermint/libs/json"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"math/rand"
 	"testing"
@@ -34,18 +34,18 @@ func TestNewGenesis(t *testing.T) {
 	genDoc, err := NewGenesisDoc("TestChainID", validators, holders, govRules)
 	require.NoError(t, err)
 
-	bzJson, err := json.MarshalIndent(genDoc, "", "   ")
+	bzJson, err := tmjson.MarshalIndent(genDoc, "", "   ")
 	require.NoError(t, err)
 	fmt.Println(string(bzJson))
 }
 
-func TestDevnetGensisUnmarshal(t *testing.T) {
+func TestDevnetGenesisUnmarshal(t *testing.T) {
 	genDoc := &tmtypes.GenesisDoc{}
-	err := json.Unmarshal(jsonBlobDevnetGenesis, genDoc)
+	err := tmjson.Unmarshal(jsonBlobDevnetGenesis, genDoc)
 	require.NoError(t, err)
 
 	appState := &GenesisAppState{}
-	err = json.Unmarshal(genDoc.AppState, appState)
+	err = tmjson.Unmarshal(genDoc.AppState, appState)
 	require.NoError(t, err)
 
 	require.Equal(t, uint64(0), appState.GovRules.Version)

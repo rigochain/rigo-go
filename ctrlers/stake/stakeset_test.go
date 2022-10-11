@@ -47,7 +47,7 @@ func newStakesTo(sset *stake.StakeSet, n int) {
 	}
 }
 
-func TestNewStake(t *testing.T) {
+func TestNewStakeSet(t *testing.T) {
 	w0 := client.NewWallet([]byte("1"))
 	addr0 := w0.Address()
 	stakeSet := stake.NewStakeSet(addr0, w0.GetPubKey())
@@ -56,10 +56,6 @@ func TestNewStake(t *testing.T) {
 		addr0,
 		big.NewInt(1000), 1, nil,
 		govRules)
-	require.True(t, s0.Power > int64(0))
-	require.Equal(t, govRules.AmountToPower(big.NewInt(1000)), s0.Power)
-	require.True(t, s0.BlockReward.Sign() > 0)
-	require.Equal(t, govRules.PowerToReward(s0.Power), s0.BlockReward)
 	require.NoError(t, stakeSet.AppendStake(s0))
 
 	s1 := stake.NewStakeWithAmount(
@@ -101,7 +97,9 @@ func TestReward(t *testing.T) {
 	validator := newStakeSet()
 	newStakesTo(validator, int(libs.RandInt63n(10000)))
 
+	// first reward
 	reward0 := validator.ApplyReward()
+
 	sumReward0 := big.NewInt(0)
 	for i := 0; i < validator.StakesLen(); i++ {
 		s := validator.GetStake(i)
@@ -112,8 +110,11 @@ func TestReward(t *testing.T) {
 
 	require.Equal(t, reward0, validator.TotalReward)
 	require.Equal(t, sumReward0, validator.TotalReward)
+	require.Equal(t, validator.TotalReward, validator.SumReward())
 
+	// second reward
 	reward1 := validator.ApplyReward()
+
 	sumReward1 := big.NewInt(0)
 	for i := 0; i < validator.StakesLen(); i++ {
 		s := validator.GetStake(i)
@@ -122,15 +123,15 @@ func TestReward(t *testing.T) {
 		sumReward1 = new(big.Int).Add(sumReward1, s.Reward)
 	}
 	require.Equal(t, reward0, reward1)
-	require.Equal(t, reward1.Mul(reward0, big.NewInt(2)), validator.TotalReward)
+	require.Equal(t, new(big.Int).Add(reward0, reward1), validator.TotalReward)
 	require.Equal(t, sumReward1, validator.TotalReward)
+	require.Equal(t, sumReward1, validator.SumReward())
 
 	require.True(t, reward0.Sign() > 0)
 	require.True(t, reward1.Sign() > 0)
 	require.True(t, sumReward0.Sign() > 0)
 	require.True(t, sumReward1.Sign() > 0)
 	require.True(t, validator.TotalReward.Sign() > 0)
-
 }
 
 func TestStakeSetList(t *testing.T) {
