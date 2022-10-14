@@ -78,7 +78,7 @@ func (tx *Trx) TypeString() string {
 func (tx *Trx) Decode(bz []byte) error {
 	pm := TrxProto{}
 	if err := proto.Unmarshal(bz, &pm); err != nil {
-		return xerrors.Wrap(err)
+		return xerrors.NewFrom(err)
 	} else if err := tx.fromProto(&pm); err != nil {
 		return err
 	}
@@ -89,16 +89,22 @@ func (tx *Trx) Encode() ([]byte, error) {
 	if pm, err := tx.toProto(); err != nil {
 		return nil, err
 	} else if bz, err := proto.Marshal(pm); err != nil {
-		return nil, xerrors.Wrap(err)
+		return nil, xerrors.NewFrom(err)
 	} else {
 		return bz, nil
 	}
 }
 
 func (tx *Trx) fromProto(txProto *TrxProto) error {
+	var payload ITrxPayload
 	switch txProto.Type {
-	case TRX_TRANSFER, TRX_STAKING, TRX_UNSTAKING:
+	case TRX_TRANSFER, TRX_STAKING:
 		// there is no payload!!!
+	case TRX_UNSTAKING:
+		payload = &TrxPayloadUnstaking{}
+		if err := payload.Decode(txProto.XPayload); err != nil {
+			return err
+		}
 	case TRX_EXECUTE:
 		return xerrors.New("not supported payload type")
 	default:
@@ -113,19 +119,19 @@ func (tx *Trx) fromProto(txProto *TrxProto) error {
 	tx.Amount = new(big.Int).SetBytes(txProto.XAmount)
 	tx.Gas = new(big.Int).SetBytes(txProto.XGas)
 	tx.Type = txProto.Type
-	tx.Payload = nil
+	tx.Payload = payload
 	tx.Sig = txProto.Sig
 	return nil
 }
 
 func (tx *Trx) toProto() (*TrxProto, error) {
-	switch tx.GetType() {
-	case TRX_TRANSFER, TRX_STAKING, TRX_UNSTAKING:
-		// there is no payload!!!
-	case TRX_EXECUTE:
-		return nil, xerrors.ErrInvalidTrxPayloadType
-	default:
-		return nil, xerrors.ErrInvalidTrxPayloadType
+	var payload []byte
+	if tx.Payload != nil {
+		if bz, err := tx.Payload.Encode(); err != nil {
+			return nil, err
+		} else {
+			payload = bz
+		}
 	}
 	return &TrxProto{
 		Version:  tx.Version,
@@ -136,7 +142,7 @@ func (tx *Trx) toProto() (*TrxProto, error) {
 		XAmount:  tx.Amount.Bytes(),
 		XGas:     tx.Gas.Bytes(),
 		Type:     tx.Type,
-		XPayload: nil,
+		XPayload: payload,
 		Sig:      tx.Sig,
 	}, nil
 }

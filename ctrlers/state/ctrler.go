@@ -10,11 +10,11 @@ import (
 	"github.com/kysee/arcanus/ctrlers/stake"
 	"github.com/kysee/arcanus/genesis"
 	"github.com/kysee/arcanus/libs"
+	"github.com/kysee/arcanus/libs/crypto"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
+	tmcrypto "github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	tmver "github.com/tendermint/tendermint/version"
@@ -44,17 +44,17 @@ func NewChainCtrler(dbDir string, logger log.Logger) *ChainCtrler {
 		panic(err)
 	}
 
+	govCtrler, err := gov.NewGovCtrler(dbDir, logger)
+	if err != nil {
+		panic(err)
+	}
+
 	acctCtrler, err := account.NewAccountCtrler(dbDir, logger)
 	if err != nil {
 		panic(err)
 	}
 
 	stakeCtrler, err := stake.NewStakeCtrler(dbDir, logger)
-	if err != nil {
-		panic(err)
-	}
-
-	govCtrler, err := gov.NewGovCtrler(dbDir, logger)
 	if err != nil {
 		panic(err)
 	}
@@ -85,7 +85,7 @@ func (ctrler *ChainCtrler) Info(info abcitypes.RequestInfo) abcitypes.ResponseIn
 	lastBlockHeight := ctrler.stateDB.LastBlockHeight()
 	if lastBlockHeight > 0 {
 		err := ctrler.govCtrler.ImportRules(func() []byte {
-			_acct := ctrler.acctCtrler.FindAccount(libs.ZeroBytes(crypto.AddressSize), false)
+			_acct := ctrler.acctCtrler.FindAccount(libs.ZeroBytes(tmcrypto.AddressSize), false)
 			if _acct == nil {
 				panic(errors.New("the account of governance rules is not found"))
 			} else if len(_acct.GetCode()) == 0 {
@@ -134,7 +134,7 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 			panic(err)
 		} else {
 			// create account for gov rules and save it
-			govRulesAddr := libs.ZeroBytes(crypto.AddressSize)
+			govRulesAddr := libs.ZeroBytes(tmcrypto.AddressSize)
 			govRulesAcct := ctrler.acctCtrler.FindOrNewAccount(govRulesAddr, true)
 			govRulesAcct.SetCode(govRulesCode) // will be saved at commit
 			return govRulesCode
@@ -146,10 +146,12 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 	for _, validator := range chain.Validators {
 		pubKey := validator.GetPubKey()
 		pubKeyBytes := pubKey.GetSecp256K1()
-		addr := secp256k1.PubKey(pubKeyBytes).Address()
-
+		addr, err := crypto.PubBytes2Addr(pubKeyBytes)
+		if err != nil {
+			panic(err)
+		}
 		staker := ctrler.stakeCtrler.AddStakerWith(addr, pubKeyBytes)
-		stake0 := stake.NewStakeWithPower(addr, validator.Power, 0, libs.ZeroBytes(32), ctrler.govCtrler.GetRules())
+		stake0 := stake.NewStakeWithPower(staker.Owner, validator.Power, 0, libs.ZeroBytes(32), ctrler.govCtrler.GetRules())
 		staker.AppendStake(stake0)
 	}
 
@@ -294,7 +296,7 @@ func (ctrler *ChainCtrler) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Res
 		ctrler.stakeCtrler.ApplyReward(lastBlockGasInfo.Owner, lastBlockGasInfo.Gas)
 	}
 
-	updatedValidators := ctrler.stakeCtrler.UpdateValidators()
+	updatedValidators := ctrler.stakeCtrler.UpdateValidators(ctrler.govCtrler.GetRules())
 
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates: updatedValidators,

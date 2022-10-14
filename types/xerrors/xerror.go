@@ -18,6 +18,7 @@ const (
 	ErrCodeInvalidTrx
 	ErrCodeNotFoundTx
 	ErrCodeNotFoundStaker
+	ErrCodeNotFoundStake
 )
 
 type xerr2 error
@@ -30,16 +31,16 @@ const (
 )
 
 var (
-	ErrCheckTx    = WithCode(ErrCodeCheckTx, "CheckTx failed")
-	ErrBeginBlock = WithCode(ErrCodeBeginBlock, "BeginBlock failed")
-	ErrDeliverTx  = WithCode(ErrCodeDeliverTx, "DeliverTx failed")
-	ErrEndBlock   = WithCode(ErrCodeEndBlock, "EndBlock failed")
-	ErrCommit     = WithCode(ErrCodeCommit, "Commit failed")
-	ErrQuery      = WithCode(ErrCodeQuery, "query failed")
+	ErrCheckTx    = NewWith(ErrCodeCheckTx, "CheckTx failed")
+	ErrBeginBlock = NewWith(ErrCodeBeginBlock, "BeginBlock failed")
+	ErrDeliverTx  = NewWith(ErrCodeDeliverTx, "DeliverTx failed")
+	ErrEndBlock   = NewWith(ErrCodeEndBlock, "EndBlock failed")
+	ErrCommit     = NewWith(ErrCodeCommit, "Commit failed")
+	ErrQuery      = NewWith(ErrCodeQuery, "query failed")
 
-	ErrNotFoundAccount       = WithCode(ErrCodeNotFoundAccount, "not found account")
-	ErrInvalidAccountType    = WithCode(ErrCodeInvalidAccountType, "invalid account type")
-	ErrInvalidTrx            = WithCode(ErrCodeInvalidTrx, "invalid transaction")
+	ErrNotFoundAccount       = NewWith(ErrCodeNotFoundAccount, "not found account")
+	ErrInvalidAccountType    = NewWith(ErrCodeInvalidAccountType, "invalid account type")
+	ErrInvalidTrx            = NewWith(ErrCodeInvalidTrx, "invalid transaction")
 	ErrNegGas                = ErrInvalidTrx.Wrap(errors.New("negative gas"))
 	ErrInvalidNonce          = ErrInvalidTrx.Wrap(errors.New("invalid nonce"))
 	ErrNegAmount             = ErrInvalidTrx.Wrap(errors.New("negative amount"))
@@ -47,11 +48,12 @@ var (
 	ErrInvalidTrxType        = ErrInvalidTrx.Wrap(errors.New("wrong transaction type"))
 	ErrInvalidTrxPayloadType = ErrInvalidTrx.Wrap(errors.New("wrong transaction payload type"))
 	ErrInvalidTrxSig         = ErrInvalidTrx.With(errors.New("invalid signature"))
-	ErrNotFoundTx            = WithCode(ErrCodeNotFoundTx, "not found tx")
-	ErrNotFoundStaker        = WithCode(ErrCodeNotFoundStaker, "not found staker")
+	ErrNotFoundTx            = NewWith(ErrCodeNotFoundTx, "not found tx")
+	ErrNotFoundStaker        = NewWith(ErrCodeNotFoundStaker, "not found staker")
+	ErrNotFoundStake         = NewWith(ErrCodeNotFoundStake, "not found stake")
 
-	ErrInvalidQueryCmd    = WithCode(ErrCodeInvalidQueryCmd, "invalid query command")
-	ErrInvalidQueryParams = WithCode(ErrCodeInvalidQueryParams, "invalid query parameters")
+	ErrInvalidQueryCmd    = NewWith(ErrCodeInvalidQueryCmd, "invalid query command")
+	ErrInvalidQueryParams = NewWith(ErrCodeInvalidQueryParams, "invalid query parameters")
 )
 
 type XError interface {
@@ -76,14 +78,14 @@ func New(m string) XError {
 	}
 }
 
-func WithCode(code uint32, msg string) XError {
+func NewWith(code uint32, msg string) XError {
 	return &xerr{
 		code: code,
 		msg:  msg,
 	}
 }
 
-func Wrap(err error) XError {
+func NewFrom(err error) XError {
 	return &xerr{
 		code: ErrCodeGeneric,
 		msg:  err.Error(),

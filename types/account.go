@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/tendermint/tendermint/crypto"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"math/big"
 	"sort"
 	"strings"
@@ -15,30 +16,41 @@ const (
 	ACCT_COMMON_TYPE int16 = 1 + iota
 )
 
+type Address = tmbytes.HexBytes
+
 func ToAcctKey(addr Address) AcctKey {
 	var key AcctKey
 	copy(key[:], addr[:AddrSize])
 	return key
 }
 
-func ToAddress(key AcctKey) Address {
-	addr := make([]byte, AddrSize)
-	copy(addr, key[:])
-	return addr
-}
-
-func Hex2Address(_hex string) (Address, error) {
+func AddressFromHex(_hex string) (Address, error) {
 	if strings.HasPrefix(_hex, "0x") {
 		_hex = _hex[2:]
 	}
 	bzAddr, err := hex.DecodeString(_hex)
 	if err != nil {
-		return nil, xerrors.Wrap(err)
+		return nil, xerrors.NewFrom(err)
 	}
 	if len(bzAddr) != crypto.AddressSize {
 		return nil, xerrors.New("error of address length: address length should be 20 bytes")
 	}
 	return bzAddr, nil
+}
+
+type AcctKey [AddrSize]byte
+
+// MarshalText() is needed to use AcctKey as key of map
+
+func (ak AcctKey) MarshalText() ([]byte, error) {
+	s := hex.EncodeToString(ak[:])
+	return []byte(s), nil
+}
+
+func (ak AcctKey) Address() Address {
+	addr := make([]byte, AddrSize)
+	copy(addr, ak[:])
+	return addr
 }
 
 type AcctKeyList []AcctKey

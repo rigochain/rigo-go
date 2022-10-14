@@ -24,8 +24,9 @@ type TrxContext struct {
 	NeedAmt      *big.Int
 	GasUsed      *big.Int
 
-	GovRules types.IGovRules
-	Error    xerrors.XError
+	GovRules      types.IGovRules
+	AccountFinder types.IAccountFinder
+	Error         xerrors.XError
 }
 
 func NewTrxContext(txbz []byte, height int64, exec bool, acctFinder types.IAccountFinder, govRules types.IGovRules) (*TrxContext, error) {
@@ -44,12 +45,11 @@ func NewTrxContext(txbz []byte, height int64, exec bool, acctFinder types.IAccou
 		return nil, xerrors.ErrNotFoundAccount
 	}
 
-	// todo: check sender account nonce
-	// To test easily, do not check nonce.
-	//// check sender account nonce
-	//if xerr := acct.CheckNonce(tx.Nonce); xerr != nil {
-	//	return nil, xerr
-	//}
+	// check sender account nonce
+	if xerr := acct.CheckNonce(tx.Nonce); xerr != nil {
+		return nil, xerr
+	}
+	acct.AddNonce()
 
 	// check sender account balance
 	needFund := new(big.Int).Add(tx.Amount, tx.Gas)
@@ -64,7 +64,7 @@ func NewTrxContext(txbz []byte, height int64, exec bool, acctFinder types.IAccou
 		if _txbz, err := tx.Encode(); err != nil {
 			return nil, xerrors.ErrInvalidTrx
 		} else if _addr, _pub, err := crypto.Sig2Addr(_txbz, sig); err != nil {
-			return nil, xerrors.Wrap(err)
+			return nil, xerrors.NewFrom(err)
 		} else if bytes.Compare(_addr, tx.From) != 0 {
 			return nil, xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, _addr))
 		} else {
@@ -74,14 +74,15 @@ func NewTrxContext(txbz []byte, height int64, exec bool, acctFinder types.IAccou
 	}
 
 	return &TrxContext{
-		Tx:           tx,
-		TxHash:       tmcrypto.Sha256(txbz),
-		Height:       height,
-		Exec:         exec,
-		Sender:       acct,
-		SenderPubKey: pubBytes,
-		NeedAmt:      needFund,
-		GasUsed:      big.NewInt(0),
-		GovRules:     govRules,
+		Tx:            tx,
+		TxHash:        tmcrypto.Sha256(txbz),
+		Height:        height,
+		Exec:          exec,
+		Sender:        acct,
+		SenderPubKey:  pubBytes,
+		NeedAmt:       needFund,
+		GasUsed:       big.NewInt(0),
+		AccountFinder: acctFinder,
+		GovRules:      govRules,
 	}, nil
 }

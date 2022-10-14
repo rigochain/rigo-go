@@ -3,6 +3,7 @@ package genesis
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -23,22 +24,27 @@ func (gh *GenesisAssetHolder) Hash() []byte {
 }
 
 type GenesisGovRules struct {
-	Version        uint64 `json:"version"`
-	AmountPerPower string `json:"amountPerPower"`
-	RewardPerPower string `json:"rewardPerPower"`
+	Version           int32  `json:"version"`
+	MaxValidatorCnt   int32  `json:"maxValidatorCnt"`
+	RewardDelayBlocks int64  `json:"rewardDelayBlocks"`
+	AmountPerPower    string `json:"amountPerPower"`
+	RewardPerPower    string `json:"rewardPerPower"`
 }
 
 func DefaultGenesisGovRules() *GenesisGovRules {
+	gr := gov.DefaultGovRules()
 	return &GenesisGovRules{
-		Version:        0,
-		AmountPerPower: "1000000000000000000", // 1_000000000000000000
-		RewardPerPower: "1000000000",
+		Version:           gr.Version,
+		MaxValidatorCnt:   gr.MaxValidatorCnt,
+		RewardDelayBlocks: gr.RewardDelayBlocks,
+		AmountPerPower:    gr.AmountPerPower.String(),
+		RewardPerPower:    gr.RewardPerPower.String(),
 	}
 }
 
 func (gr *GenesisGovRules) Hash() []byte {
 	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, gr.Version)
+	binary.BigEndian.PutUint32(buf, uint32(gr.Version))
 
 	hasher := sha256.New()
 	hasher.Write(buf)

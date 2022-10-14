@@ -1,6 +1,7 @@
 package account_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/kysee/arcanus/ctrlers/account"
 	"github.com/kysee/arcanus/libs"
@@ -18,6 +19,27 @@ var (
 	addr0 = libs.RandAddress()
 	dbDir = filepath.Join(os.TempDir(), "account-ctrler-test")
 )
+
+func TestAccountMapMarshal(t *testing.T) {
+	addrs := make([]types.Address, 10)
+	for i, _ := range addrs {
+		addrs[i] = libs.RandAddress()
+	}
+
+	accts := &struct {
+		Map1 map[types.AcctKey]*account.Account `json:"map1"`
+	}{
+		Map1: make(map[types.AcctKey]*account.Account),
+	}
+	for _, addr := range addrs {
+		accts.Map1[types.ToAcctKey(addr)] = &account.Account{}
+	}
+
+	_, err := json.Marshal(accts)
+	require.NoError(t, err)
+
+	// how to check that the key is ordered ???
+}
 
 func TestAccountCtrler_Find0(t *testing.T) {
 	os.RemoveAll(dbDir)

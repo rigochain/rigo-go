@@ -118,17 +118,17 @@ type SFilePVLastSignState struct {
 func (lss *SFilePVLastSignState) CheckHRS(height int64, round int32, step int8) (bool, error) {
 
 	if lss.Height > height {
-		return false, xerrors.Wrap(fmt.Errorf("height regression. Got %v, last height %v", height, lss.Height))
+		return false, xerrors.NewFrom(fmt.Errorf("height regression. Got %v, last height %v", height, lss.Height))
 	}
 
 	if lss.Height == height {
 		if lss.Round > round {
-			return false, xerrors.Wrap(fmt.Errorf("round regression at height %v. Got %v, last round %v", height, round, lss.Round))
+			return false, xerrors.NewFrom(fmt.Errorf("round regression at height %v. Got %v, last round %v", height, round, lss.Round))
 		}
 
 		if lss.Round == round {
 			if lss.Step > step {
-				return false, xerrors.Wrap(fmt.Errorf(
+				return false, xerrors.NewFrom(fmt.Errorf(
 					"step regression at height %v round %v. Got %v, last step %v",
 					height,
 					round,
@@ -301,7 +301,7 @@ func (pv *SFilePV) GetPubKey() (crypto.PubKey, error) {
 // chainID. Implements PrivValidator.
 func (pv *SFilePV) SignVote(chainID string, vote *tmproto.Vote) error {
 	if err := pv.signVote(chainID, vote); err != nil {
-		return xerrors.Wrap(fmt.Errorf("error signing vote: %v", err))
+		return xerrors.NewFrom(fmt.Errorf("error signing vote: %v", err))
 	}
 	return nil
 }
@@ -310,7 +310,7 @@ func (pv *SFilePV) SignVote(chainID string, vote *tmproto.Vote) error {
 // the chainID. Implements PrivValidator.
 func (pv *SFilePV) SignProposal(chainID string, proposal *tmproto.Proposal) error {
 	if err := pv.signProposal(chainID, proposal); err != nil {
-		return xerrors.Wrap(fmt.Errorf("error signing proposal: %v", err))
+		return xerrors.NewFrom(fmt.Errorf("error signing proposal: %v", err))
 	}
 	return nil
 }
@@ -388,7 +388,7 @@ func (pv *SFilePV) signVote(chainID string, vote *tmproto.Vote) error {
 			vote.Timestamp = timestamp
 			vote.Signature = lss.Signature
 		} else {
-			err = xerrors.Wrap(fmt.Errorf("conflicting data"))
+			err = xerrors.NewFrom(fmt.Errorf("conflicting data"))
 		}
 		return err
 	}
@@ -430,7 +430,7 @@ func (pv *SFilePV) signProposal(chainID string, proposal *tmproto.Proposal) erro
 			proposal.Timestamp = timestamp
 			proposal.Signature = lss.Signature
 		} else {
-			err = xerrors.Wrap(fmt.Errorf("conflicting data"))
+			err = xerrors.NewFrom(fmt.Errorf("conflicting data"))
 		}
 		return err
 	}

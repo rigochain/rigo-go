@@ -37,7 +37,7 @@ func (ctrler *GovCtrler) ImportRules(cb func() []byte) error {
 	if bz == nil {
 		return xerrors.New("rule blob is nil")
 	} else if rules, err := DecodeGovRules(bz); err != nil {
-		return xerrors.Wrap(err)
+		return xerrors.NewFrom(err)
 	} else {
 		ctrler.rules = rules
 	}

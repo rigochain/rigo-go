@@ -15,6 +15,10 @@ message TrxProto {
   bytes sig = 10;
 }
 
+message TrxPayloadUnstakingProto {
+  bytes tx_hash = 1;
+}
+
 message TrxPayloadExecContractProto {
   bytes _code = 1;
 }

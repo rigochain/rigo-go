@@ -209,7 +209,6 @@ func (ctrler *AccountCtrler) Apply(ctx *trxs.TrxContext) error {
 	if err := ctx.Sender.SubBalance(ctx.Tx.Gas); err != nil {
 		return err
 	}
-	ctx.Sender.AddNonce()
 	ctx.GasUsed = ctx.Tx.Gas
 	return nil
 }

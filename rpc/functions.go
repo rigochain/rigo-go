@@ -17,9 +17,9 @@ import (
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
 func queryAccount(ctx *tmrpctypes.Context, addr string) (types.IAccount, error) {
-	bzAddr, err := types.Hex2Address(addr)
+	bzAddr, err := types.AddressFromHex(addr)
 	if err != nil {
-		return nil, xerrors.Wrap(err)
+		return nil, xerrors.NewFrom(err)
 	}
 
 	qd := &types.QueryData{
@@ -40,7 +40,7 @@ func queryAccount(ctx *tmrpctypes.Context, addr string) (types.IAccount, error) 
 		}
 		return acct, nil
 	} else {
-		return nil, xerrors.WithCode(resp.Response.Code, resp.Response.Log)
+		return nil, xerrors.NewWith(resp.Response.Code, resp.Response.Log)
 	}
 }
 
@@ -74,9 +74,9 @@ func QueryAcctNonce(ctx *tmrpctypes.Context, addr string) (*ResponseAcctNonce, e
 }
 
 func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.StakeSet, error) {
-	bzAddr, err := types.Hex2Address(addr)
+	bzAddr, err := types.AddressFromHex(addr)
 	if err != nil {
-		return nil, xerrors.Wrap(err)
+		return nil, xerrors.NewFrom(err)
 	}
 
 	qd := &types.QueryData{
@@ -99,7 +99,7 @@ func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.StakeSet, error) 
 		}
 		return sset, nil
 	} else {
-		return nil, xerrors.WithCode(resp.Response.Code, resp.Response.Log)
+		return nil, xerrors.NewWith(resp.Response.Code, resp.Response.Log)
 	}
 }
 

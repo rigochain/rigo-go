@@ -10,30 +10,48 @@ import (
 	"sync"
 )
 
-type stakeList []*Stake
+type startHeightOrder []*Stake
 
-func (slst stakeList) Len() int {
+func (slst startHeightOrder) Len() int {
 	return len(slst)
 }
 
-func (slst stakeList) Less(i, j int) bool {
+// ascending order
+func (slst startHeightOrder) Less(i, j int) bool {
 	return slst[i].StartHeight < slst[j].StartHeight
 }
 
-func (slst stakeList) Swap(i, j int) {
+func (slst startHeightOrder) Swap(i, j int) {
 	slst[i], slst[j] = slst[j], slst[i]
 }
 
-var _ sort.Interface = (stakeList)(nil)
+var _ sort.Interface = (startHeightOrder)(nil)
+
+type refundHeightOrder []*Stake
+
+func (slst refundHeightOrder) Len() int {
+	return len(slst)
+}
+
+// ascending order
+func (slst refundHeightOrder) Less(i, j int) bool {
+	return slst[i].RefundHeight < slst[j].RefundHeight
+}
+
+func (slst refundHeightOrder) Swap(i, j int) {
+	slst[i], slst[j] = slst[j], slst[i]
+}
+
+var _ sort.Interface = (refundHeightOrder)(nil)
 
 type StakeSet struct {
 	Owner       types.Address  `json:"owner"`
-	PubKey      types.HexBytes `json:"pub_key"`
-	Stakes      stakeList      `json:"stakes"` // ordered by block height
-	TotalAmount *big.Int       `json:"total_amount"`
-	TotalPower  int64          `json:"total_power"`
-	TotalReward *big.Int       `json:"total_reward"`
-	FeeReward   *big.Int       `json:"fee_reward"`
+	PubKey      types.HexBytes `json:"pubKey"`
+	Stakes      []*Stake       `json:"stakes"`
+	TotalAmount *big.Int       `json:"totalAmount"`
+	TotalPower  int64          `json:"totalPower"`
+	TotalReward *big.Int       `json:"totalReward"`
+	FeeReward   *big.Int       `json:"feeReward"`
 
 	mtx sync.RWMutex
 }
@@ -61,14 +79,12 @@ func (sset *StakeSet) AppendStake(stakes ...*Stake) error {
 	sset.mtx.Lock()
 	defer sset.mtx.Unlock()
 
-	_ = sset.appendStake(stakes...)
-
-	return nil
+	return sset.appendStake(stakes...)
 }
 
 func (sset *StakeSet) appendStake(stakes ...*Stake) error {
 	sset.Stakes = append(sset.Stakes, stakes...)
-	sort.Sort(sset.Stakes)
+	sort.Sort(startHeightOrder(sset.Stakes))
 
 	for _, s := range stakes {
 		sset.TotalPower += s.Power
@@ -78,14 +94,19 @@ func (sset *StakeSet) appendStake(stakes ...*Stake) error {
 }
 
 func (sset *StakeSet) PopStake() *Stake {
-	return sset.DelStake(0)
+	return sset.DelStakeByIdx(0)
 }
 
-func (sset *StakeSet) DelStake(idx int) *Stake {
+func (sset *StakeSet) DelStake(txhash types.HexBytes) *Stake {
 	sset.mtx.Lock()
 	defer sset.mtx.Unlock()
 
-	if s := sset.delStake(idx); s != nil {
+	i, s0 := sset.findStake(txhash)
+	if i < 0 || s0 == nil {
+		return nil
+	}
+
+	if s := sset.delStakeByIdx(i); s != nil {
 		sset.TotalPower -= s.Power
 		sset.TotalAmount = new(big.Int).Sub(sset.TotalAmount, s.Amount)
 		sset.TotalReward = new(big.Int).Sub(sset.TotalReward, s.Reward)
@@ -94,7 +115,20 @@ func (sset *StakeSet) DelStake(idx int) *Stake {
 	return nil
 }
 
-func (sset *StakeSet) delStake(idx int) *Stake {
+func (sset *StakeSet) DelStakeByIdx(idx int) *Stake {
+	sset.mtx.Lock()
+	defer sset.mtx.Unlock()
+
+	if s := sset.delStakeByIdx(idx); s != nil {
+		sset.TotalPower -= s.Power
+		sset.TotalAmount = new(big.Int).Sub(sset.TotalAmount, s.Amount)
+		sset.TotalReward = new(big.Int).Sub(sset.TotalReward, s.Reward)
+		return s
+	}
+	return nil
+}
+
+func (sset *StakeSet) delStakeByIdx(idx int) *Stake {
 	if idx >= len(sset.Stakes) {
 		return nil
 	} else {
@@ -118,7 +152,7 @@ func (sset *StakeSet) getStake(idx int) *Stake {
 	return sset.Stakes[idx]
 }
 
-func (sset *StakeSet) FirstStake() *Stake {
+func (sset *StakeSet) NextStake() *Stake {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
@@ -133,13 +167,33 @@ func (sset *StakeSet) LastStake() *Stake {
 	return sset.getStake(idx)
 }
 
-func (sset *StakeSet) findStakeByAddr(addr types.Address) *Stake {
-	for _, s := range sset.Stakes {
-		if bytes.Compare(addr, s.Owner) == 0 {
-			return s
+func (sset *StakeSet) FindStake(txhash types.HexBytes) (int, *Stake) {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	return sset.findStake(txhash)
+}
+
+func (sset *StakeSet) findStake(txhash types.HexBytes) (int, *Stake) {
+	for i, s := range sset.Stakes {
+		if bytes.Compare(txhash, s.TxHash) == 0 {
+			return i, s
 		}
 	}
-	return nil
+	return -1, nil
+}
+
+func (sset *StakeSet) StakesOf(addr types.Address) []*Stake {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	var ret []*Stake
+	for _, s := range sset.Stakes {
+		if bytes.Compare(addr, s.Owner) == 0 {
+			ret = append(ret, s)
+		}
+	}
+	return ret
 }
 
 func (sset *StakeSet) StakesLen() int {
@@ -154,6 +208,19 @@ func (sset *StakeSet) GetTotalAmount() *big.Int {
 	defer sset.mtx.RUnlock()
 
 	return sset.TotalAmount
+}
+
+func (sset *StakeSet) AmountOf(addr types.Address) *big.Int {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	ret := big.NewInt(0)
+	for _, s0 := range sset.Stakes {
+		if bytes.Compare(s0.Owner, addr) == 0 {
+			ret = ret.Add(ret, s0.Amount)
+		}
+	}
+	return ret
 }
 
 func (sset *StakeSet) SumAmount() *big.Int {
@@ -178,6 +245,19 @@ func (sset *StakeSet) GetTotalPower() int64 {
 	return sset.TotalPower
 }
 
+func (sset *StakeSet) PowerOf(addr types.Address) int64 {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	ret := int64(0)
+	for _, s0 := range sset.Stakes {
+		if bytes.Compare(s0.Owner, addr) == 0 {
+			ret += s0.Power
+		}
+	}
+	return ret
+}
+
 func (sset *StakeSet) SumPower() int64 {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
@@ -198,6 +278,19 @@ func (sset *StakeSet) GetTotalReward() *big.Int {
 	defer sset.mtx.RUnlock()
 
 	return new(big.Int).Set(sset.TotalReward)
+}
+
+func (sset *StakeSet) RewardOf(addr types.Address) *big.Int {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	ret := big.NewInt(0)
+	for _, s0 := range sset.Stakes {
+		if bytes.Compare(s0.Owner, addr) == 0 {
+			ret = ret.Add(ret, s0.Reward)
+		}
+	}
+	return ret
 }
 
 func (sset *StakeSet) SumReward() *big.Int {

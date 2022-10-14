@@ -4,14 +4,26 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/kysee/arcanus/types"
-	"math"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"math/big"
 )
 
 type GovRules struct {
-	Version        uint64   `json:"version"`
-	AmountPerPower *big.Int `json:"amountPerPower"`
-	RewardPerPower *big.Int `json:"rewardPerPower"`
+	Version           int32    `json:"version"`
+	MaxValidatorCnt   int32    `json:"maxValidatorCnt"`
+	RewardDelayBlocks int64    `json:"rewardDelayBlocks"`
+	AmountPerPower    *big.Int `json:"amountPerPower"`
+	RewardPerPower    *big.Int `json:"rewardPerPower"`
+}
+
+func DefaultGovRules() *GovRules {
+	return &GovRules{
+		Version:           0,
+		MaxValidatorCnt:   21,
+		RewardDelayBlocks: 10,
+		AmountPerPower:    big.NewInt(1_000000000_000000000),
+		RewardPerPower:    big.NewInt(1_000000000),
+	}
 }
 
 func DecodeGovRules(bz []byte) (*GovRules, error) {
@@ -24,17 +36,21 @@ func DecodeGovRules(bz []byte) (*GovRules, error) {
 
 func fromProto(pm *GovRulesProto) *GovRules {
 	return &GovRules{
-		Version:        pm.Version,
-		AmountPerPower: new(big.Int).SetBytes(pm.XAmountPerPower),
-		RewardPerPower: new(big.Int).SetBytes(pm.XRewardPerPower),
+		Version:           pm.Version,
+		MaxValidatorCnt:   pm.MaxValidatorCnt,
+		RewardDelayBlocks: pm.RewardDelayBlocks,
+		AmountPerPower:    new(big.Int).SetBytes(pm.XAmountPerPower),
+		RewardPerPower:    new(big.Int).SetBytes(pm.XRewardPerPower),
 	}
 }
 
 func toProto(gr *GovRules) *GovRulesProto {
 	return &GovRulesProto{
-		Version:         gr.Version,
-		XAmountPerPower: gr.AmountPerPower.Bytes(),
-		XRewardPerPower: gr.RewardPerPower.Bytes(),
+		Version:           gr.Version,
+		MaxValidatorCnt:   gr.MaxValidatorCnt,
+		RewardDelayBlocks: gr.RewardDelayBlocks,
+		XAmountPerPower:   gr.AmountPerPower.Bytes(),
+		XRewardPerPower:   gr.RewardPerPower.Bytes(),
 	}
 }
 
@@ -46,6 +62,23 @@ func (gr *GovRules) Encode() ([]byte, error) {
 //
 // implement interface IGovRules
 //
+
+func (gr *GovRules) MaxValidatorCount() int32 {
+	return gr.MaxValidatorCnt
+}
+
+// MaxStakeAmount means the max of amount which could be deposited.
+// tmtypes.MaxTotalVotingPower = int64(math.MaxInt64) / 8
+// When the type of voting power is `int64`and VP:XCO = 1:1,
+// the MAXSTAKEsau becomes `int64(math.MaxInt64) / 8 * 10^18` (~= 922경 XCO)
+func (gr *GovRules) MaxStakeAmount() *big.Int {
+	return new(big.Int).Mul(big.NewInt(tmtypes.MaxTotalVotingPower), gr.AmountPerPower)
+}
+
+func (gr *GovRules) GetRewardDelayBlocks() int64 {
+	return gr.RewardDelayBlocks
+}
+
 func (gr *GovRules) AmountToPower(amt *big.Int) int64 {
 	// 1 VotingPower == 1 XCO
 	_vp := new(big.Int).Quo(amt, gr.AmountPerPower)
@@ -66,13 +99,6 @@ func (gr *GovRules) PowerToReward(power int64) *big.Int {
 		panic(fmt.Sprintf("power is negative: %v", power))
 	}
 	return new(big.Int).Mul(big.NewInt(power), gr.RewardPerPower)
-}
-
-// MaxStakeAmount means the max of amount which could be deposited.
-// When the type of voting power is `int64`and VP:XCO = 1:1,
-// the MAXSTAKEsau becomes `9223372036854775807 000000000000000000` (~= 922경 XCO)
-func (gr *GovRules) MaxStakeAmount() *big.Int {
-	return new(big.Int).Mul(big.NewInt(math.MaxInt64), gr.AmountPerPower)
 }
 
 var _ types.IGovRules = (*GovRules)(nil)

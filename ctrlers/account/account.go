@@ -93,26 +93,24 @@ func (acct *Account) CheckNonce(n uint64) error {
 }
 
 func (acct *Account) AddBalance(amt *big.Int) error {
-	if amt.Sign() < 0 {
-		return xerrors.New("invalid amount: negative amount")
-	}
-
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()
 
+	if amt.Sign() < 0 {
+		return xerrors.New("invalid amount: negative amount")
+	}
 	acct.Balance = new(big.Int).Add(acct.Balance, amt)
 
 	return nil
 }
 
 func (acct *Account) SubBalance(amt *big.Int) error {
-	if amt.Sign() < 0 {
-		return xerrors.New("invalid amount: negative amount")
-	}
-
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()
 
+	if amt.Sign() < 0 {
+		return xerrors.New("invalid amount: negative amount")
+	}
 	if amt.Cmp(acct.Balance) > 0 {
 		return xerrors.New("invalid amount: insufficient balance")
 	}
