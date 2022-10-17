@@ -84,17 +84,15 @@ func (sset *StakeSet) AppendStake(stakes ...*Stake) error {
 
 func (sset *StakeSet) appendStake(stakes ...*Stake) error {
 	sset.Stakes = append(sset.Stakes, stakes...)
-	sort.Sort(startHeightOrder(sset.Stakes))
+
+	// I don't know why Stakes should be sorted by start height
+	//sort.Sort(startHeightOrder(sset.Stakes))
 
 	for _, s := range stakes {
 		sset.TotalPower += s.Power
 		sset.TotalAmount = new(big.Int).Add(sset.TotalAmount, s.Amount)
 	}
 	return nil
-}
-
-func (sset *StakeSet) PopStake() *Stake {
-	return sset.DelStakeByIdx(0)
 }
 
 func (sset *StakeSet) DelStake(txhash types.HexBytes) *Stake {

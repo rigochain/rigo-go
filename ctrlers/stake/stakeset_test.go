@@ -25,36 +25,40 @@ func newStakeSet() *stake.StakeSet {
 	return stake.NewStakeSet(w0.Address(), w0.GetPubKey())
 }
 
-func newStakesTo(sset *stake.StakeSet, n int) []types.Address {
+type stakesMap map[types.AcctKey][]*stake.Stake
+
+func randomStakesTo(sset *stake.StakeSet, n int) stakesMap {
 	var addr types.Address
-	var addrs []types.Address
+	retStakeMap := make(stakesMap)
+
 	stakes := make([]*stake.Stake, n)
 	for i, _ := range stakes {
 		if addr == nil || libs.RandInt63()%3 == 0 {
 			addr = libs.RandAddress()
-			addrs = append(addrs, addr)
 		}
 
 		stakes[i] = stake.NewStakeWithAmount(
 			addr,
-			big.NewInt(1000),             //libs.RandBigIntN(new(big.Int).Quo(testGovRules.MaxStakeAmount(), big.NewInt(int64(n)))), // amount
-			libs.RandInt63n(10_000_0000), // height
-			libs.RandHexBytes(32),        //txhash
+			libs.RandBigIntN(new(big.Int).Quo(testGovRules.MaxStakeAmount(), big.NewInt(int64(n)))), // amount
+			libs.RandInt63n(1_000_000), // height
+			libs.RandHexBytes(32),      //txhash
 			testGovRules)
 		// fmt.Println(addr, stakes[i].Amount, stakes[i].Power)
+
+		retStakeMap[types.ToAcctKey(addr)] = append(retStakeMap[types.ToAcctKey(addr)], stakes[i])
 	}
 	if err := sset.AppendStake(stakes...); err != nil {
 		panic(err)
 	}
-	return addrs
+	return retStakeMap
 }
 
 func TestStakeSet(t *testing.T) {
 	stakesCnt := int(libs.RandInt63n(10000))
 	stakeSet := newStakeSet()
-	addrs := newStakesTo(stakeSet, stakesCnt)
-	require.NotNil(t, addrs)
-	require.True(t, 0 < len(addrs))
+	stakesMapByOwner := randomStakesTo(stakeSet, stakesCnt)
+	require.NotNil(t, stakesMapByOwner)
+	require.True(t, 0 < len(stakesMapByOwner))
 
 	require.Equal(t, stakesCnt, stakeSet.StakesLen())
 	require.Equal(t, stakeSet.SumPower(), stakeSet.TotalPower)
@@ -63,7 +67,8 @@ func TestStakeSet(t *testing.T) {
 	sumPower := int64(0)
 	sumAmt := big.NewInt(0)
 
-	for _, addr := range addrs {
+	for acctKey, _ := range stakesMapByOwner {
+		addr := acctKey.Address()
 		stakes := stakeSet.StakesOf(addr)
 		require.NotNil(t, stakes)
 
@@ -101,7 +106,7 @@ func TestStakeSet(t *testing.T) {
 
 //func TestStakeOrder(t *testing.T) {
 //	stakeSet := newStakeSet()
-//	newStakesTo(stakeSet, int(libs.RandInt63n(10000)))
+//	randomStakesTo(stakeSet, int(libs.RandInt63n(10000)))
 //
 //	var preStake *stake.Stake = nil
 //	for i := 0; i < stakeSet.StakesLen(); i++ {
@@ -118,7 +123,7 @@ func TestStakeSet(t *testing.T) {
 
 func TestApplyReward(t *testing.T) {
 	validator := newStakeSet()
-	newStakesTo(validator, int(libs.RandInt63n(10000)))
+	randomStakesTo(validator, int(libs.RandInt63n(10000)))
 
 	// first reward
 	reward0 := validator.ApplyReward()
@@ -138,7 +143,7 @@ func TestApplyReward(t *testing.T) {
 
 func BenchmarkApplyReward(b *testing.B) {
 	val0 := newStakeSet()
-	newStakesTo(val0, 10000)
+	randomStakesTo(val0, 10000)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

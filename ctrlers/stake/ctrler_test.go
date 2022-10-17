@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/kysee/arcanus/ctrlers/stake"
 	"github.com/kysee/arcanus/libs"
+	"github.com/kysee/arcanus/types"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/libs/log"
 	"os"
@@ -27,14 +28,6 @@ func createStakers(cnt int, ctrler *stake.StakeCtrler) error {
 	return nil
 }
 
-func randStaking(ctrler *stake.StakeCtrler) error {
-	for i := 0; i < ctrler.StakersLen(); i++ {
-		staker := ctrler.GetStaker(i)
-		newStakesTo(staker, 1000)
-	}
-	return nil
-}
-
 func newStakers(n int) stake.StakeSetArray {
 	vals := make(stake.StakeSetArray, n)
 	for i, _ := range vals {
@@ -43,10 +36,23 @@ func newStakers(n int) stake.StakeSetArray {
 	return vals
 }
 
+var (
+	stakingMapByStaker = make(map[types.AcctKey]stakesMap)
+)
+
+func stakingRandom(ctrler *stake.StakeCtrler) error {
+	for i := 0; i < ctrler.StakersLen(); i++ {
+		staker := ctrler.GetStaker(i)
+
+		stakingMapByStaker[types.ToAcctKey(staker.Owner)] = randomStakesTo(staker, 10000)
+	}
+	return nil
+}
+
 func TestCreateStakers(t *testing.T) {
 	vals := newStakers(21)
 	for _, val := range vals {
-		newStakesTo(val, 10000)
+		randomStakesTo(val, 10000)
 	}
 
 	for i := 0; i < vals.Len(); i++ {
@@ -62,7 +68,7 @@ func TestStakerOrder(t *testing.T) {
 	ctrler, err := stake.NewStakeCtrler(dbDir, log.NewNopLogger())
 	require.NoError(t, err)
 	require.NoError(t, createStakers(21, ctrler))
-	require.NoError(t, randStaking(ctrler))
+	require.NoError(t, stakingRandom(ctrler))
 	require.Equal(t, 21, ctrler.StakersLen())
 
 	_ = ctrler.UpdateValidators(testGovRules) // sort
@@ -80,13 +86,13 @@ func TestStakerOrder(t *testing.T) {
 	require.NoError(t, ctrler.Close())
 }
 
-func TestUnstaking(t *testing.T) {
+func TestLazyUnstaking(t *testing.T) {
 	os.RemoveAll(dbDir)
 
 	ctrler, err := stake.NewStakeCtrler(dbDir, log.NewNopLogger())
 	require.NoError(t, err)
 	require.NoError(t, createStakers(21, ctrler))
-	require.NoError(t, randStaking(ctrler))
+	require.NoError(t, stakingRandom(ctrler))
 	require.Equal(t, 21, ctrler.StakersLen())
 
 	_ = ctrler.UpdateValidators(testGovRules) // sort

@@ -19,6 +19,7 @@ func TestNewStake(t *testing.T) {
 	require.Equal(t, testGovRules.AmountToPower(amt), s0.Power)
 	require.True(t, s0.BlockReward.Sign() > 0)
 	require.Equal(t, testGovRules.PowerToReward(s0.Power), s0.BlockReward)
+	require.Equal(t, big.NewInt(0), s0.Reward)
 }
 
 func TestApplyRewardByStake(t *testing.T) {
@@ -26,9 +27,10 @@ func TestApplyRewardByStake(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		amt := libs.RandBigIntN(new(big.Int).Div(testGovRules.MaxStakeAmount(), big.NewInt(1000)))
+		txhash := libs.RandBytes(32)
 		stakes[i] = stake.NewStakeWithAmount(
 			addr0,
-			amt, 1, nil,
+			amt, 1, txhash,
 			testGovRules)
 	}
 

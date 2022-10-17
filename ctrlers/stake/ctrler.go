@@ -62,8 +62,8 @@ type StakeCtrler struct {
 	stakersTree *iavl.MutableTree
 
 	allStakers     StakeSetArray
-	allStakersMap  map[types.AcctKey]*StakeSet
-	updatedStakers StakeSetArray // removed + updated + newer
+	allStakersMap  map[types.AcctKey]*StakeSet // the key is staker's account key
+	updatedStakers StakeSetArray               // removed + updated + newer
 
 	lastValidators ValidatorInfoList
 

@@ -70,7 +70,6 @@ func NewTrxContext(txbz []byte, height int64, exec bool, acctFinder types.IAccou
 		} else {
 			pubBytes = _pub
 		}
-
 	}
 
 	return &TrxContext{
