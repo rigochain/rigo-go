@@ -1,7 +1,6 @@
 package trxs
 
-type TrxPayloadAssetTransfer struct {
-}
+type TrxPayloadAssetTransfer struct{}
 
 func (tx *TrxPayloadAssetTransfer) Type() int32 {
 	return TRX_TRANSFER

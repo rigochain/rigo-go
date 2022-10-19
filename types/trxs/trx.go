@@ -48,7 +48,7 @@ type Trx struct {
 	Sig     types.HexBytes `json:"sig"`
 }
 
-func NewTrx(ver uint32, from, to types.Address, nonce uint64, amt, gas *big.Int, txtype int32) *Trx {
+func NewTrx(ver uint32, from, to types.Address, nonce uint64, amt, gas *big.Int, payload ITrxPayload) *Trx {
 	return &Trx{
 		Version: ver,
 		Time:    time.Now().Round(0).UTC().UnixNano(),
@@ -57,7 +57,8 @@ func NewTrx(ver uint32, from, to types.Address, nonce uint64, amt, gas *big.Int,
 		To:      to,
 		Amount:  amt,
 		Gas:     gas,
-		Type:    txtype,
+		Type:    payload.Type(),
+		Payload: payload,
 	}
 }
 

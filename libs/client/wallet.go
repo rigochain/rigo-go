@@ -137,18 +137,18 @@ func (w *Wallet) Unlock(s []byte) error {
 	return w.wkey.Unlock(s)
 }
 
-func (w *Wallet) SignTrx(tx *trxs.Trx) error {
+func (w *Wallet) SignTrx(tx *trxs.Trx) (types.HexBytes, types.HexBytes, error) {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
 	if txbz, err := tx.Encode(); err != nil {
-		return err
+		return nil, nil, err
 	} else if sig, err := w.wkey.Sign(txbz); err != nil {
-		return err
+		return nil, nil, err
 	} else {
 		tx.Sig = sig
+		return sig, txbz, nil
 	}
-	return nil
 }
 
 func (w *Wallet) TransferSync(to types.Address, amt, gas *big.Int) (*coretypes.ResultBroadcastTx, error) {
@@ -156,7 +156,7 @@ func (w *Wallet) TransferSync(to types.Address, amt, gas *big.Int) (*coretypes.R
 		w.Address(), to,
 		amt, gas,
 		w.acct.GetNonce()+1)
-	if err := w.SignTrx(tx); err != nil {
+	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err
 	} else {
 		return rpc.SendTransactionSync(tx)
@@ -168,7 +168,7 @@ func (w *Wallet) StakingSync(to types.Address, amt, gas *big.Int) (*coretypes.Re
 		w.Address(), to,
 		amt, gas,
 		w.acct.GetNonce()+1)
-	if err := w.SignTrx(tx); err != nil {
+	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err
 	} else {
 		return rpc.SendTransactionSync(tx)

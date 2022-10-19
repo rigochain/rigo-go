@@ -13,7 +13,7 @@ func NewTrxTransfer(from, to types.Address, amt, gas *big.Int, nonce uint64) *tr
 		nonce,
 		amt,
 		gas,
-		trxs.TRX_TRANSFER)
+		&trxs.TrxPayloadAssetTransfer{})
 }
 
 func NewTrxStaking(from, to types.Address, amt, gas *big.Int, nonce uint64) *trxs.Trx {
@@ -23,15 +23,15 @@ func NewTrxStaking(from, to types.Address, amt, gas *big.Int, nonce uint64) *trx
 		nonce,
 		amt,
 		gas,
-		trxs.TRX_STAKING)
+		&trxs.TrxPayloadStaking{})
 }
 
-func NewTrxUnstaking(from, to types.Address, amt, gas *big.Int, nonce uint64) *trxs.Trx {
+func NewTrxUnstaking(from, to types.Address, txhash types.HexBytes, gas *big.Int, nonce uint64) *trxs.Trx {
 	return trxs.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
-		amt,
+		big.NewInt(0),
 		gas,
-		trxs.TRX_STAKING)
+		&trxs.TrxPayloadUnstaking{TxHash: txhash})
 }

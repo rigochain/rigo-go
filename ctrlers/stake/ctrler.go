@@ -297,6 +297,31 @@ func (ctrler *StakeCtrler) applyStaking(ctx *trxs.TrxContext) error {
 	return nil
 }
 
+func (ctrler *StakeCtrler) applyUnstakingByTxHash(ctx *trxs.TrxContext) error {
+	if ctx.Exec {
+		staker := ctrler.findStaker(ctx.Tx.To)
+		if staker == nil {
+			return xerrors.ErrNotFoundStaker
+		}
+
+		txhash := ctx.Tx.Payload.(*trxs.TrxPayloadUnstaking).TxHash
+		s0 := staker.DelStake(txhash)
+		if s0 == nil {
+			return xerrors.ErrNotFoundStake
+		}
+
+		s0.RefundHeight = ctx.Height + ctx.GovRules.GetRewardDelayBlocks()
+		// ctrler.frozenStakes is ordered by RefundHeight
+		ctrler.newFrozenStakes = append(ctrler.newFrozenStakes, s0)
+
+		if staker.TotalPower == 0 {
+			_ = ctrler.removeStaker(staker.Owner)
+		}
+	}
+	return nil
+}
+
+// applyUnstaking() is DEPRECATED.
 func (ctrler *StakeCtrler) applyUnstaking(ctx *trxs.TrxContext) error {
 	if ctx.Exec {
 		staker := ctrler.findStaker(ctx.Tx.To)
@@ -353,7 +378,7 @@ func (ctrler *StakeCtrler) Apply(ctx *trxs.TrxContext) error {
 	case trxs.TRX_STAKING:
 		return ctrler.applyStaking(ctx)
 	case trxs.TRX_UNSTAKING:
-		return ctrler.applyUnstaking(ctx)
+		return ctrler.applyUnstakingByTxHash(ctx)
 	default:
 		return xerrors.New("unknown transaction type")
 	}
@@ -403,6 +428,15 @@ func (ctrler *StakeCtrler) GetLastValidatorCnt() int {
 	defer ctrler.mtx.RUnlock()
 
 	return len(ctrler.lastValidators)
+}
+
+func (ctrler *StakeCtrler) GetTotalAmount() *big.Int {
+	// todo: improve performance
+	amt := big.NewInt(0)
+	for _, s0 := range ctrler.allStakers {
+		amt = new(big.Int).Add(amt, s0.GetTotalAmount())
+	}
+	return amt
 }
 
 func (ctrler *StakeCtrler) GetTotalPower() int64 {
