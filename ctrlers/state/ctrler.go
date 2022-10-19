@@ -1,7 +1,6 @@
 package state
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"github.com/kysee/arcanus/cmd/version"
@@ -11,6 +10,7 @@ import (
 	"github.com/kysee/arcanus/genesis"
 	"github.com/kysee/arcanus/libs"
 	"github.com/kysee/arcanus/libs/crypto"
+	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -151,7 +151,7 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 			panic(err)
 		}
 		staker := ctrler.stakeCtrler.AddStakerWith(addr, pubKeyBytes)
-		stake0 := stake.NewStakeWithPower(staker.Owner, validator.Power, 0, libs.ZeroBytes(32), ctrler.govCtrler.GetRules())
+		stake0 := stake.NewStakeWithPower(staker.Owner, staker.Owner, validator.Power, 0, libs.ZeroBytes(32), ctrler.govCtrler.GetRules())
 		staker.AppendStake(stake0)
 	}
 
@@ -296,7 +296,7 @@ func (ctrler *ChainCtrler) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Res
 		ctrler.stakeCtrler.ApplyReward(lastBlockGasInfo.Owner, lastBlockGasInfo.Gas)
 	}
 
-	updatedValidators := ctrler.stakeCtrler.UpdateValidators(ctrler.govCtrler.GetRules())
+	updatedValidators := ctrler.stakeCtrler.UpdateValidators(int(ctrler.govCtrler.GetRules().GetMaxValidatorCount()))
 
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates: updatedValidators,
@@ -313,16 +313,19 @@ func (ctrler *ChainCtrler) Commit() abcitypes.ResponseCommit {
 		panic(err)
 	}
 
+	ctrler.logger.Debug("account hash", types.HexBytes(appHash0), "version", ver0)
+
 	appHash1, ver1, err := ctrler.stakeCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
+	ctrler.logger.Debug("stakes hash", types.HexBytes(appHash0), "version", ver1)
 
 	if ver0 != ver1 {
 		panic(fmt.Sprintf("Not same versions: account:%v, stake:%v", ver0, ver1))
 	}
 
-	appHash := sha256.Sum256(append(appHash0, appHash1...))
+	appHash := crypto.DefaultHash(append(appHash0, appHash1...))
 
 	ctrler.stateDB.PutLastBlockHeight(ver0)
 	ctrler.stateDB.PutLastBlockAppHash(appHash[:])

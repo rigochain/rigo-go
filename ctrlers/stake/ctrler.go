@@ -58,16 +58,16 @@ func (vilst ValidatorInfoList) find(addr types.Address) *ValidatorInfo {
 }
 
 type StakeCtrler struct {
-	stakersDB   db.DB
-	stakersTree *iavl.MutableTree
+	stakesDB   db.DB
+	stakesTree *iavl.MutableTree
 
-	allStakers     StakeSetArray
-	allStakersMap  map[types.AcctKey]*StakeSet // the key is staker's account key
-	updatedStakers StakeSetArray               // removed + updated + newer
+	allStakers    StakeSetArray
+	allStakersMap map[types.AcctKey]*StakeSet // the key is staker's account key
+	updatedStakes []*Stake                    // updated + newer
 
 	lastValidators ValidatorInfoList
 
-	frozenDB        db.DB
+	frozenStakesDB  db.DB
 	allFrozenStakes []*Stake
 	newFrozenStakes []*Stake
 	delFrozenStakes []*Stake
@@ -79,42 +79,48 @@ type StakeCtrler struct {
 func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 
 	// for all stakers
-	stakeDB, err := db.NewDB("stake", "goleveldb", dbDir)
+	stakeDB, err := db.NewDB("stakes", "goleveldb", dbDir)
 	if err != nil {
 		return nil, err
 	}
-	stakersTree, err := iavl.NewMutableTree(stakeDB, 1024)
+	stakesTree, err := iavl.NewMutableTree(stakeDB, 1024)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := stakersTree.Load(); err != nil {
+	if _, err := stakesTree.Load(); err != nil {
 		return nil, err
 	}
 
 	var allStakers StakeSetArray
 	allStakersMap := make(map[types.AcctKey]*StakeSet)
 
-	stopped, err := stakersTree.Iterate(func(key []byte, value []byte) bool {
-		staker := &StakeSet{}
-		if err := json.Unmarshal(value, staker); err != nil {
+	stopped, err := stakesTree.Iterate(func(key []byte, value []byte) bool {
+		s0 := &Stake{}
+		if err := json.Unmarshal(value, s0); err != nil {
 			logger.Error("Unable to load staker", "address", types.HexBytes(key), "error", err)
 			return true
 		}
 
-		sumPower := staker.SumPower()
-		if staker.TotalPower != sumPower {
-			logger.Error("Wrong power", "TotalPower", staker.TotalPower, "Sum of powers of stakes", sumPower)
+		if bytes.Compare(s0.TxHash, key) != 0 {
+			logger.Error("Wrong TxHash", "key", types.HexBytes(key), "stake's txhash", s0.TxHash)
 			return true
 		}
 
-		addrKey := types.ToAcctKey(key)
-		if stakeSet, ok := allStakersMap[addrKey]; ok {
-			logger.Error("Conflict staker", "address", types.HexBytes(key), "already existed", stakeSet)
+		addrKey := types.ToAcctKey(s0.To)
+		delegatedStaker, ok := allStakersMap[addrKey]
+		if !ok {
+			delegatedStaker = &StakeSet{
+				Owner: s0.To,
+			}
+			allStakers = append(allStakers, delegatedStaker)
+			allStakersMap[addrKey] = delegatedStaker
+		}
+
+		if err := delegatedStaker.AppendStake(s0); err != nil {
+			logger.Error("error in appending stake")
 			return true
 		}
 
-		allStakers = append(allStakers, staker)
-		allStakersMap[types.ToAcctKey(key)] = staker
 		return false
 	})
 	if err != nil {
@@ -123,7 +129,7 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 		return nil, xerrors.New("Stop to load stakers tree")
 	}
 
-	sort.Sort(allStakers)
+	sort.Sort(powerOrderedStakeSets(allStakers))
 
 	frozenDB, err := db.NewDB("frozen", "goleveldb", dbDir)
 	if err != nil {
@@ -151,11 +157,11 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 	sort.Sort(refundHeightOrder(allFrozenStakes))
 
 	ret := &StakeCtrler{
-		stakersDB:       stakeDB,
-		stakersTree:     stakersTree,
+		stakesDB:        stakeDB,
+		stakesTree:      stakesTree,
 		allStakers:      allStakers,
 		allStakersMap:   allStakersMap,
-		frozenDB:        frozenDB,
+		frozenStakesDB:  frozenDB,
 		allFrozenStakes: allFrozenStakes,
 		logger:          logger,
 	}
@@ -273,13 +279,19 @@ func (ctrler *StakeCtrler) applyStaking(ctx *trxs.TrxContext) error {
 			return xerrors.ErrNotFoundStaker
 		}
 
-		if xerr := staker.AppendStake(NewStakeWithAmount(ctx.Tx.From, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovRules)); xerr != nil {
+		s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovRules)
+		expectedPower := ctrler.GetTotalPower() + s0.Power
+		if expectedPower < 0 || expectedPower > ctx.GovRules.MaxTotalPower() {
+			return xerrors.ErrTooManyPower
+		}
+
+		if xerr := staker.AppendStake(s0); xerr != nil {
 			// Not reachable. AppendStake() does not return error
 			ctrler.logger.Error("Not reachable", "error", xerr)
 			panic(xerr)
 		}
 
-		ctrler.updatedStakers = append(ctrler.updatedStakers, staker)
+		ctrler.updatedStakes = append(ctrler.updatedStakes, s0)
 	}
 
 	return nil
@@ -329,7 +341,6 @@ func (ctrler *StakeCtrler) applyUnstaking(ctx *trxs.TrxContext) error {
 		if staker.TotalPower == 0 {
 			_ = ctrler.removeStaker(staker.Owner)
 		}
-		ctrler.updatedStakers = append(ctrler.updatedStakers, staker)
 	}
 	return nil
 }
@@ -387,14 +398,30 @@ func (ctrler *StakeCtrler) ProcessFrozenStakesAt(height int64, acctFinder types.
 	return nil
 }
 
-func (ctrler *StakeCtrler) UpdateValidators(govRules types.IGovRules) []tmtypes.ValidatorUpdate {
+func (ctrler *StakeCtrler) GetLastValidatorCnt() int {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return len(ctrler.lastValidators)
+}
+
+func (ctrler *StakeCtrler) GetTotalPower() int64 {
+	// todo: improve performance
+	power := int64(0)
+	for _, s0 := range ctrler.allStakers {
+		power += s0.GetTotalPower()
+	}
+	return power
+}
+
+func (ctrler *StakeCtrler) UpdateValidators(maxVals int) []tmtypes.ValidatorUpdate {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	sort.Sort(ctrler.allStakers)
+	sort.Sort(powerOrderedStakeSets(ctrler.allStakers)) // sort by power
 
 	var newValidators ValidatorInfoList
-	n := libs.MIN(len(ctrler.allStakers), int(govRules.MaxValidatorCount()))
+	n := libs.MIN(len(ctrler.allStakers), maxVals)
 	for i := 0; i < n; i++ {
 		staker := ctrler.allStakers[i]
 		newValidators = append(newValidators, &ValidatorInfo{
@@ -403,7 +430,7 @@ func (ctrler *StakeCtrler) UpdateValidators(govRules types.IGovRules) []tmtypes.
 			Power:   staker.TotalPower,
 		})
 	}
-	sort.Sort(newValidators)
+	sort.Sort(newValidators) // sort by address
 
 	ret := validatorUpdates(ctrler.lastValidators, newValidators)
 	ctrler.lastValidators = newValidators
@@ -422,8 +449,10 @@ func validatorUpdates(existing, newers ValidatorInfoList) []tmtypes.ValidatorUpd
 			valUpdates = append(valUpdates, tmtypes.UpdateValidator(existing[i].PubKey, 0, "secp256k1"))
 			i++
 		} else if ret == 0 {
-			// lastValidator[i] is updated to newValidators[j]
-			valUpdates = append(valUpdates, tmtypes.UpdateValidator(newers[j].PubKey, newers[j].Power, "secp256k1"))
+			if existing[i].Power != newers[j].Power {
+				// lastValidator[i] is updated to newValidators[j]
+				valUpdates = append(valUpdates, tmtypes.UpdateValidator(newers[j].PubKey, newers[j].Power, "secp256k1"))
+			}
 			i++
 			j++
 		} else { // ret > 0
@@ -434,9 +463,11 @@ func validatorUpdates(existing, newers ValidatorInfoList) []tmtypes.ValidatorUpd
 	}
 
 	for ; i < len(existing); i++ {
+		// removed
 		valUpdates = append(valUpdates, tmtypes.UpdateValidator(existing[i].PubKey, 0, "secp256k1"))
 	}
-	for ; j < len(newers); i++ {
+	for ; j < len(newers); j++ {
+		// added newer
 		valUpdates = append(valUpdates, tmtypes.UpdateValidator(newers[j].PubKey, newers[j].Power, "secp256k1"))
 	}
 
@@ -449,7 +480,7 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, error) {
 
 	// todo: Commit() should be atomic operation
 
-	batch := ctrler.frozenDB.NewBatch()
+	batch := ctrler.frozenStakesDB.NewBatch()
 	defer batch.Close()
 
 	for _, s := range ctrler.delFrozenStakes {
@@ -461,57 +492,51 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, error) {
 	ctrler.delFrozenStakes = nil
 	for _, s := range ctrler.newFrozenStakes {
 		if bz, err := json.Marshal(s); err != nil {
-			return nil, -1, err
+			return nil, -1, xerrors.NewFrom(err)
 		} else if err := batch.Set(s.TxHash, bz); err != nil {
-			return nil, -1, err
+			return nil, -1, xerrors.NewFrom(err)
+		} else if _, _, err := ctrler.stakesTree.Remove(s.TxHash); err != nil {
+			return nil, -1, xerrors.NewFrom(err)
 		}
-	}
-	if err := batch.Write(); err != nil {
-		return nil, -1, err
 	}
 
 	ctrler.allFrozenStakes = append(ctrler.allFrozenStakes, ctrler.newFrozenStakes...)
 	ctrler.newFrozenStakes = nil
 	sort.Sort(refundHeightOrder(ctrler.allFrozenStakes))
 
-	for _, staker := range ctrler.updatedStakers {
-		if staker.GetTotalPower() == 0 {
-			// removed
-			if _, _, err := ctrler.stakersTree.Remove(staker.Owner); err != nil {
-				return nil, -1, xerrors.NewFrom(err)
-			}
-		} else {
-			// new or updated
-			if bz, err := json.Marshal(staker); err != nil {
-				return nil, -1, xerrors.NewFrom(err)
-			} else if _, err := ctrler.stakersTree.Set(staker.Owner, bz); err != nil {
-				return nil, -1, xerrors.NewFrom(err)
-			}
+	for _, s0 := range ctrler.updatedStakes {
+		if bz, err := json.Marshal(s0); err != nil {
+			return nil, -1, xerrors.NewFrom(err)
+		} else if _, err := ctrler.stakesTree.Set(s0.TxHash, bz); err != nil {
+			return nil, -1, xerrors.NewFrom(err)
 		}
 	}
-	ctrler.updatedStakers = nil
+	ctrler.updatedStakes = nil
 
-	return ctrler.stakersTree.SaveVersion()
+	if err := batch.Write(); err != nil {
+		return nil, -1, err
+	}
+	return ctrler.stakesTree.SaveVersion()
 }
 
 func (ctrler *StakeCtrler) Close() error {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if ctrler.stakersDB != nil {
-		if err := ctrler.stakersDB.Close(); err != nil {
+	if ctrler.stakesDB != nil {
+		if err := ctrler.stakesDB.Close(); err != nil {
 			return nil
 		}
 	}
-	if ctrler.frozenDB != nil {
-		if err := ctrler.frozenDB.Close(); err != nil {
+	if ctrler.frozenStakesDB != nil {
+		if err := ctrler.frozenStakesDB.Close(); err != nil {
 			return err
 		}
 	}
 
-	ctrler.stakersDB = nil
-	ctrler.stakersTree = nil
-	ctrler.frozenDB = nil
+	ctrler.stakesDB = nil
+	ctrler.stakesTree = nil
+	ctrler.frozenStakesDB = nil
 	return nil
 }
 
@@ -520,27 +545,20 @@ var _ types.ILedgerCtrler = (*StakeCtrler)(nil)
 
 type StakeSetArray []*StakeSet
 
-func (vs StakeSetArray) Len() int {
-	return len(vs)
-}
-
-// descending order by TotalPower
-func (vs StakeSetArray) Less(i, j int) bool {
-	return vs[i].TotalPower > vs[j].TotalPower
-}
-
-func (vs StakeSetArray) Swap(i, j int) {
-	vs[i], vs[j] = vs[j], vs[i]
-}
-
-var _ sort.Interface = (StakeSetArray)(nil)
-
 func (vs StakeSetArray) SumTotalAmount() *big.Int {
 	var amt *big.Int
 	for _, val := range vs {
 		amt = new(big.Int).Add(amt, val.TotalAmount)
 	}
 	return amt
+}
+
+func (vs StakeSetArray) SumTotalPower() int64 {
+	power := int64(0)
+	for _, val := range vs {
+		power += val.TotalPower
+	}
+	return power
 }
 
 func (vs StakeSetArray) SumTotalReward() *big.Int {
@@ -559,10 +577,26 @@ func (vs StakeSetArray) SumTotalFeeReward() *big.Int {
 	return fee
 }
 
-func (vs StakeSetArray) SumTotalPower() int64 {
-	power := int64(0)
-	for _, val := range vs {
-		power += val.TotalPower
-	}
-	return power
+type powerOrderedStakeSets []*StakeSet
+
+func (vs powerOrderedStakeSets) Len() int {
+	return len(vs)
 }
+
+// descending order by TotalPower
+func (vs powerOrderedStakeSets) Less(i, j int) bool {
+	if vs[i].TotalPower != vs[j].TotalPower {
+		return vs[i].TotalPower > vs[j].TotalPower
+	} else if len(vs[i].Stakes) != len(vs[j].Stakes) {
+		return len(vs[i].Stakes) > len(vs[j].Stakes)
+	} else if bytes.Compare(vs[i].Owner, vs[j].Owner) > 0 {
+		return true
+	}
+	return false
+}
+
+func (vs powerOrderedStakeSets) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+
+var _ sort.Interface = (powerOrderedStakeSets)(nil)

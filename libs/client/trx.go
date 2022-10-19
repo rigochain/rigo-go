@@ -25,3 +25,13 @@ func NewTrxStaking(from, to types.Address, amt, gas *big.Int, nonce uint64) *trx
 		gas,
 		trxs.TRX_STAKING)
 }
+
+func NewTrxUnstaking(from, to types.Address, amt, gas *big.Int, nonce uint64) *trxs.Trx {
+	return trxs.NewTrx(
+		uint32(1),
+		from, to,
+		nonce,
+		amt,
+		gas,
+		trxs.TRX_STAKING)
+}

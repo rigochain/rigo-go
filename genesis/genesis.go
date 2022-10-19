@@ -1,9 +1,9 @@
 package genesis
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"github.com/kysee/arcanus/ctrlers/gov"
+	"github.com/kysee/arcanus/libs/crypto"
 	"github.com/kysee/arcanus/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -17,7 +17,7 @@ type GenesisAssetHolder struct {
 }
 
 func (gh *GenesisAssetHolder) Hash() []byte {
-	hasher := sha256.New()
+	hasher := crypto.DefaultHasher()
 	hasher.Write(gh.Address[:])
 	hasher.Write([]byte(gh.Balance))
 	return hasher.Sum(nil)
@@ -46,7 +46,7 @@ func (gr *GenesisGovRules) Hash() []byte {
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint32(buf, uint32(gr.Version))
 
-	hasher := sha256.New()
+	hasher := crypto.DefaultHasher()
 	hasher.Write(buf)
 	hasher.Write([]byte(gr.AmountPerPower))
 	hasher.Write([]byte(gr.RewardPerPower))
@@ -59,7 +59,7 @@ type GenesisAppState struct {
 }
 
 func (ga *GenesisAppState) Hash() ([]byte, error) {
-	hasher := sha256.New()
+	hasher := crypto.DefaultHasher()
 
 	hasher.Write(ga.GovRules.Hash())
 	for _, h := range ga.AssetHolders {

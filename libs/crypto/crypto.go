@@ -3,12 +3,11 @@ package crypto
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"crypto/sha256"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/xerrors"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
-	"golang.org/x/crypto/ripemd160"
+	"hash"
 )
 
 func NewPrvKey() (*ecdsa.PrivateKey, error) {
@@ -49,8 +48,7 @@ func Pub2Addr(pub *ecdsa.PublicKey) types.Address {
 
 // pubBytes is 33 bytes compressed format
 func PubBytes2Addr(pubBytes []byte) (types.Address, error) {
-	// todo: generate address like as ethereum style
-
+	// ethereum style
 	//pub, err := ethcrypto.DecompressPubkey(pubBytes)
 	//if err != nil {
 	//	return nil, err
@@ -58,17 +56,7 @@ func PubBytes2Addr(pubBytes []byte) (types.Address, error) {
 	//a := ethcrypto.PubkeyToAddress(*pub)
 	//return a[:], nil
 
-	if len(pubBytes) != tmsecp256k1.PubKeySize {
-		panic("length of pubkey is incorrect")
-	}
-	hasherSHA256 := sha256.New()
-	_, _ = hasherSHA256.Write(pubBytes) // does not error
-	sha := hasherSHA256.Sum(nil)
-
-	hasherRIPEMD160 := ripemd160.New()
-	_, _ = hasherRIPEMD160.Write(sha) // does not error
-
-	return types.Address(hasherRIPEMD160.Sum(nil)), nil
+	return tmsecp256k1.PubKey(pubBytes).Address(), nil
 }
 
 func CompressPubkey(pub *ecdsa.PublicKey) types.HexBytes {
@@ -90,7 +78,19 @@ func Sig2Addr(msg, sig []byte) (types.Address, types.HexBytes, error) {
 }
 
 func DefaultHash(datas ...[]byte) []byte {
-	return ethcrypto.Keccak256(datas...)
+	hasher := DefaultHasher()
+	for _, bz := range datas {
+		hasher.Write(bz)
+	}
+	return hasher.Sum(nil)
+}
+
+func DefaultHasher() hash.Hash {
+	return ethcrypto.NewKeccakState()
+}
+
+func DefaultHasherName() string {
+	return "keccak256"
 }
 
 //

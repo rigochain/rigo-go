@@ -11,6 +11,7 @@ import (
 
 type Stake struct {
 	Owner       types.Address `json:"owner"`
+	To          types.Address `json:"to"`
 	Amount      *big.Int      `json:"amount"`
 	Power       int64         `json:"power"`
 	BlockReward *big.Int      `json:"blockReward"`
@@ -23,11 +24,12 @@ type Stake struct {
 	mtx sync.RWMutex
 }
 
-func NewStakeWithAmount(addr types.Address, amt *big.Int, height int64, txhash types.HexBytes, rules types.IGovRules) *Stake {
+func NewStakeWithAmount(owner, to types.Address, amt *big.Int, height int64, txhash types.HexBytes, rules types.IGovRules) *Stake {
 	power := rules.AmountToPower(amt)
 	blockReward := rules.PowerToReward(power)
 	return &Stake{
-		Owner:        addr,
+		Owner:        owner,
+		To:           to,
 		Amount:       amt,
 		Power:        power,
 		BlockReward:  blockReward,
@@ -38,11 +40,12 @@ func NewStakeWithAmount(addr types.Address, amt *big.Int, height int64, txhash t
 	}
 }
 
-func NewStakeWithPower(addr types.Address, power int64, height int64, txhash types.HexBytes, rules types.IGovRules) *Stake {
+func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhash types.HexBytes, rules types.IGovRules) *Stake {
 	amt := rules.PowerToAmount(power)
 	blockReward := rules.PowerToReward(power)
 	return &Stake{
-		Owner:        addr,
+		Owner:        owner,
+		To:           to,
 		Amount:       amt,
 		Power:        power,
 		BlockReward:  blockReward,
@@ -58,6 +61,7 @@ func (s *Stake) Equal(o *Stake) bool {
 	defer s.mtx.RUnlock()
 
 	return bytes.Compare(s.Owner, o.Owner) == 0 &&
+		bytes.Compare(s.To, o.To) == 0 &&
 		bytes.Compare(s.TxHash, o.TxHash) == 0 &&
 		s.StartHeight == o.StartHeight &&
 		s.Amount.Cmp(o.Amount) == 0
@@ -69,6 +73,7 @@ func (s *Stake) Copy() *Stake {
 
 	return &Stake{
 		Owner:        s.Owner,
+		To:           s.To,
 		Amount:       new(big.Int).Set(s.Amount),
 		Power:        s.Power,
 		BlockReward:  new(big.Int).Set(s.BlockReward),

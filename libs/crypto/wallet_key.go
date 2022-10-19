@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -68,11 +67,11 @@ func NewWalletKey(keyBytes, pass []byte) *WalletKey {
 		rand.Read(salt)
 		iter := 200000 + int(binary.BigEndian.Uint16(salt[:2]))
 
-		sk := pbkdf2.Key(pass, salt, iter, DKLEN, sha256.New)
+		sk := pbkdf2.Key(pass, salt, iter, DKLEN, DefaultHasher)
 
 		_dkParams = &dkParams{
 			Algo:  "pbkdf2",
-			Prf:   "sha256",
+			Prf:   DefaultHasherName(),
 			Iter:  iter,
 			Salt:  salt,
 			DkLen: DKLEN,
@@ -168,7 +167,7 @@ func (wk *WalletKey) Unlock(s []byte) error {
 	}
 
 	if s != nil {
-		sk := pbkdf2.Key(s, wk.DKParams.Salt, wk.DKParams.Iter, wk.DKParams.DkLen, sha256.New)
+		sk := pbkdf2.Key(s, wk.DKParams.Salt, wk.DKParams.Iter, wk.DKParams.DkLen, DefaultHasher)
 		iv := wk.CipherTextParams.Iv
 		ciphertext := wk.CipherTextParams.Text
 		prvKey := make([]byte, len(ciphertext))

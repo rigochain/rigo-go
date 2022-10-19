@@ -48,6 +48,7 @@ var (
 	ErrInvalidTrxType        = ErrInvalidTrx.Wrap(errors.New("wrong transaction type"))
 	ErrInvalidTrxPayloadType = ErrInvalidTrx.Wrap(errors.New("wrong transaction payload type"))
 	ErrInvalidTrxSig         = ErrInvalidTrx.With(errors.New("invalid signature"))
+	ErrTooManyPower          = ErrInvalidTrx.With(errors.New("too many power"))
 	ErrNotFoundTx            = NewWith(ErrCodeNotFoundTx, "not found tx")
 	ErrNotFoundStaker        = NewWith(ErrCodeNotFoundStaker, "not found staker")
 	ErrNotFoundStake         = NewWith(ErrCodeNotFoundStake, "not found stake")

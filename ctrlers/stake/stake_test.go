@@ -8,10 +8,16 @@ import (
 	"testing"
 )
 
+var (
+	addr0 = libs.RandAddress()
+	addr1 = libs.RandAddress()
+)
+
 func TestNewStake(t *testing.T) {
 	amt := libs.RandBigIntN(testGovRules.MaxStakeAmount())
 	s0 := stake.NewStakeWithAmount(
 		addr0,
+		addr1,
 		amt, 1, nil,
 		testGovRules)
 
@@ -30,6 +36,7 @@ func TestApplyRewardByStake(t *testing.T) {
 		txhash := libs.RandBytes(32)
 		stakes[i] = stake.NewStakeWithAmount(
 			addr0,
+			addr1,
 			amt, 1, txhash,
 			testGovRules)
 	}

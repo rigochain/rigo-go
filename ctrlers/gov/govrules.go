@@ -63,7 +63,7 @@ func (gr *GovRules) Encode() ([]byte, error) {
 // implement interface IGovRules
 //
 
-func (gr *GovRules) MaxValidatorCount() int32 {
+func (gr *GovRules) GetMaxValidatorCount() int32 {
 	return gr.MaxValidatorCnt
 }
 
@@ -73,6 +73,10 @@ func (gr *GovRules) MaxValidatorCount() int32 {
 // the MAXSTAKEsau becomes `int64(math.MaxInt64) / 8 * 10^18` (~= 922경 XCO)
 func (gr *GovRules) MaxStakeAmount() *big.Int {
 	return new(big.Int).Mul(big.NewInt(tmtypes.MaxTotalVotingPower), gr.AmountPerPower)
+}
+
+func (gr *GovRules) MaxTotalPower() int64 {
+	return tmtypes.MaxTotalVotingPower
 }
 
 func (gr *GovRules) GetRewardDelayBlocks() int64 {

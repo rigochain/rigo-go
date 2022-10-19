@@ -25,38 +25,60 @@ func newStakeSet() *stake.StakeSet {
 	return stake.NewStakeSet(w0.Address(), w0.GetPubKey())
 }
 
-type stakesMap map[types.AcctKey][]*stake.Stake
+type StakingResult struct {
+	Owner types.Address
+	To    types.Address
+	Power int64
+	Amt   *big.Int
+}
 
-func randomStakesTo(sset *stake.StakeSet, n int) stakesMap {
+type StakeResultsMap map[types.AcctKey]*StakingResult
+
+func randomStakesTo(sset *stake.StakeSet, n int, allowedPower int64) (StakeResultsMap, error) {
 	var addr types.Address
-	retStakeMap := make(stakesMap)
+	retStakeMap := make(StakeResultsMap)
 
-	stakes := make([]*stake.Stake, n)
-	for i, _ := range stakes {
+	allowedPower = allowedPower / int64(n)
+
+	for i := 0; i < n; i++ {
 		if addr == nil || libs.RandInt63()%3 == 0 {
 			addr = libs.RandAddress()
+			if _, ok := retStakeMap[types.ToAcctKey(addr)]; !ok {
+				retStakeMap[types.ToAcctKey(addr)] = &StakingResult{
+					Owner: addr,
+					To:    sset.Owner,
+					Power: int64(0),
+					Amt:   big.NewInt(0),
+				}
+			}
 		}
-
-		stakes[i] = stake.NewStakeWithAmount(
+		power := libs.RandInt63n(allowedPower)
+		amt := testGovRules.PowerToAmount(power)
+		s := stake.NewStakeWithAmount(
 			addr,
-			libs.RandBigIntN(new(big.Int).Quo(testGovRules.MaxStakeAmount(), big.NewInt(int64(n)))), // amount
+			sset.Owner,
+			amt,                        // amount
 			libs.RandInt63n(1_000_000), // height
 			libs.RandHexBytes(32),      //txhash
 			testGovRules)
-		// fmt.Println(addr, stakes[i].Amount, stakes[i].Power)
 
-		retStakeMap[types.ToAcctKey(addr)] = append(retStakeMap[types.ToAcctKey(addr)], stakes[i])
+		if err := sset.AppendStake(s); err != nil {
+			return nil, err
+		}
+
+		ret := retStakeMap[types.ToAcctKey(addr)]
+		ret.Power += power
+		ret.Amt = ret.Amt.Add(ret.Amt, amt)
 	}
-	if err := sset.AppendStake(stakes...); err != nil {
-		panic(err)
-	}
-	return retStakeMap
+
+	return retStakeMap, nil
 }
 
 func TestStakeSet(t *testing.T) {
 	stakesCnt := int(libs.RandInt63n(10000))
 	stakeSet := newStakeSet()
-	stakesMapByOwner := randomStakesTo(stakeSet, stakesCnt)
+	stakesMapByOwner, err := randomStakesTo(stakeSet, stakesCnt, testGovRules.MaxTotalPower())
+	require.NoError(t, err)
 	require.NotNil(t, stakesMapByOwner)
 	require.True(t, 0 < len(stakesMapByOwner))
 
@@ -123,7 +145,8 @@ func TestStakeSet(t *testing.T) {
 
 func TestApplyReward(t *testing.T) {
 	validator := newStakeSet()
-	randomStakesTo(validator, int(libs.RandInt63n(10000)))
+	_, err := randomStakesTo(validator, int(libs.RandInt63n(10000)), testGovRules.MaxTotalPower())
+	require.NoError(t, err)
 
 	// first reward
 	reward0 := validator.ApplyReward()
@@ -143,7 +166,8 @@ func TestApplyReward(t *testing.T) {
 
 func BenchmarkApplyReward(b *testing.B) {
 	val0 := newStakeSet()
-	randomStakesTo(val0, 10000)
+	_, err := randomStakesTo(val0, 10000, testGovRules.MaxTotalPower())
+	require.NoError(b, err)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

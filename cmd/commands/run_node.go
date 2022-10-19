@@ -2,9 +2,9 @@ package commands
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"fmt"
 	"github.com/kysee/arcanus/libs"
+	"github.com/kysee/arcanus/libs/crypto"
 	xnode "github.com/kysee/arcanus/node"
 	"io"
 	"os"
@@ -167,7 +167,7 @@ func checkGenesisHash(config *cfg.Config) error {
 		return fmt.Errorf("can't open genesis file: %w", err)
 	}
 	defer f.Close()
-	h := sha256.New()
+	h := crypto.DefaultHasher()
 	if _, err := io.Copy(h, f); err != nil {
 		return fmt.Errorf("error when hashing genesis file: %w", err)
 	}

@@ -6,7 +6,6 @@ import (
 	"github.com/kysee/arcanus/libs/crypto"
 	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/xerrors"
-	tmcrypto "github.com/tendermint/tendermint/crypto"
 	"math/big"
 )
 
@@ -24,9 +23,9 @@ type TrxContext struct {
 	NeedAmt      *big.Int
 	GasUsed      *big.Int
 
-	GovRules      types.IGovRules
-	AccountFinder types.IAccountFinder
-	Error         xerrors.XError
+	GovRules types.IGovRules
+	//AccountFinder types.IAccountFinder
+	Error xerrors.XError
 }
 
 func NewTrxContext(txbz []byte, height int64, exec bool, acctFinder types.IAccountFinder, govRules types.IGovRules) (*TrxContext, error) {
@@ -73,15 +72,15 @@ func NewTrxContext(txbz []byte, height int64, exec bool, acctFinder types.IAccou
 	}
 
 	return &TrxContext{
-		Tx:            tx,
-		TxHash:        tmcrypto.Sha256(txbz),
-		Height:        height,
-		Exec:          exec,
-		Sender:        acct,
-		SenderPubKey:  pubBytes,
-		NeedAmt:       needFund,
-		GasUsed:       big.NewInt(0),
-		AccountFinder: acctFinder,
-		GovRules:      govRules,
+		Tx:           tx,
+		TxHash:       crypto.DefaultHash(txbz),
+		Height:       height,
+		Exec:         exec,
+		Sender:       acct,
+		SenderPubKey: pubBytes,
+		NeedAmt:      needFund,
+		GasUsed:      big.NewInt(0),
+		//AccountFinder: acctFinder,
+		GovRules: govRules,
 	}, nil
 }
