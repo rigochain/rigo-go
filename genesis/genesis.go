@@ -24,8 +24,8 @@ func (gh *GenesisAssetHolder) Hash() []byte {
 }
 
 type GenesisGovRules struct {
-	Version           int32  `json:"version"`
-	MaxValidatorCnt   int32  `json:"maxValidatorCnt"`
+	Version           int64  `json:"version"`
+	MaxValidatorCnt   int64  `json:"maxValidatorCnt"`
 	RewardDelayBlocks int64  `json:"rewardDelayBlocks"`
 	AmountPerPower    string `json:"amountPerPower"`
 	RewardPerPower    string `json:"rewardPerPower"`

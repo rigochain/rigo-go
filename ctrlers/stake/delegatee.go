@@ -233,6 +233,13 @@ func (sset *Delegatee) StakesLen() int {
 	return len(sset.Stakes)
 }
 
+func (sset *Delegatee) GetSelfAmount() *big.Int {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	return sset.SelfAmount
+}
+
 func (sset *Delegatee) GetTotalAmount() *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
@@ -240,7 +247,7 @@ func (sset *Delegatee) GetTotalAmount() *big.Int {
 	return sset.TotalAmount
 }
 
-func (sset *Delegatee) AmountOf(addr types.Address) *big.Int {
+func (sset *Delegatee) SumAmountOf(addr types.Address) *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
@@ -268,6 +275,13 @@ func (sset *Delegatee) sumAmount() *big.Int {
 	return amt
 }
 
+func (sset *Delegatee) GetSelfPower() int64 {
+	sset.mtx.RLock()
+	defer sset.mtx.RUnlock()
+
+	return sset.SelfPower
+}
+
 func (sset *Delegatee) GetTotalPower() int64 {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
@@ -275,7 +289,7 @@ func (sset *Delegatee) GetTotalPower() int64 {
 	return sset.TotalPower
 }
 
-func (sset *Delegatee) PowerOf(addr types.Address) int64 {
+func (sset *Delegatee) SumPowerOf(addr types.Address) int64 {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
@@ -310,7 +324,7 @@ func (sset *Delegatee) GetTotalReward() *big.Int {
 	return new(big.Int).Set(sset.TotalReward)
 }
 
-func (sset *Delegatee) RewardOf(addr types.Address) *big.Int {
+func (sset *Delegatee) SumRewardOf(addr types.Address) *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 

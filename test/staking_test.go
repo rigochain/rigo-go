@@ -39,4 +39,6 @@ func TestStaking(t *testing.T) {
 	//require.Equal(t, trxs.TRX_TRANSFER, txRet.TxDetail.Payload.Type())
 	require.Equal(t, gas, txRet.TxDetail.Gas)
 	require.Equal(t, stakeAmt, txRet.TxDetail.Amount)
+
+	// todo: query stake amount and check that the response is correct
 }

@@ -3,7 +3,7 @@ package types
 import "math/big"
 
 type IGovRules interface {
-	GetMaxValidatorCount() int32
+	GetMaxValidatorCount() int64
 	GetRewardDelayBlocks() int64
 	MaxStakeAmount() *big.Int
 	MaxTotalPower() int64

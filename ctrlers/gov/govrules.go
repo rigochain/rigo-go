@@ -9,8 +9,8 @@ import (
 )
 
 type GovRules struct {
-	Version           int32    `json:"version"`
-	MaxValidatorCnt   int32    `json:"maxValidatorCnt"`
+	Version           int64    `json:"version"`
+	MaxValidatorCnt   int64    `json:"maxValidatorCnt"`
 	RewardDelayBlocks int64    `json:"rewardDelayBlocks"`
 	AmountPerPower    *big.Int `json:"amountPerPower"`
 	RewardPerPower    *big.Int `json:"rewardPerPower"`
@@ -63,7 +63,7 @@ func (gr *GovRules) Encode() ([]byte, error) {
 // implement interface IGovRules
 //
 
-func (gr *GovRules) GetMaxValidatorCount() int32 {
+func (gr *GovRules) GetMaxValidatorCount() int64 {
 	return gr.MaxValidatorCnt
 }
 

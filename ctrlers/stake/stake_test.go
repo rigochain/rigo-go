@@ -43,7 +43,7 @@ func TestApplyRewardByStake(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		_ = stakes[i].ApplyReward()
-		require.True(t, stakes[i].Reward.Cmp(big.NewInt(0)) > 0)
+		require.True(t, stakes[i].Reward.Sign() > 0)
 		require.Equal(t, stakes[i].BlockReward, stakes[i].Reward)
 	}
 

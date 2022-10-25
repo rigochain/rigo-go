@@ -129,7 +129,7 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 		return nil, xerrors.New("Stop to load stakers tree")
 	}
 
-	sort.Sort(powerOrderedStakeSets(allStakers))
+	sort.Sort(powerOrderedDelegatees(allStakers))
 
 	frozenDB, err := db.NewDB("frozen", "goleveldb", dbDir)
 	if err != nil {
@@ -474,24 +474,24 @@ func (ctrler *StakeCtrler) UpdateValidators(maxVals int) []tmtypes.ValidatorUpda
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	sort.Sort(powerOrderedStakeSets(ctrler.allDelegatees)) // sort by power
+	sort.Sort(powerOrderedDelegatees(ctrler.allDelegatees)) // sort by power
 
 	var newValidators ValidatorInfoList
 	n := libs.MIN(len(ctrler.allDelegatees), maxVals)
 	for i := 0; i < n; i++ {
-		staker := ctrler.allDelegatees[i]
+		delegatee := ctrler.allDelegatees[i]
 		newValidators = append(newValidators, &ValidatorInfo{
-			Address: staker.Addr,
-			PubKey:  staker.PubKey,
-			Power:   staker.TotalPower,
+			Address: delegatee.Addr,
+			PubKey:  delegatee.PubKey,
+			Power:   delegatee.TotalPower,
 		})
 	}
 	sort.Sort(newValidators) // sort by address
 
-	ret := validatorUpdates(ctrler.lastValidators, newValidators)
+	valUps := validatorUpdates(ctrler.lastValidators, newValidators)
 	ctrler.lastValidators = newValidators
 
-	return ret
+	return valUps
 }
 
 func validatorUpdates(existing, newers ValidatorInfoList) []tmtypes.ValidatorUpdate {
@@ -633,14 +633,14 @@ func (vs DelegateeArray) SumTotalFeeReward() *big.Int {
 	return fee
 }
 
-type powerOrderedStakeSets []*Delegatee
+type powerOrderedDelegatees []*Delegatee
 
-func (vs powerOrderedStakeSets) Len() int {
+func (vs powerOrderedDelegatees) Len() int {
 	return len(vs)
 }
 
 // descending order by TotalPower
-func (vs powerOrderedStakeSets) Less(i, j int) bool {
+func (vs powerOrderedDelegatees) Less(i, j int) bool {
 	if vs[i].TotalPower != vs[j].TotalPower {
 		return vs[i].TotalPower > vs[j].TotalPower
 	} else if len(vs[i].Stakes) != len(vs[j].Stakes) {
@@ -651,8 +651,8 @@ func (vs powerOrderedStakeSets) Less(i, j int) bool {
 	return false
 }
 
-func (vs powerOrderedStakeSets) Swap(i, j int) {
+func (vs powerOrderedDelegatees) Swap(i, j int) {
 	vs[i], vs[j] = vs[j], vs[i]
 }
 
-var _ sort.Interface = (powerOrderedStakeSets)(nil)
+var _ sort.Interface = (powerOrderedDelegatees)(nil)
