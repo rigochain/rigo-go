@@ -150,8 +150,8 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 		if err != nil {
 			panic(err)
 		}
-		staker := ctrler.stakeCtrler.AddStakerWith(addr, pubKeyBytes)
-		stake0 := stake.NewStakeWithPower(staker.Owner, staker.Owner, validator.Power, 0, libs.ZeroBytes(32), ctrler.govCtrler.GetRules())
+		staker := ctrler.stakeCtrler.AddDelegateeWith(addr, pubKeyBytes)
+		stake0 := stake.NewStakeWithPower(staker.Addr, staker.Addr, validator.Power, 0, libs.ZeroBytes(32), ctrler.govCtrler.GetRules())
 		staker.AppendStake(stake0)
 	}
 

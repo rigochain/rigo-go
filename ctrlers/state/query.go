@@ -36,7 +36,7 @@ func (ctrler *ChainCtrler) Query(req abcitypes.RequestQuery) abcitypes.ResponseQ
 		}
 	case types.QUERY_STAKES:
 		addr := types.Address(qd.Params)
-		if staker := ctrler.stakeCtrler.FindStaker(addr); staker == nil {
+		if staker := ctrler.stakeCtrler.FindDelegatee(addr); staker == nil {
 			response.Code = xerrors.ErrNotFoundStaker.Code()
 			response.Log = xerrors.ErrNotFoundStaker.Error()
 		} else if v, err := json.Marshal(staker); err != nil {

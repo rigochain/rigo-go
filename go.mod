@@ -1,6 +1,6 @@
 module github.com/kysee/arcanus
 
-go 1.18
+go 1.19
 
 require (
 	github.com/cosmos/iavl v0.19.1

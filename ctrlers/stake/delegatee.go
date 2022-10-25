@@ -44,22 +44,27 @@ func (slst refundHeightOrder) Swap(i, j int) {
 
 var _ sort.Interface = (refundHeightOrder)(nil)
 
-type StakeSet struct {
-	Owner       types.Address  `json:"owner"`
-	PubKey      types.HexBytes `json:"pubKey"`
-	Stakes      []*Stake       `json:"stakes"`
-	TotalAmount *big.Int       `json:"totalAmount"`
-	TotalPower  int64          `json:"totalPower"`
-	TotalReward *big.Int       `json:"totalReward"`
-	FeeReward   *big.Int       `json:"feeReward"`
+type Delegatee struct {
+	Addr   types.Address  `json:"address"`
+	PubKey types.HexBytes `json:"pubKey"`
+	Stakes []*Stake       `json:"stakes"`
+
+	SelfAmount  *big.Int `json:"selfAmount"`
+	SelfPower   int64    `json:"selfPower"`
+	TotalAmount *big.Int `json:"totalAmount"`
+	TotalPower  int64    `json:"totalPower"`
+	TotalReward *big.Int `json:"totalReward"`
+	FeeReward   *big.Int `json:"feeReward"`
 
 	mtx sync.RWMutex
 }
 
-func NewStakeSet(addr types.Address, pubKey types.HexBytes) *StakeSet {
-	return &StakeSet{
-		Owner:       addr,
+func NewDelegatee(addr types.Address, pubKey types.HexBytes) *Delegatee {
+	return &Delegatee{
+		Addr:        addr,
 		PubKey:      pubKey,
+		SelfAmount:  big.NewInt(0),
+		SelfPower:   0,
 		TotalPower:  0,
 		TotalAmount: big.NewInt(0),
 		TotalReward: big.NewInt(0),
@@ -67,7 +72,7 @@ func NewStakeSet(addr types.Address, pubKey types.HexBytes) *StakeSet {
 	}
 }
 
-func (sset *StakeSet) String() string {
+func (sset *Delegatee) String() string {
 	bz, err := json.MarshalIndent(sset, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("{error: %v}", err)
@@ -75,27 +80,30 @@ func (sset *StakeSet) String() string {
 	return string(bz)
 }
 
-func (sset *StakeSet) AppendStake(stakes ...*Stake) error {
+func (sset *Delegatee) AppendStake(stakes ...*Stake) error {
 	sset.mtx.Lock()
 	defer sset.mtx.Unlock()
 
 	return sset.appendStake(stakes...)
 }
 
-func (sset *StakeSet) appendStake(stakes ...*Stake) error {
+func (sset *Delegatee) appendStake(stakes ...*Stake) error {
+	//stakes[n].To is equal to sset.Addr
+
 	sset.Stakes = append(sset.Stakes, stakes...)
 
-	// I don't know why Stakes should be sorted by start height
-	//sort.Sort(startHeightOrder(sset.Stakes))
-
 	for _, s := range stakes {
+		if s.IsSelfStake() {
+			sset.SelfPower += s.Power
+			sset.SelfAmount = new(big.Int).Add(sset.SelfAmount, s.Amount)
+		}
 		sset.TotalPower += s.Power
 		sset.TotalAmount = new(big.Int).Add(sset.TotalAmount, s.Amount)
 	}
 	return nil
 }
 
-func (sset *StakeSet) DelStake(txhash types.HexBytes) *Stake {
+func (sset *Delegatee) DelStake(txhash types.HexBytes) *Stake {
 	sset.mtx.Lock()
 	defer sset.mtx.Unlock()
 
@@ -105,6 +113,10 @@ func (sset *StakeSet) DelStake(txhash types.HexBytes) *Stake {
 	}
 
 	if s := sset.delStakeByIdx(i); s != nil {
+		if s.IsSelfStake() {
+			sset.SelfPower -= s.Power
+			sset.SelfAmount = new(big.Int).Sub(sset.SelfAmount, s.Amount)
+		}
 		sset.TotalPower -= s.Power
 		sset.TotalAmount = new(big.Int).Sub(sset.TotalAmount, s.Amount)
 		sset.TotalReward = new(big.Int).Sub(sset.TotalReward, s.Reward)
@@ -113,11 +125,15 @@ func (sset *StakeSet) DelStake(txhash types.HexBytes) *Stake {
 	return nil
 }
 
-func (sset *StakeSet) DelStakeByIdx(idx int) *Stake {
+func (sset *Delegatee) DelStakeByIdx(idx int) *Stake {
 	sset.mtx.Lock()
 	defer sset.mtx.Unlock()
 
 	if s := sset.delStakeByIdx(idx); s != nil {
+		if s.IsSelfStake() {
+			sset.SelfPower -= s.Power
+			sset.SelfAmount = new(big.Int).Sub(sset.SelfAmount, s.Amount)
+		}
 		sset.TotalPower -= s.Power
 		sset.TotalAmount = new(big.Int).Sub(sset.TotalAmount, s.Amount)
 		sset.TotalReward = new(big.Int).Sub(sset.TotalReward, s.Reward)
@@ -126,7 +142,7 @@ func (sset *StakeSet) DelStakeByIdx(idx int) *Stake {
 	return nil
 }
 
-func (sset *StakeSet) delStakeByIdx(idx int) *Stake {
+func (sset *Delegatee) delStakeByIdx(idx int) *Stake {
 	if idx >= len(sset.Stakes) {
 		return nil
 	} else {
@@ -136,28 +152,44 @@ func (sset *StakeSet) delStakeByIdx(idx int) *Stake {
 	}
 }
 
-func (sset *StakeSet) GetStake(idx int) *Stake {
+func (sset *Delegatee) DelAllStakes() []*Stake {
+	sset.mtx.Lock()
+	defer sset.mtx.Unlock()
+
+	stakes := sset.Stakes
+	sset.Stakes = nil
+
+	for _, s := range stakes {
+		sset.TotalPower -= s.Power
+		sset.TotalAmount = new(big.Int).Sub(sset.TotalAmount, s.Amount)
+		sset.TotalReward = new(big.Int).Sub(sset.TotalReward, s.Reward)
+	}
+
+	return stakes
+}
+
+func (sset *Delegatee) GetStake(idx int) *Stake {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return sset.getStake(idx)
 }
 
-func (sset *StakeSet) getStake(idx int) *Stake {
+func (sset *Delegatee) getStake(idx int) *Stake {
 	if idx >= len(sset.Stakes) {
 		return nil
 	}
 	return sset.Stakes[idx]
 }
 
-func (sset *StakeSet) NextStake() *Stake {
+func (sset *Delegatee) NextStake() *Stake {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return sset.getStake(0)
 }
 
-func (sset *StakeSet) LastStake() *Stake {
+func (sset *Delegatee) LastStake() *Stake {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
@@ -165,14 +197,14 @@ func (sset *StakeSet) LastStake() *Stake {
 	return sset.getStake(idx)
 }
 
-func (sset *StakeSet) FindStake(txhash types.HexBytes) (int, *Stake) {
+func (sset *Delegatee) FindStake(txhash types.HexBytes) (int, *Stake) {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return sset.findStake(txhash)
 }
 
-func (sset *StakeSet) findStake(txhash types.HexBytes) (int, *Stake) {
+func (sset *Delegatee) findStake(txhash types.HexBytes) (int, *Stake) {
 	for i, s := range sset.Stakes {
 		if bytes.Compare(txhash, s.TxHash) == 0 {
 			return i, s
@@ -181,54 +213,54 @@ func (sset *StakeSet) findStake(txhash types.HexBytes) (int, *Stake) {
 	return -1, nil
 }
 
-func (sset *StakeSet) StakesOf(addr types.Address) []*Stake {
+func (sset *Delegatee) StakesOf(addr types.Address) []*Stake {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	var ret []*Stake
 	for _, s := range sset.Stakes {
-		if bytes.Compare(addr, s.Owner) == 0 {
+		if bytes.Compare(addr, s.From) == 0 {
 			ret = append(ret, s)
 		}
 	}
 	return ret
 }
 
-func (sset *StakeSet) StakesLen() int {
+func (sset *Delegatee) StakesLen() int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return len(sset.Stakes)
 }
 
-func (sset *StakeSet) GetTotalAmount() *big.Int {
+func (sset *Delegatee) GetTotalAmount() *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return sset.TotalAmount
 }
 
-func (sset *StakeSet) AmountOf(addr types.Address) *big.Int {
+func (sset *Delegatee) AmountOf(addr types.Address) *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	ret := big.NewInt(0)
 	for _, s0 := range sset.Stakes {
-		if bytes.Compare(s0.Owner, addr) == 0 {
+		if bytes.Compare(s0.From, addr) == 0 {
 			ret = ret.Add(ret, s0.Amount)
 		}
 	}
 	return ret
 }
 
-func (sset *StakeSet) SumAmount() *big.Int {
+func (sset *Delegatee) SumAmount() *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return sset.sumAmount()
 }
 
-func (sset *StakeSet) sumAmount() *big.Int {
+func (sset *Delegatee) sumAmount() *big.Int {
 	amt := big.NewInt(0)
 	for _, s := range sset.Stakes {
 		_ = amt.Add(amt, s.Amount)
@@ -236,34 +268,34 @@ func (sset *StakeSet) sumAmount() *big.Int {
 	return amt
 }
 
-func (sset *StakeSet) GetTotalPower() int64 {
+func (sset *Delegatee) GetTotalPower() int64 {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return sset.TotalPower
 }
 
-func (sset *StakeSet) PowerOf(addr types.Address) int64 {
+func (sset *Delegatee) PowerOf(addr types.Address) int64 {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	ret := int64(0)
 	for _, s0 := range sset.Stakes {
-		if bytes.Compare(s0.Owner, addr) == 0 {
+		if bytes.Compare(s0.From, addr) == 0 {
 			ret += s0.Power
 		}
 	}
 	return ret
 }
 
-func (sset *StakeSet) SumPower() int64 {
+func (sset *Delegatee) SumPower() int64 {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return sset.sumPower()
 }
 
-func (sset *StakeSet) sumPower() int64 {
+func (sset *Delegatee) sumPower() int64 {
 	power := int64(0)
 	for _, s := range sset.Stakes {
 		power += s.Power
@@ -271,34 +303,34 @@ func (sset *StakeSet) sumPower() int64 {
 	return power
 }
 
-func (sset *StakeSet) GetTotalReward() *big.Int {
+func (sset *Delegatee) GetTotalReward() *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return new(big.Int).Set(sset.TotalReward)
 }
 
-func (sset *StakeSet) RewardOf(addr types.Address) *big.Int {
+func (sset *Delegatee) RewardOf(addr types.Address) *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	ret := big.NewInt(0)
 	for _, s0 := range sset.Stakes {
-		if bytes.Compare(s0.Owner, addr) == 0 {
+		if bytes.Compare(s0.From, addr) == 0 {
 			ret = ret.Add(ret, s0.Reward)
 		}
 	}
 	return ret
 }
 
-func (sset *StakeSet) SumReward() *big.Int {
+func (sset *Delegatee) SumReward() *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return sset.sumReward()
 }
 
-func (sset *StakeSet) sumReward() *big.Int {
+func (sset *Delegatee) sumReward() *big.Int {
 	reward := big.NewInt(0)
 	for _, s := range sset.Stakes {
 		_ = reward.Add(reward, s.Reward)
@@ -306,14 +338,14 @@ func (sset *StakeSet) sumReward() *big.Int {
 	return reward
 }
 
-func (sset *StakeSet) ApplyReward() *big.Int {
+func (sset *Delegatee) ApplyReward() *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
 	return sset.applyReward()
 }
 
-func (sset *StakeSet) applyReward() *big.Int {
+func (sset *Delegatee) applyReward() *big.Int {
 	reward := big.NewInt(0)
 	for _, s := range sset.Stakes {
 		reward = new(big.Int).Add(reward, s.applyReward())
@@ -322,7 +354,7 @@ func (sset *StakeSet) applyReward() *big.Int {
 	return reward
 }
 
-func (sset *StakeSet) ApplyFeeReward(fee *big.Int) {
+func (sset *Delegatee) ApplyFeeReward(fee *big.Int) {
 	sset.mtx.Lock()
 	defer sset.mtx.Unlock()
 

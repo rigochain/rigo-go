@@ -1,7 +1,6 @@
 package stake_test
 
 import (
-	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/ctrlers/stake"
 	"github.com/kysee/arcanus/libs"
 	"github.com/kysee/arcanus/libs/client"
@@ -12,29 +11,14 @@ import (
 	"testing"
 )
 
-var testGovRules = &gov.GovRules{
-	Version:           0,
-	MaxValidatorCnt:   21,
-	RewardDelayBlocks: 10,
-	AmountPerPower:    big.NewInt(1000),
-	RewardPerPower:    big.NewInt(10),
-}
-
-func newStakeSet() *stake.StakeSet {
+func newDelegatee() *stake.Delegatee {
 	w0 := client.NewWallet([]byte("1"))
-	return stake.NewStakeSet(w0.Address(), w0.GetPubKey())
-}
-
-type StakingResult struct {
-	Owner types.Address
-	To    types.Address
-	Power int64
-	Amt   *big.Int
+	return stake.NewDelegatee(w0.Address(), w0.GetPubKey())
 }
 
 type StakeResultsMap map[types.AcctKey]*StakingResult
 
-func randomStakesTo(sset *stake.StakeSet, n int, allowedPower int64) (StakeResultsMap, error) {
+func randomStakesTo(sset *stake.Delegatee, n int, allowedPower int64) (StakeResultsMap, error) {
 	var addr types.Address
 	retStakeMap := make(StakeResultsMap)
 
@@ -46,7 +30,7 @@ func randomStakesTo(sset *stake.StakeSet, n int, allowedPower int64) (StakeResul
 			if _, ok := retStakeMap[types.ToAcctKey(addr)]; !ok {
 				retStakeMap[types.ToAcctKey(addr)] = &StakingResult{
 					Owner: addr,
-					To:    sset.Owner,
+					To:    sset.Addr,
 					Power: int64(0),
 					Amt:   big.NewInt(0),
 				}
@@ -56,7 +40,7 @@ func randomStakesTo(sset *stake.StakeSet, n int, allowedPower int64) (StakeResul
 		amt := testGovRules.PowerToAmount(power)
 		s := stake.NewStakeWithAmount(
 			addr,
-			sset.Owner,
+			sset.Addr,
 			amt,                        // amount
 			libs.RandInt63n(1_000_000), // height
 			libs.RandHexBytes(32),      //txhash
@@ -74,9 +58,9 @@ func randomStakesTo(sset *stake.StakeSet, n int, allowedPower int64) (StakeResul
 	return retStakeMap, nil
 }
 
-func TestStakeSet(t *testing.T) {
+func TestDelegatee(t *testing.T) {
 	stakesCnt := int(libs.RandInt63n(10000))
-	stakeSet := newStakeSet()
+	stakeSet := newDelegatee()
 	stakesMapByOwner, err := randomStakesTo(stakeSet, stakesCnt, testGovRules.MaxTotalPower())
 	require.NoError(t, err)
 	require.NotNil(t, stakesMapByOwner)
@@ -127,7 +111,7 @@ func TestStakeSet(t *testing.T) {
 }
 
 //func TestStakeOrder(t *testing.T) {
-//	stakeSet := newStakeSet()
+//	stakeSet := newDelegatee()
 //	randomStakesTo(stakeSet, int(libs.RandInt63n(10000)))
 //
 //	var preStake *stake.Stake = nil
@@ -144,7 +128,7 @@ func TestStakeSet(t *testing.T) {
 //}
 
 func TestApplyReward(t *testing.T) {
-	validator := newStakeSet()
+	validator := newDelegatee()
 	_, err := randomStakesTo(validator, int(libs.RandInt63n(10000)), testGovRules.MaxTotalPower())
 	require.NoError(t, err)
 
@@ -165,7 +149,7 @@ func TestApplyReward(t *testing.T) {
 }
 
 func BenchmarkApplyReward(b *testing.B) {
-	val0 := newStakeSet()
+	val0 := newDelegatee()
 	_, err := randomStakesTo(val0, 10000, testGovRules.MaxTotalPower())
 	require.NoError(b, err)
 

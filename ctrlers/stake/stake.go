@@ -10,7 +10,7 @@ import (
 )
 
 type Stake struct {
-	Owner       types.Address `json:"owner"`
+	From        types.Address `json:"owner"`
 	To          types.Address `json:"to"`
 	Amount      *big.Int      `json:"amount"`
 	Power       int64         `json:"power"`
@@ -24,11 +24,11 @@ type Stake struct {
 	mtx sync.RWMutex
 }
 
-func NewStakeWithAmount(owner, to types.Address, amt *big.Int, height int64, txhash types.HexBytes, rules types.IGovRules) *Stake {
+func NewStakeWithAmount(from, to types.Address, amt *big.Int, height int64, txhash types.HexBytes, rules types.IGovRules) *Stake {
 	power := rules.AmountToPower(amt)
 	blockReward := rules.PowerToReward(power)
 	return &Stake{
-		Owner:        owner,
+		From:         from,
 		To:           to,
 		Amount:       amt,
 		Power:        power,
@@ -44,7 +44,7 @@ func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhas
 	amt := rules.PowerToAmount(power)
 	blockReward := rules.PowerToReward(power)
 	return &Stake{
-		Owner:        owner,
+		From:         owner,
 		To:           to,
 		Amount:       amt,
 		Power:        power,
@@ -60,7 +60,7 @@ func (s *Stake) Equal(o *Stake) bool {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
-	return bytes.Compare(s.Owner, o.Owner) == 0 &&
+	return bytes.Compare(s.From, o.From) == 0 &&
 		bytes.Compare(s.To, o.To) == 0 &&
 		bytes.Compare(s.TxHash, o.TxHash) == 0 &&
 		s.StartHeight == o.StartHeight &&
@@ -72,8 +72,8 @@ func (s *Stake) Copy() *Stake {
 	defer s.mtx.RUnlock()
 
 	return &Stake{
-		Owner:        s.Owner,
-		To:           s.To,
+		From:         append(s.From, nil...),
+		To:           append(s.To, nil...),
 		Amount:       new(big.Int).Set(s.Amount),
 		Power:        s.Power,
 		BlockReward:  new(big.Int).Set(s.BlockReward),
@@ -93,6 +93,13 @@ func (s *Stake) ApplyReward() *big.Int {
 func (s *Stake) applyReward() *big.Int {
 	s.Reward = new(big.Int).Add(s.Reward, s.BlockReward)
 	return s.BlockReward
+}
+
+func (s *Stake) IsSelfStake() bool {
+	s.mtx.RLock()
+	defer s.mtx.RUnlock()
+
+	return bytes.Compare(s.From, s.To) == 0
 }
 
 func (s *Stake) String() string {

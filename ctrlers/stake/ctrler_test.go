@@ -20,29 +20,29 @@ var (
 	testStakingResultMapByOwner  = make(StakeResultsMap)
 )
 
-func createStakers(ctrler *stake.StakeCtrler, cnt int) error {
-	vals := newStakerArray(cnt)
+func createDelegatees(ctrler *stake.StakeCtrler, cnt int) error {
+	vals := newDelegatees(cnt)
 	for _, val := range vals {
-		if ctrler.AddStaker(val) == nil {
-			return errors.New("function AddStaker() returns nil")
+		if ctrler.AddDelegatee(val) == nil {
+			return errors.New("function AddDelegatee() returns nil")
 		}
 	}
 	return nil
 }
 
-func newStakerArray(n int) stake.StakeSetArray {
-	vals := make(stake.StakeSetArray, n)
+func newDelegatees(n int) stake.DelegateeArray {
+	vals := make(stake.DelegateeArray, n)
 	for i, _ := range vals {
-		vals[i] = newStakeSet()
+		vals[i] = newDelegatee()
 	}
 	return vals
 }
 
 func stakingRandom(ctrler *stake.StakeCtrler, maxCnt int) error {
-	allowedPowerForStaker := (testGovRules.MaxTotalPower() - ctrler.GetTotalPower()) / int64(ctrler.StakersLen())
+	allowedPowerForStaker := (testGovRules.MaxTotalPower() - ctrler.GetTotalPower()) / int64(ctrler.DelegateeLen())
 
-	for i := 0; i < ctrler.StakersLen(); i++ {
-		staker := ctrler.GetStaker(i)
+	for i := 0; i < ctrler.DelegateeLen(); i++ {
+		staker := ctrler.GetDelegatee(i)
 
 		rn := rand.Intn(maxCnt)
 		_stakingResultMapByOwner, err := randomStakesTo(staker, rn, allowedPowerForStaker)
@@ -64,13 +64,13 @@ func stakingRandom(ctrler *stake.StakeCtrler, maxCnt int) error {
 				}
 			}
 		}
-		testStakingResultMapByStaker[types.ToAcctKey(staker.Owner)] = _stakingResultMapByOwner
+		testStakingResultMapByStaker[types.ToAcctKey(staker.Addr)] = _stakingResultMapByOwner
 	}
 	return nil
 }
 
 func TestCreateStakers(t *testing.T) {
-	vals := newStakerArray(int(testGovRules.GetMaxValidatorCount()))
+	vals := newDelegatees(int(testGovRules.GetMaxValidatorCount()))
 	for _, val := range vals {
 		_, err := randomStakesTo(val, 10000, testGovRules.MaxTotalPower()-vals.SumTotalPower())
 		require.NoError(t, err)
@@ -91,9 +91,9 @@ func TestStakerStakes(t *testing.T) {
 
 	stakerCnt := rand.Intn(1000)
 	stakeCntOfStaker := rand.Intn(10000)
-	require.NoError(t, createStakers(ctrler, stakerCnt))
+	require.NoError(t, createDelegatees(ctrler, stakerCnt))
 	require.NoError(t, stakingRandom(ctrler, stakeCntOfStaker))
-	require.Equal(t, stakerCnt, ctrler.StakersLen())
+	require.Equal(t, stakerCnt, ctrler.DelegateeLen())
 
 	valUpdates0 := ctrler.UpdateValidators(int(testGovRules.GetMaxValidatorCount())) // sort
 	//
@@ -101,7 +101,7 @@ func TestStakerStakes(t *testing.T) {
 	for i := 0; i < len(valUpdates0); i++ {
 		found := false
 		for j := 0; j < ctrler.GetLastValidatorCnt(); j++ {
-			staker := ctrler.GetStaker(j)
+			staker := ctrler.GetDelegatee(j)
 			require.NotNil(t, staker)
 			if valUpdates0[i].Power == staker.TotalPower &&
 				bytes.Compare(valUpdates0[i].PubKey.GetSecp256K1(), staker.PubKey) == 0 {
@@ -118,13 +118,13 @@ func TestStakerStakes(t *testing.T) {
 		}
 	}
 
-	var preVal *stake.StakeSet
-	for i := 0; i < ctrler.StakersLen(); i++ {
-		staker := ctrler.GetStaker(i)
+	var preVal *stake.Delegatee
+	for i := 0; i < ctrler.DelegateeLen(); i++ {
+		staker := ctrler.GetDelegatee(i)
 
 		//
 		// check power of staker
-		_stakesMapByOwner, ok := testStakingResultMapByStaker[types.ToAcctKey(staker.Owner)]
+		_stakesMapByOwner, ok := testStakingResultMapByStaker[types.ToAcctKey(staker.Addr)]
 		require.True(t, ok)
 
 		for owner, stakingRet := range _stakesMapByOwner {
@@ -152,7 +152,7 @@ func TestStakerStakes(t *testing.T) {
 	for i := 0; i < len(valUpdates2); i++ {
 		found := false
 		for j := 0; j < ctrler.GetLastValidatorCnt(); j++ {
-			staker := ctrler.GetStaker(j)
+			staker := ctrler.GetDelegatee(j)
 			require.NotNil(t, staker)
 			if valUpdates2[i].Power == staker.TotalPower &&
 				bytes.Compare(valUpdates2[i].PubKey.GetSecp256K1(), staker.PubKey) == 0 {
@@ -170,12 +170,12 @@ func TestStakerStakes(t *testing.T) {
 	}
 
 	preVal = nil
-	for i := 0; i < ctrler.StakersLen(); i++ {
-		staker := ctrler.GetStaker(i)
+	for i := 0; i < ctrler.DelegateeLen(); i++ {
+		staker := ctrler.GetDelegatee(i)
 
 		//
 		// check power of staker
-		_stakesMapByOwner, ok := testStakingResultMapByStaker[types.ToAcctKey(staker.Owner)]
+		_stakesMapByOwner, ok := testStakingResultMapByStaker[types.ToAcctKey(staker.Addr)]
 		require.True(t, ok)
 
 		for owner, stakingRet := range _stakesMapByOwner {
@@ -196,8 +196,8 @@ func TestStakerStakes(t *testing.T) {
 	// someone's power is equal to the sum of power deposited to stakers by someone
 	for k, sret := range testStakingResultMapByOwner {
 		sumPower := int64(0)
-		for i := 0; i < ctrler.StakersLen(); i++ {
-			staker := ctrler.GetStaker(i)
+		for i := 0; i < ctrler.DelegateeLen(); i++ {
+			staker := ctrler.GetDelegatee(i)
 			require.NotNil(t, staker)
 
 			sumPower += staker.PowerOf(k.Address())
@@ -206,8 +206,8 @@ func TestStakerStakes(t *testing.T) {
 	}
 
 	sumPower := int64(0)
-	for i := 0; i < ctrler.StakersLen(); i++ {
-		staker := ctrler.GetStaker(i)
+	for i := 0; i < ctrler.DelegateeLen(); i++ {
+		staker := ctrler.GetDelegatee(i)
 		require.NotNil(t, staker)
 
 		sumPower += staker.GetTotalPower()

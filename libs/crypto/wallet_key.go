@@ -65,7 +65,7 @@ func NewWalletKey(keyBytes, pass []byte) *WalletKey {
 	if pass != nil {
 		salt := make([]byte, DKLEN)
 		rand.Read(salt)
-		iter := 200000 + int(binary.BigEndian.Uint16(salt[:2]))
+		iter := 20000 + int(binary.BigEndian.Uint16(salt[:2]))
 
 		sk := pbkdf2.Key(pass, salt, iter, DKLEN, DefaultHasher)
 

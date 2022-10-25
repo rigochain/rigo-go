@@ -73,7 +73,7 @@ func QueryAcctNonce(ctx *tmrpctypes.Context, addr string) (*ResponseAcctNonce, e
 	}, nil
 }
 
-func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.StakeSet, error) {
+func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.Delegatee, error) {
 	bzAddr, err := types.AddressFromHex(addr)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
@@ -92,7 +92,7 @@ func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.StakeSet, error) 
 	}
 
 	if resp.Response.Code == xerrors.ErrCodeSuccess {
-		sset := &stake.StakeSet{}
+		sset := &stake.Delegatee{}
 		err := json.Unmarshal(resp.Response.Value, sset)
 		if err != nil {
 			return nil, err
@@ -103,7 +103,7 @@ func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.StakeSet, error) 
 	}
 }
 
-func QueryStakes(ctx *tmrpctypes.Context, addr string) (*stake.StakeSet, error) {
+func QueryStakes(ctx *tmrpctypes.Context, addr string) (*stake.Delegatee, error) {
 	staker, err := queryStakes(ctx, addr)
 	if err != nil {
 		return nil, err
