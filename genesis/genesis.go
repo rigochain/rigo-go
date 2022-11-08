@@ -24,21 +24,22 @@ func (gh *GenesisAssetHolder) Hash() []byte {
 }
 
 type GenesisGovRules struct {
-	Version           int64  `json:"version"`
-	MaxValidatorCnt   int64  `json:"maxValidatorCnt"`
-	RewardDelayBlocks int64  `json:"rewardDelayBlocks"`
-	AmountPerPower    string `json:"amountPerPower"`
-	RewardPerPower    string `json:"rewardPerPower"`
+	Version            int64  `json:"version"`
+	MaxValidatorCnt    int64  `json:"maxValidatorCnt"`
+	AmountPerPower     string `json:"amountPerPower"`
+	RewardPerPower     string `json:"rewardPerPower"`
+	LazyRewardBlocks   int64  `json:"lazyRewardBlocks"`
+	LazyApplyingBlocks int64  `json:"lazyApplyingBlocks"`
 }
 
 func DefaultGenesisGovRules() *GenesisGovRules {
 	gr := gov.DefaultGovRules()
 	return &GenesisGovRules{
-		Version:           gr.Version,
-		MaxValidatorCnt:   gr.MaxValidatorCnt,
-		RewardDelayBlocks: gr.RewardDelayBlocks,
-		AmountPerPower:    gr.AmountPerPower.String(),
-		RewardPerPower:    gr.RewardPerPower.String(),
+		Version:            gr.Version,
+		MaxValidatorCnt:    gr.MaxValidatorCnt,
+		AmountPerPower:     gr.AmountPerPower.String(),
+		RewardPerPower:     gr.RewardPerPower.String(),
+		LazyApplyingBlocks: gr.LazyApplyingBlocks,
 	}
 }
 

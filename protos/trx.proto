@@ -22,3 +22,16 @@ message TrxPayloadUnstakingProto {
 message TrxPayloadExecContractProto {
   bytes _code = 1;
 }
+
+message TrxPayloadProposalProto {
+  string message = 1;
+  int64 votingBlocks = 2;
+  int64 lazyApplyingBlocks = 3;
+  int32 proposalType = 4;
+  repeated bytes options = 5;
+}
+
+message TrxPayloadVoteProto {
+  bytes txhash = 1;
+  int32 choice = 2;
+}

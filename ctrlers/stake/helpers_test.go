@@ -55,11 +55,12 @@ var (
 	acctCtrlerHelper = &AccountHelper{}
 	stakeCtrler, _   = stake.NewStakeCtrler(DBDIR, tmlog.NewNopLogger())
 	testGovRules     = &gov.GovRules{
-		Version:           0,
-		MaxValidatorCnt:   21,
-		RewardDelayBlocks: 10,
-		AmountPerPower:    big.NewInt(1000),
-		RewardPerPower:    big.NewInt(10),
+		Version:            0,
+		MaxValidatorCnt:    21,
+		AmountPerPower:     big.NewInt(1000),
+		RewardPerPower:     big.NewInt(10),
+		LazyRewardBlocks:   10,
+		LazyApplyingBlocks: 10,
 	}
 
 	Wallets              []*TestWallet

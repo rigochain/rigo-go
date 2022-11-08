@@ -9,20 +9,22 @@ import (
 )
 
 type GovRules struct {
-	Version           int64    `json:"version"`
-	MaxValidatorCnt   int64    `json:"maxValidatorCnt"`
-	RewardDelayBlocks int64    `json:"rewardDelayBlocks"`
-	AmountPerPower    *big.Int `json:"amountPerPower"`
-	RewardPerPower    *big.Int `json:"rewardPerPower"`
+	Version            int64    `json:"version"`
+	MaxValidatorCnt    int64    `json:"maxValidatorCnt"`
+	AmountPerPower     *big.Int `json:"amountPerPower"`
+	RewardPerPower     *big.Int `json:"rewardPerPower"`
+	LazyRewardBlocks   int64    `json:"lazyRewardBlocks"`
+	LazyApplyingBlocks int64    `json:"lazyApplyingBlocks"`
 }
 
 func DefaultGovRules() *GovRules {
 	return &GovRules{
-		Version:           0,
-		MaxValidatorCnt:   21,
-		RewardDelayBlocks: 10,
-		AmountPerPower:    big.NewInt(1_000000000_000000000),
-		RewardPerPower:    big.NewInt(1_000000000),
+		Version:            0,
+		MaxValidatorCnt:    21,
+		AmountPerPower:     big.NewInt(1_000000000_000000000),
+		RewardPerPower:     big.NewInt(1_000000000),
+		LazyRewardBlocks:   10,
+		LazyApplyingBlocks: 10,
 	}
 }
 
@@ -36,21 +38,23 @@ func DecodeGovRules(bz []byte) (*GovRules, error) {
 
 func fromProto(pm *GovRulesProto) *GovRules {
 	return &GovRules{
-		Version:           pm.Version,
-		MaxValidatorCnt:   pm.MaxValidatorCnt,
-		RewardDelayBlocks: pm.RewardDelayBlocks,
-		AmountPerPower:    new(big.Int).SetBytes(pm.XAmountPerPower),
-		RewardPerPower:    new(big.Int).SetBytes(pm.XRewardPerPower),
+		Version:            pm.Version,
+		MaxValidatorCnt:    pm.MaxValidatorCnt,
+		AmountPerPower:     new(big.Int).SetBytes(pm.XAmountPerPower),
+		RewardPerPower:     new(big.Int).SetBytes(pm.XRewardPerPower),
+		LazyRewardBlocks:   pm.LazyRewardBlocks,
+		LazyApplyingBlocks: pm.LazyApplyingBlocks,
 	}
 }
 
 func toProto(gr *GovRules) *GovRulesProto {
 	return &GovRulesProto{
-		Version:           gr.Version,
-		MaxValidatorCnt:   gr.MaxValidatorCnt,
-		RewardDelayBlocks: gr.RewardDelayBlocks,
-		XAmountPerPower:   gr.AmountPerPower.Bytes(),
-		XRewardPerPower:   gr.RewardPerPower.Bytes(),
+		Version:            gr.Version,
+		MaxValidatorCnt:    gr.MaxValidatorCnt,
+		XAmountPerPower:    gr.AmountPerPower.Bytes(),
+		XRewardPerPower:    gr.RewardPerPower.Bytes(),
+		LazyRewardBlocks:   gr.LazyRewardBlocks,
+		LazyApplyingBlocks: gr.LazyApplyingBlocks,
 	}
 }
 
@@ -79,10 +83,6 @@ func (gr *GovRules) MaxTotalPower() int64 {
 	return tmtypes.MaxTotalVotingPower
 }
 
-func (gr *GovRules) GetRewardDelayBlocks() int64 {
-	return gr.RewardDelayBlocks
-}
-
 func (gr *GovRules) AmountToPower(amt *big.Int) int64 {
 	// 1 VotingPower == 1 XCO
 	_vp := new(big.Int).Quo(amt, gr.AmountPerPower)
@@ -103,6 +103,14 @@ func (gr *GovRules) PowerToReward(power int64) *big.Int {
 		panic(fmt.Sprintf("power is negative: %v", power))
 	}
 	return new(big.Int).Mul(big.NewInt(power), gr.RewardPerPower)
+}
+
+func (gr *GovRules) GetLazyRewardBlocks() int64 {
+	return gr.LazyRewardBlocks
+}
+
+func (gr *GovRules) GetLazyApplyingBlocks() int64 {
+	return gr.LazyApplyingBlocks
 }
 
 var _ types.IGovRules = (*GovRules)(nil)

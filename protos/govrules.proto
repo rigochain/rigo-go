@@ -5,7 +5,8 @@ option go_package = "github.com/kysee/arcanus/ctrlers/gov";
 message GovRulesProto {
   int64 version = 1;
   int64 maxValidatorCnt = 2;
-  int64 rewardDelayBlocks = 3;
-  bytes _amount_per_power = 4;
-  bytes _reward_per_power = 5;
+  bytes _amount_per_power = 3;
+  bytes _reward_per_power = 4;
+  int64 lazyRewardBlocks = 5;
+  int64 lazyApplyingBlocks = 6;
 }

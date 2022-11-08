@@ -64,13 +64,19 @@ func NewChainCtrler(dbDir string, logger log.Logger) *ChainCtrler {
 		acctCtrler:  acctCtrler,
 		stakeCtrler: stakeCtrler,
 		govCtrler:   govCtrler,
-		trxExecutor: NewTrxExecutor(logger, acctCtrler, stakeCtrler),
+		trxExecutor: NewTrxExecutor(logger, acctCtrler, stakeCtrler, govCtrler),
 		logger:      logger,
 	}
 }
 
 func (ctrler *ChainCtrler) Close() error {
 	if err := ctrler.acctCtrler.Close(); err != nil {
+		return err
+	}
+	if err := ctrler.stakeCtrler.Close(); err != nil {
+		return err
+	}
+	if err := ctrler.govCtrler.Close(); err != nil {
 		return err
 	}
 	if err := ctrler.stateDB.Close(); err != nil {
@@ -187,11 +193,36 @@ func (ctrler *ChainCtrler) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respo
 
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
-		if txctx, err := trxs.NewTrxContext(req.Tx,
+		if txctx, err := trxs.NewTrxContextEx(req.Tx,
 			ctrler.stateDB.LastBlockHeight()+int64(1),
 			false,
-			ctrler.acctCtrler,
-			ctrler.govCtrler.GetRules()); err != nil {
+			func(_txctx *trxs.TrxContext) error {
+				_tx := _txctx.Tx
+				// find sender account
+				acct := ctrler.acctCtrler.FindAccount(_tx.From, _txctx.Exec)
+				if acct == nil {
+					return xerrors.ErrNotFoundAccount
+				}
+				_txctx.Sender = acct
+
+				// check sender account nonce
+				if xerr := acct.CheckNonce(_tx.Nonce); xerr != nil {
+					return xerr
+				}
+				acct.AddNonce()
+
+				// check sender account balance
+				needFund := new(big.Int).Add(_tx.Amount, _tx.Gas)
+				if xerr := acct.CheckBalance(needFund); xerr != nil {
+					return xerr
+				}
+				_txctx.NeedAmt = needFund
+
+				_txctx.GovRules = ctrler.govCtrler.GetRules()
+				_txctx.StakeCtrler = ctrler.stakeCtrler
+
+				return nil
+			}); err != nil {
 
 			xerr, ok := err.(xerrors.XError)
 			if !ok {
@@ -242,11 +273,36 @@ func (ctrler *ChainCtrler) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes
 func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	response := abcitypes.ResponseDeliverTx{}
 
-	if txctx, err := trxs.NewTrxContext(req.Tx,
+	if txctx, err := trxs.NewTrxContextEx(req.Tx,
 		ctrler.stateDB.LastBlockHeight()+int64(1),
 		true,
-		ctrler.acctCtrler,
-		ctrler.govCtrler.GetRules()); err != nil {
+		func(_txctx *trxs.TrxContext) error {
+			_tx := _txctx.Tx
+			// find sender account
+			acct := ctrler.acctCtrler.FindAccount(_tx.From, _txctx.Exec)
+			if acct == nil {
+				return xerrors.ErrNotFoundAccount
+			}
+			_txctx.Sender = acct
+
+			// check sender account nonce
+			if xerr := acct.CheckNonce(_tx.Nonce); xerr != nil {
+				return xerr
+			}
+			acct.AddNonce()
+
+			// check sender account balance
+			needFund := new(big.Int).Add(_tx.Amount, _tx.Gas)
+			if xerr := acct.CheckBalance(needFund); xerr != nil {
+				return xerr
+			}
+			_txctx.NeedAmt = needFund
+
+			_txctx.GovRules = ctrler.govCtrler.GetRules()
+			_txctx.StakeCtrler = ctrler.stakeCtrler
+
+			return nil
+		}); err != nil {
 
 		xerr, ok := err.(xerrors.XError)
 		if !ok {

@@ -79,13 +79,14 @@ func TestUnstakingByTx(t *testing.T) {
 	require.Equal(t, sumFrozenPower, sumUnstakingPower)
 
 	// test lazy rewarding
-	lastHeight += testGovRules.GetRewardDelayBlocks()
+	lastHeight += testGovRules.GetLazyRewardBlocks()
 	err := stakeCtrler.ProcessFrozenStakesAt(lastHeight, acctCtrlerHelper)
 	require.NoError(t, err)
 
 	stakeCtrler.Commit()
 	frozenStakes = stakeCtrler.GetFrozenStakes()
 	require.Equal(t, 0, len(frozenStakes))
+
 }
 
 func TestUpdateValidators(t *testing.T) {
@@ -94,8 +95,14 @@ func TestUpdateValidators(t *testing.T) {
 	require.True(t, len(valUpdates0) > 0)
 	require.True(t, stakeCtrler.GetLastValidatorCnt() > 0)
 
+	valUpdates1 := stakeCtrler.UpdateValidators(int(testGovRules.GetMaxValidatorCount())) // sort
+	require.True(t, len(valUpdates1) == 0)
+	require.True(t, stakeCtrler.GetLastValidatorCnt() > 0)
+
 	//
 	// check validatorUpdates
+	// todo: check that validators is correct or not
+	//
 	for i := 0; i < len(valUpdates0); i++ {
 		found := false
 		for j := 0; j < stakeCtrler.GetLastValidatorCnt(); j++ {

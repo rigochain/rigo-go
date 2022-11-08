@@ -24,11 +24,6 @@ const (
 	EVENT_ATTR_ADDRPAIR = "addrpair"
 )
 
-//	type ITrx interface {
-//		Type() int32
-//		Encode() ([]byte, error)
-//		Decode([]byte) error
-//	}
 type ITrxPayload interface {
 	Type() int32
 	Encode() ([]byte, error)

@@ -313,7 +313,7 @@ func (ctrler *StakeCtrler) applyUnstakingByTxHash(ctx *trxs.TrxContext) error {
 			return xerrors.ErrNotFoundStake
 		}
 
-		s0.RefundHeight = ctx.Height + ctx.GovRules.GetRewardDelayBlocks()
+		s0.RefundHeight = ctx.Height + ctx.GovRules.GetLazyRewardBlocks()
 		// ctrler.frozenStakes is ordered by RefundHeight
 		ctrler.newFrozenStakes = append(ctrler.newFrozenStakes, s0)
 
@@ -363,7 +363,7 @@ func (ctrler *StakeCtrler) applyUnstaking(ctx *trxs.TrxContext) error {
 				_ = staker.DelStake(s0.TxHash) // returns `*Stake` same as `s0`
 				damt = new(big.Int).Sub(damt, s0.Amount)
 
-				s0.RefundHeight = ctx.Height + ctx.GovRules.GetRewardDelayBlocks()
+				s0.RefundHeight = ctx.Height + ctx.GovRules.GetLazyRewardBlocks()
 
 				// ctrler.frozenStakes is ordered by RefundHeight
 				ctrler.newFrozenStakes = append(ctrler.newFrozenStakes, s0)

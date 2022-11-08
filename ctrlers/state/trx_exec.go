@@ -34,6 +34,13 @@ func (txe *TrxExecutor) Execute(ctx *trxs.TrxContext) error {
 		} else if err := h.Apply(ctx); err != nil {
 			return err
 		}
+	case trxs.TRX_PROPOSAL, trxs.TRX_VOTING:
+		h := txe.handlers[2]
+		if err := h.Validate(ctx); err != nil {
+			return err
+		} else if err := h.Apply(ctx); err != nil {
+			return err
+		}
 	default:
 		return xerrors.ErrInvalidTrxType
 	}

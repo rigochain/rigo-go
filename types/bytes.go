@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/kysee/arcanus/libs"
 	"strings"
 )
 
@@ -46,6 +47,20 @@ func (bz *HexBytes) UnmarshalJSON(data []byte) error {
 // Bytes fulfills various interfaces in light-client, etc...
 func (bz HexBytes) Bytes() []byte {
 	return bz
+}
+
+func (bz HexBytes) Array20() [32]byte {
+	n := libs.MIN(32, len(bz))
+	var ret [32]byte
+	copy(ret[:], bz[:n])
+	return ret
+}
+
+func (bz HexBytes) Array32() [32]byte {
+	n := libs.MIN(32, len(bz))
+	var ret [32]byte
+	copy(ret[:], bz[:n])
+	return ret
 }
 
 func (bz HexBytes) String() string {
