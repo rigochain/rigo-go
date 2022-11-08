@@ -154,7 +154,7 @@ func (w *Wallet) SignTrx(tx *trxs.Trx) (types.HexBytes, types.HexBytes, error) {
 func (w *Wallet) TransferSync(to types.Address, amt, gas *big.Int) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
-		amt, gas,
+		gas, amt,
 		w.acct.GetNonce()+1)
 	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ func (w *Wallet) TransferSync(to types.Address, amt, gas *big.Int) (*coretypes.R
 func (w *Wallet) StakingSync(to types.Address, amt, gas *big.Int) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxStaking(
 		w.Address(), to,
-		amt, gas,
+		gas, amt,
 		w.acct.GetNonce()+1)
 	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err

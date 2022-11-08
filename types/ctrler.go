@@ -1,6 +1,9 @@
 package types
 
-import "math/big"
+import (
+	"github.com/tendermint/tendermint/types"
+	"math/big"
+)
 
 type ILedgerCtrler interface {
 	Commit() ([]byte, int64, error)
@@ -10,4 +13,5 @@ type ILedgerCtrler interface {
 type IStakeCtrler interface {
 	GetTotalAmount() *big.Int
 	GetTotalPower() int64
+	GetTotalPowerOf(types.Address) int64
 }

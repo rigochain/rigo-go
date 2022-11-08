@@ -470,6 +470,14 @@ func (ctrler *StakeCtrler) GetTotalPower() int64 {
 	return power
 }
 
+func (ctrler *StakeCtrler) GetTotalPowerOf(addr types.Address) int64 {
+	power := int64(0)
+	if delegatee, ok := ctrler.allDelegateesMap[types.ToAcctKey(addr)]; ok {
+		power += delegatee.GetTotalPower()
+	}
+	return power
+}
+
 func (ctrler *StakeCtrler) UpdateValidators(maxVals int) []tmtypes.ValidatorUpdate {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()

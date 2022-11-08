@@ -1,10 +1,10 @@
 package gov
 
 import (
-	"github.com/kysee/arcanus/ctrlers/gov/proposals"
 	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	tmdb "github.com/tendermint/tm-db"
 	"sync"
@@ -15,10 +15,60 @@ type GovCtrler struct {
 
 	rules types.IGovRules
 
-	proposals map[[32]byte]types.IProposable
+	allProposals     map[[32]byte]types.IProposable
+	updatedProposals []types.IProposable
 
 	logger log.Logger
 	mtx    sync.RWMutex
+}
+
+func NewGovCtrler(dbDir string, logger log.Logger) (*GovCtrler, error) {
+	govDB, err := tmdb.NewDB("gov", "goleveldb", dbDir)
+	if err != nil {
+		return nil, err
+	}
+
+	iter, err := govDB.Iterator(nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+
+	allProposals := make(map[[32]byte]types.IProposable)
+	for ; iter.Valid(); iter.Next() {
+		k := iter.Key()
+		v := iter.Value()
+		p := &GovRulesProposal{}
+		if err := tmjson.Unmarshal(v, p); err != nil {
+			return nil, err
+		}
+		allProposals[types.HexBytes(k).Array32()] = p
+	}
+	if err := iter.Error(); err != nil {
+		return nil, err
+	}
+
+	return &GovCtrler{govDB: govDB, allProposals: allProposals, logger: logger}, nil
+}
+
+func (ctrler *GovCtrler) SetRules(rules types.IGovRules) {
+	ctrler.rules = rules
+}
+
+func (ctrler *GovCtrler) GetRules() types.IGovRules {
+	return ctrler.rules
+}
+
+func (ctrler *GovCtrler) ImportRules(cb func() []byte) error {
+	bz := cb()
+	if bz == nil {
+		return xerrors.New("rule blob is nil")
+	} else if rules, err := DecodeGovRules(bz); err != nil {
+		return xerrors.NewFrom(err)
+	} else {
+		ctrler.rules = rules
+	}
+	return nil
 }
 
 var _ trxs.ITrxHandler = (*GovCtrler)(nil)
@@ -56,26 +106,49 @@ func (ctrler *GovCtrler) applyProposal(ctx *trxs.TrxContext) error {
 
 		}
 
-		if _, ok := ctrler.proposals[ctx.TxHash.Array32()]; ok {
-			return xerrors.New("there is already the txhash in proposals")
+		if _, ok := ctrler.allProposals[ctx.TxHash.Array32()]; ok {
+			return xerrors.New("there is already the txhash in allProposals")
 		}
 
-		ctrler.proposals[ctx.TxHash.Array32()] = &proposals.GovRulesProposal{
+		proposal := &GovRulesProposal{
+			TxHash:            ctx.TxHash,
 			StartVotingHeight: ctx.Height + 1,
 			LastVotingHeight:  ctx.Height + txpayload.VotingBlocks,
 			ApplyingHeight:    ctx.Height + txpayload.VotingBlocks + ctx.GovRules.GetLazyApplyingBlocks(),
 			MajorityPower:     ctx.StakeCtrler.GetTotalPower() * int64(2) / int64(3),
 			Rules:             rules,
 		}
+		ctrler.updatedProposals = append(ctrler.updatedProposals, proposal)
+		ctrler.allProposals[ctx.TxHash.Array32()] = proposal
 	}
 	return nil
 }
 
 func (ctrler *GovCtrler) applyVote(ctx *trxs.TrxContext) error {
+	votingPayload := ctx.Tx.Payload.(*trxs.TrxPayloadVoting)
+	proposal, ok := ctrler.allProposals[votingPayload.TxHash.Array32()]
+	if !ok {
+		return xerrors.New("not found proposal")
+	}
+	votes := proposal.GetVotesOf(ctx.Tx.From, votingPayload.Choice)
+	if votes > 0 {
+		return xerrors.New("already voted")
+	}
+
+	proposal.DoVote(ctx.Tx.From, ctx.StakeCtrler.GetTotalPowerOf(ctx.Tx.From))
+	ctrler.updatedProposals = append(ctrler.updatedProposals, proposal)
 	return nil
 }
 
 func (ctrler *GovCtrler) Commit() ([]byte, int64, error) {
+	for _, proposal := range ctrler.updatedProposals {
+		if bz, err := proposal.Encode(); err != nil {
+			return nil, -1, err
+		} else if err := ctrler.govDB.Set(proposal.ID(), bz); err != nil {
+			return nil, -1, err
+		}
+	}
+	ctrler.updatedProposals = nil
 	return nil, 0, nil
 }
 
@@ -90,35 +163,5 @@ func (ctrler *GovCtrler) Close() error {
 	}
 
 	ctrler.govDB = nil
-	return nil
-}
-
-func NewGovCtrler(dbDir string, logger log.Logger) (*GovCtrler, error) {
-	// todo: use govDB to save governance rules proposal, voting actions, etc.
-	govDB, err := tmdb.NewDB("gov", "goleveldb", dbDir)
-	if err != nil {
-		return nil, err
-	}
-
-	return &GovCtrler{govDB: govDB, logger: logger}, nil
-}
-
-func (ctrler *GovCtrler) SetRules(rules types.IGovRules) {
-	ctrler.rules = rules
-}
-
-func (ctrler *GovCtrler) GetRules() types.IGovRules {
-	return ctrler.rules
-}
-
-func (ctrler *GovCtrler) ImportRules(cb func() []byte) error {
-	bz := cb()
-	if bz == nil {
-		return xerrors.New("rule blob is nil")
-	} else if rules, err := DecodeGovRules(bz); err != nil {
-		return xerrors.NewFrom(err)
-	} else {
-		ctrler.rules = rules
-	}
 	return nil
 }

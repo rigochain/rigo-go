@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/tendermint/tendermint/types"
 	"math/big"
 )
 
@@ -21,7 +22,7 @@ const (
 )
 
 type IProposable interface {
-	ID() int64
+	ID() []byte
 	Type() int32
 	Encode() ([]byte, error)
 	Decode([]byte) error
@@ -31,5 +32,7 @@ type IProposable interface {
 	GetApplyingHeight() int64
 	GetMajorityPower() int64
 	GetOption(int) interface{}
-	GetVote(int) int64
+	GetVotesFor(int32) int64
+	GetVotesOf(types.Address, int32) int64
+	DoVote(types.Address, int64)
 }

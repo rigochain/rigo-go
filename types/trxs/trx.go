@@ -101,6 +101,16 @@ func (tx *Trx) fromProto(txProto *TrxProto) error {
 		if err := payload.Decode(txProto.XPayload); err != nil {
 			return err
 		}
+	case TRX_PROPOSAL:
+		payload = &TrxPayloadProposal{}
+		if err := payload.Decode(txProto.XPayload); err != nil {
+			return err
+		}
+	case TRX_VOTING:
+		payload = &TrxPayloadVoting{}
+		if err := payload.Decode(txProto.XPayload); err != nil {
+			return err
+		}
 	case TRX_EXECUTE:
 		return xerrors.New("not supported payload type")
 	default:

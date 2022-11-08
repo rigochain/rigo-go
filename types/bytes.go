@@ -3,7 +3,6 @@ package types
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/kysee/arcanus/libs"
 	"strings"
 )
 
@@ -49,16 +48,22 @@ func (bz HexBytes) Bytes() []byte {
 	return bz
 }
 
-func (bz HexBytes) Array20() [32]byte {
-	n := libs.MIN(32, len(bz))
-	var ret [32]byte
+func (bz HexBytes) Array20() [20]byte {
+	var ret [20]byte
+	n := len(ret)
+	if len(bz) < n {
+		n = len(bz)
+	}
 	copy(ret[:], bz[:n])
 	return ret
 }
 
 func (bz HexBytes) Array32() [32]byte {
-	n := libs.MIN(32, len(bz))
 	var ret [32]byte
+	n := len(ret)
+	if len(bz) < n {
+		n = len(bz)
+	}
 	copy(ret[:], bz[:n])
 	return ret
 }

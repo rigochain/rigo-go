@@ -5,11 +5,10 @@ import (
 )
 
 type TrxPayloadProposal struct {
-	Message            string
-	VotingBlocks       int64
-	LazyApplyingBlocks int64
-	ProposalType       int32
-	Options            [][]byte
+	Message      string
+	VotingBlocks int64
+	ProposalType int32
+	Options      [][]byte
 }
 
 var _ ITrxPayload = (*TrxPayloadProposal)(nil)
@@ -26,7 +25,6 @@ func (tx *TrxPayloadProposal) Decode(bz []byte) error {
 
 	tx.Message = pm.Message
 	tx.VotingBlocks = pm.VotingBlocks
-	tx.LazyApplyingBlocks = pm.LazyApplyingBlocks
 	tx.ProposalType = pm.ProposalType
 	tx.Options = pm.Options
 	return nil
@@ -34,11 +32,10 @@ func (tx *TrxPayloadProposal) Decode(bz []byte) error {
 
 func (tx *TrxPayloadProposal) Encode() ([]byte, error) {
 	pm := &TrxPayloadProposalProto{
-		Message:            tx.Message,
-		VotingBlocks:       tx.VotingBlocks,
-		LazyApplyingBlocks: tx.LazyApplyingBlocks,
-		ProposalType:       tx.ProposalType,
-		Options:            tx.Options,
+		Message:      tx.Message,
+		VotingBlocks: tx.VotingBlocks,
+		ProposalType: tx.ProposalType,
+		Options:      tx.Options,
 	}
 
 	return proto.Marshal(pm)

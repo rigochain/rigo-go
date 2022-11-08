@@ -364,6 +364,11 @@ func (ctrler *ChainCtrler) Commit() abcitypes.ResponseCommit {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
+	_, _, err := ctrler.govCtrler.Commit()
+	if err != nil {
+		panic(err)
+	}
+
 	appHash0, ver0, err := ctrler.acctCtrler.Commit()
 	if err != nil {
 		panic(err)

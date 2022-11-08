@@ -169,7 +169,7 @@ func randMakeStakingTrxContext() (*trxs.TrxContext, error) {
 func makeStakingTrxContext(from, to *TestWallet, power int64) (*trxs.TrxContext, error) {
 	amt := testGovRules.PowerToAmount(power)
 
-	tx := client.NewTrxStaking(from.W.Address(), to.W.Address(), amt, dummyGas, dummyNonce)
+	tx := client.NewTrxStaking(from.W.Address(), to.W.Address(), dummyGas, amt, dummyNonce)
 	bz, err := tx.Encode()
 	if err != nil {
 		return nil, err
@@ -217,7 +217,7 @@ func randMakeUnstakingTrxContext() (*trxs.TrxContext, error) {
 
 func makeUnstakingTrxContext(from, to *TestWallet, txhash types.HexBytes) (*trxs.TrxContext, error) {
 
-	tx := client.NewTrxUnstaking(from.W.Address(), to.W.Address(), txhash, dummyGas, dummyNonce)
+	tx := client.NewTrxUnstaking(from.W.Address(), to.W.Address(), dummyGas, dummyNonce, txhash)
 	tzbz, _, err := from.W.SignTrx(tx)
 	if err != nil {
 		return nil, err

@@ -15,6 +15,8 @@ message TrxProto {
   bytes sig = 10;
 }
 
+message TrxPayloadStakingProto {}
+
 message TrxPayloadUnstakingProto {
   bytes tx_hash = 1;
 }
@@ -26,12 +28,11 @@ message TrxPayloadExecContractProto {
 message TrxPayloadProposalProto {
   string message = 1;
   int64 votingBlocks = 2;
-  int64 lazyApplyingBlocks = 3;
-  int32 proposalType = 4;
-  repeated bytes options = 5;
+  int32 proposalType = 3;
+  repeated bytes options = 4;
 }
 
-message TrxPayloadVoteProto {
-  bytes txhash = 1;
+message TrxPayloadVotingProto {
+  bytes tx_hash = 1;
   int32 choice = 2;
 }

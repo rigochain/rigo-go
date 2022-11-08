@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/tendermint/tendermint/crypto"
-	tmbytes "github.com/tendermint/tendermint/libs/bytes"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"math/big"
 	"sort"
 	"strings"
@@ -16,7 +16,7 @@ const (
 	ACCT_COMMON_TYPE int16 = 1 + iota
 )
 
-type Address = tmbytes.HexBytes
+type Address = tmtypes.Address
 
 func ToAcctKey(addr Address) AcctKey {
 	var key AcctKey
