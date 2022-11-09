@@ -10,13 +10,13 @@ type Vote struct {
 	power int64
 }
 type GovRulesProposal struct {
-	TxHash            types.HexBytes          `json:"txHash"`
-	StartVotingHeight int64                   `json:"startVotingHeight"`
-	LastVotingHeight  int64                   `json:"lastVotingHeight"`
-	ApplyingHeight    int64                   `json:"applyingHeight"`
-	MajorityPower     int64                   `json:"majorityPower"`
-	Votes             map[types.AcctKey]int64 `json:"votes"`
-	Rules             []*GovRules             `json:"rules"`
+	TxHash            types.HexBytes   `json:"txHash"`
+	StartVotingHeight int64            `json:"startVotingHeight"`
+	LastVotingHeight  int64            `json:"lastVotingHeight"`
+	ApplyingHeight    int64            `json:"applyingHeight"`
+	MajorityPower     int64            `json:"majorityPower"`
+	Votes             map[string]int64 `json:"votes"`
+	Rules             []*GovRules      `json:"rules"`
 }
 
 func (p *GovRulesProposal) ID() []byte {
@@ -64,7 +64,7 @@ func (p *GovRulesProposal) GetVotesFor(optidx int32) int64 {
 }
 
 func (p *GovRulesProposal) GetVotesOf(addr types.Address, optidx int32) int64 {
-	v, ok := p.Votes[types.ToAcctKey(addr)]
+	v, ok := p.Votes[addr.String()]
 	if !ok {
 		v = 0
 	}
@@ -73,7 +73,7 @@ func (p *GovRulesProposal) GetVotesOf(addr types.Address, optidx int32) int64 {
 
 func (p *GovRulesProposal) DoVote(addr types.Address, power int64) {
 	if power > 0 {
-		p.Votes[types.ToAcctKey(addr)] = power
+		p.Votes[addr.String()] = power
 	}
 }
 

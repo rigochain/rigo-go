@@ -14,7 +14,6 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	//os.RemoveAll(DBDIR)
 
 	exitCode := m.Run()
 

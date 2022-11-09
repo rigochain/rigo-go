@@ -3,12 +3,97 @@ package stake_test
 import (
 	"bytes"
 	"fmt"
+	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/ctrlers/stake"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/stretchr/testify/require"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/big"
+	"math/rand"
+	"os"
+	"path/filepath"
 	"testing"
 )
+
+var (
+	DBDIR            = filepath.Join(os.TempDir(), "stake-ctrler-unstaking-test")
+	acctCtrlerHelper = &AccountHelper{}
+	stakeCtrler, _   = stake.NewStakeCtrler(DBDIR, tmlog.NewNopLogger())
+	testGovRules     = &gov.GovRules{
+		Version:            0,
+		MaxValidatorCnt:    21,
+		AmountPerPower:     big.NewInt(1000),
+		RewardPerPower:     big.NewInt(10),
+		LazyRewardBlocks:   10,
+		LazyApplyingBlocks: 10,
+	}
+
+	Wallets              []*TestWallet
+	DelegateeWallets     []*TestWallet
+	stakingToSelfTrxCtxs []*trxs.TrxContext
+	stakingTrxCtxs       []*trxs.TrxContext
+	unstakingTrxCtxs     []*trxs.TrxContext
+
+	dummyGas   = big.NewInt(0)
+	dummyNonce = uint64(0)
+
+	lastHeight = int64(1)
+)
+
+func TestMain(m *testing.M) {
+
+	Wallets = makeTestWallets(rand.Intn(100) + int(testGovRules.GetMaxValidatorCount()))
+
+	for i := 0; i < 5; i++ {
+		if txctx, err := randMakeStakingToSelfTrxContext(); err != nil {
+			panic(err)
+		} else {
+			stakingToSelfTrxCtxs = append(stakingToSelfTrxCtxs, txctx)
+		}
+		if rand.Int()%3 == 0 {
+			lastHeight++
+		}
+	}
+
+	for i := 0; i < 1000; i++ {
+		if txctx, err := randMakeStakingTrxContext(); err != nil {
+			panic(err)
+		} else {
+			stakingTrxCtxs = append(stakingTrxCtxs, txctx)
+		}
+		if rand.Int()%3 == 0 {
+			lastHeight++
+		}
+	}
+
+	lastHeight += 10
+
+	for i := 0; i < 100; i++ {
+		if txctx, err := randMakeUnstakingTrxContext(); err != nil {
+			panic(err)
+		} else {
+			already := false
+			for _, _ctx := range unstakingTrxCtxs {
+				if bytes.Compare(_ctx.Tx.Payload.(*trxs.TrxPayloadUnstaking).TxHash, txctx.Tx.Payload.(*trxs.TrxPayloadUnstaking).TxHash) == 0 {
+					already = true
+				}
+			}
+			if !already {
+				unstakingTrxCtxs = append(unstakingTrxCtxs, txctx)
+			}
+
+		}
+		if rand.Int()%3 == 0 {
+			lastHeight++
+		}
+	}
+
+	exitCode := m.Run()
+
+	os.RemoveAll(DBDIR)
+
+	os.Exit(exitCode)
+}
 
 func TestStakingToSelfByTx(t *testing.T) {
 	sumAmt := big.NewInt(0)

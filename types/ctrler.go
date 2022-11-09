@@ -14,4 +14,5 @@ type IStakeCtrler interface {
 	GetTotalAmount() *big.Int
 	GetTotalPower() int64
 	GetTotalPowerOf(types.Address) int64
+	IsValidator(types.Address) bool
 }

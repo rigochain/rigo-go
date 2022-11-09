@@ -36,28 +36,6 @@ func DecodeGovRules(bz []byte) (*GovRules, error) {
 	return fromProto(pm), nil
 }
 
-func fromProto(pm *GovRulesProto) *GovRules {
-	return &GovRules{
-		Version:            pm.Version,
-		MaxValidatorCnt:    pm.MaxValidatorCnt,
-		AmountPerPower:     new(big.Int).SetBytes(pm.XAmountPerPower),
-		RewardPerPower:     new(big.Int).SetBytes(pm.XRewardPerPower),
-		LazyRewardBlocks:   pm.LazyRewardBlocks,
-		LazyApplyingBlocks: pm.LazyApplyingBlocks,
-	}
-}
-
-func toProto(gr *GovRules) *GovRulesProto {
-	return &GovRulesProto{
-		Version:            gr.Version,
-		MaxValidatorCnt:    gr.MaxValidatorCnt,
-		XAmountPerPower:    gr.AmountPerPower.Bytes(),
-		XRewardPerPower:    gr.RewardPerPower.Bytes(),
-		LazyRewardBlocks:   gr.LazyRewardBlocks,
-		LazyApplyingBlocks: gr.LazyApplyingBlocks,
-	}
-}
-
 func (gr *GovRules) Encode() ([]byte, error) {
 	pm := toProto(gr)
 	return proto.Marshal(pm)
@@ -114,3 +92,26 @@ func (gr *GovRules) GetLazyApplyingBlocks() int64 {
 }
 
 var _ types.IGovRules = (*GovRules)(nil)
+
+func fromProto(pm *GovRulesProto) *GovRules {
+	return &GovRules{
+		Version:            pm.Version,
+		MaxValidatorCnt:    pm.MaxValidatorCnt,
+		AmountPerPower:     new(big.Int).SetBytes(pm.XAmountPerPower),
+		RewardPerPower:     new(big.Int).SetBytes(pm.XRewardPerPower),
+		LazyRewardBlocks:   pm.LazyRewardBlocks,
+		LazyApplyingBlocks: pm.LazyApplyingBlocks,
+	}
+}
+
+func toProto(gr *GovRules) *GovRulesProto {
+	a := &GovRulesProto{
+		Version:            gr.Version,
+		MaxValidatorCnt:    gr.MaxValidatorCnt,
+		XAmountPerPower:    gr.AmountPerPower.Bytes(),
+		XRewardPerPower:    gr.RewardPerPower.Bytes(),
+		LazyRewardBlocks:   gr.LazyRewardBlocks,
+		LazyApplyingBlocks: gr.LazyApplyingBlocks,
+	}
+	return a
+}

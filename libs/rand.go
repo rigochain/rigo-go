@@ -32,6 +32,10 @@ func RandAddress() types.Address {
 	return RandBytes(types.AddrSize)
 }
 
+func ZeroAddress() types.Address {
+	return ZeroBytes(types.AddrSize)
+}
+
 func RandAddrKey() types.AcctKey {
 	var k types.AcctKey
 	copy(k[:], RandBytes(types.AddrSize))

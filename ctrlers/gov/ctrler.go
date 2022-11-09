@@ -75,6 +75,7 @@ var _ trxs.ITrxHandler = (*GovCtrler)(nil)
 var _ types.ILedgerCtrler = (*GovCtrler)(nil)
 
 func (ctrler *GovCtrler) Validate(context *trxs.TrxContext) error {
+	// todo: only validators can propose
 	return nil
 }
 
@@ -116,6 +117,7 @@ func (ctrler *GovCtrler) applyProposal(ctx *trxs.TrxContext) error {
 			LastVotingHeight:  ctx.Height + txpayload.VotingBlocks,
 			ApplyingHeight:    ctx.Height + txpayload.VotingBlocks + ctx.GovRules.GetLazyApplyingBlocks(),
 			MajorityPower:     ctx.StakeCtrler.GetTotalPower() * int64(2) / int64(3),
+			Votes:             make(map[string]int64),
 			Rules:             rules,
 		}
 		ctrler.updatedProposals = append(ctrler.updatedProposals, proposal)
