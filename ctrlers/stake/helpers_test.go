@@ -39,6 +39,11 @@ var _ types.IAccountFinder = (*accountHandler)(nil)
 
 type govRuleHandler struct{}
 
+var (
+	amtPerPower    = big.NewInt(1000)
+	rewardPerPower = big.NewInt(10)
+)
+
 func (g govRuleHandler) GetMaxValidatorCount() int64 {
 	return 21
 }
@@ -52,7 +57,7 @@ func (g govRuleHandler) GetLazyApplyingBlocks() int64 {
 }
 
 func (g govRuleHandler) MaxStakeAmount() *big.Int {
-	return new(big.Int).Mul(big.NewInt(tmtypes.MaxTotalVotingPower), big.NewInt(1000))
+	return new(big.Int).Mul(big.NewInt(tmtypes.MaxTotalVotingPower), amtPerPower)
 }
 
 func (g govRuleHandler) MaxTotalPower() int64 {
@@ -61,7 +66,7 @@ func (g govRuleHandler) MaxTotalPower() int64 {
 
 func (g govRuleHandler) AmountToPower(amt *big.Int) int64 {
 	// 1 VotingPower == 1 XCO
-	_vp := new(big.Int).Quo(amt, big.NewInt(1000))
+	_vp := new(big.Int).Quo(amt, amtPerPower)
 	vp := _vp.Int64()
 	if vp < 0 {
 		panic(fmt.Sprintf("voting power is negative: %v", vp))
@@ -71,14 +76,14 @@ func (g govRuleHandler) AmountToPower(amt *big.Int) int64 {
 
 func (g govRuleHandler) PowerToAmount(power int64) *big.Int {
 	// 1 VotingPower == 1 XCO
-	return new(big.Int).Mul(big.NewInt(power), big.NewInt(1000))
+	return new(big.Int).Mul(big.NewInt(power), amtPerPower)
 }
 
 func (g govRuleHandler) PowerToReward(power int64) *big.Int {
 	if power < 0 {
 		panic(fmt.Sprintf("power is negative: %v", power))
 	}
-	return new(big.Int).Mul(big.NewInt(power), big.NewInt(10))
+	return new(big.Int).Mul(big.NewInt(power), rewardPerPower)
 }
 
 var _ types.IGovRuleHandler = (*govRuleHandler)(nil)
