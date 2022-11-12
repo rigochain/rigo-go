@@ -214,4 +214,4 @@ func (ctrler *AccountCtrler) Apply(ctx *trxs.TrxContext) error {
 }
 
 var _ trxs.ITrxHandler = (*AccountCtrler)(nil)
-var _ types.ILedgerCtrler = (*AccountCtrler)(nil)
+var _ types.ILedgerHandler = (*AccountCtrler)(nil)

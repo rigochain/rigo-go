@@ -9,53 +9,53 @@ type Vote struct {
 	addr  types.Address
 	power int64
 }
-type GovRulesProposal struct {
+type GovRuleProposal struct {
 	TxHash            types.HexBytes   `json:"txHash"`
 	StartVotingHeight int64            `json:"startVotingHeight"`
 	LastVotingHeight  int64            `json:"lastVotingHeight"`
 	ApplyingHeight    int64            `json:"applyingHeight"`
 	MajorityPower     int64            `json:"majorityPower"`
 	Votes             map[string]int64 `json:"votes"`
-	Rules             []*GovRules      `json:"rules"`
+	Rules             []*GovRule       `json:"rules"`
 }
 
-func (p *GovRulesProposal) ID() []byte {
+func (p *GovRuleProposal) ID() []byte {
 	return p.TxHash
 }
 
-func (p *GovRulesProposal) Type() int32 {
-	return types.PROPOSAL_GOVRULES
+func (p *GovRuleProposal) Type() int32 {
+	return types.PROPOSAL_GOVRULE
 }
 
-func (p *GovRulesProposal) Encode() ([]byte, error) {
+func (p *GovRuleProposal) Encode() ([]byte, error) {
 	return tmjson.Marshal(p)
 }
 
-func (p *GovRulesProposal) Decode(d []byte) error {
+func (p *GovRuleProposal) Decode(d []byte) error {
 	return tmjson.Unmarshal(d, p)
 }
 
-func (p *GovRulesProposal) GetStartVotingHeight() int64 {
+func (p *GovRuleProposal) GetStartVotingHeight() int64 {
 	return p.StartVotingHeight
 }
 
-func (p *GovRulesProposal) GetLastVotingHeight() int64 {
+func (p *GovRuleProposal) GetLastVotingHeight() int64 {
 	return p.LastVotingHeight
 }
 
-func (p *GovRulesProposal) GetApplyingHeight() int64 {
+func (p *GovRuleProposal) GetApplyingHeight() int64 {
 	return p.ApplyingHeight
 }
 
-func (p *GovRulesProposal) GetMajorityPower() int64 {
+func (p *GovRuleProposal) GetMajorityPower() int64 {
 	return p.MajorityPower
 }
 
-func (p *GovRulesProposal) GetOption(i int) interface{} {
+func (p *GovRuleProposal) GetOption(i int) interface{} {
 	return p.Rules[i]
 }
 
-func (p *GovRulesProposal) GetVotesFor(optidx int32) int64 {
+func (p *GovRuleProposal) GetVotesFor(optidx int32) int64 {
 	votes := int64(0)
 	for _, v := range p.Votes {
 		votes += v
@@ -63,7 +63,7 @@ func (p *GovRulesProposal) GetVotesFor(optidx int32) int64 {
 	return votes
 }
 
-func (p *GovRulesProposal) GetVotesOf(addr types.Address, optidx int32) int64 {
+func (p *GovRuleProposal) GetVotesOf(addr types.Address, optidx int32) int64 {
 	v, ok := p.Votes[addr.String()]
 	if !ok {
 		v = 0
@@ -71,10 +71,10 @@ func (p *GovRulesProposal) GetVotesOf(addr types.Address, optidx int32) int64 {
 	return v
 }
 
-func (p *GovRulesProposal) DoVote(addr types.Address, power int64) {
+func (p *GovRuleProposal) DoVote(addr types.Address, power int64) {
 	if power > 0 {
 		p.Votes[addr.String()] = power
 	}
 }
 
-var _ types.IProposable = (*GovRulesProposal)(nil)
+var _ types.IProposable = (*GovRuleProposal)(nil)

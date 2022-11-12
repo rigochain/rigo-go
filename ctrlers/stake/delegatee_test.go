@@ -15,8 +15,8 @@ var (
 func TestAppendStake(t *testing.T) {
 	delegatee = stake.NewDelegatee(Wallets[0].GetAddress(), Wallets[0].W.GetPubKey())
 
-	amt0 := libs.RandBigIntN(testGovRules.MaxStakeAmount())
-	power0 := testGovRules.AmountToPower(amt0)
+	amt0 := libs.RandBigIntN(govRuleHandlerHelper.MaxStakeAmount())
+	power0 := govRuleHandlerHelper.AmountToPower(amt0)
 	delegatee.AppendStake(
 		stake.NewStakeWithAmount(
 			delegatee.Addr,
@@ -24,7 +24,7 @@ func TestAppendStake(t *testing.T) {
 			amt0,                       // amount
 			libs.RandInt63n(1_000_000), // height
 			libs.RandHexBytes(32),      //txhash
-			testGovRules,
+			govRuleHandlerHelper,
 		),
 	)
 
@@ -34,8 +34,8 @@ func TestAppendStake(t *testing.T) {
 	require.Equal(t, power0, delegatee.GetTotalPower())
 
 	from1 := libs.RandAddress()
-	amt1 := libs.RandBigIntN(testGovRules.MaxStakeAmount())
-	power1 := testGovRules.AmountToPower(amt1)
+	amt1 := libs.RandBigIntN(govRuleHandlerHelper.MaxStakeAmount())
+	power1 := govRuleHandlerHelper.AmountToPower(amt1)
 	delegatee.AppendStake(
 		stake.NewStakeWithAmount(
 			from1,
@@ -43,7 +43,7 @@ func TestAppendStake(t *testing.T) {
 			amt1,                       // amount
 			libs.RandInt63n(1_000_000), // height
 			libs.RandHexBytes(32),      //txhash
-			testGovRules,
+			govRuleHandlerHelper,
 		),
 	)
 
@@ -60,7 +60,7 @@ func TestApplyReward(t *testing.T) {
 	delegatee := stake.NewDelegatee(Wallets[1].GetAddress(), Wallets[1].W.GetPubKey())
 
 	// staking
-	amt0 := libs.RandBigIntN(testGovRules.MaxStakeAmount())
+	amt0 := libs.RandBigIntN(govRuleHandlerHelper.MaxStakeAmount())
 	delegatee.AppendStake(
 		stake.NewStakeWithAmount(
 			delegatee.Addr,
@@ -68,7 +68,7 @@ func TestApplyReward(t *testing.T) {
 			amt0,                       // amount
 			libs.RandInt63n(1_000_000), // height
 			libs.RandHexBytes(32),      //txhash
-			testGovRules,
+			govRuleHandlerHelper,
 		),
 	)
 	// first reward
@@ -96,7 +96,7 @@ func BenchmarkApplyReward(b *testing.B) {
 				power,                      // power
 				libs.RandInt63n(1_000_000), // height
 				libs.RandHexBytes(32),      //txhash
-				testGovRules,
+				govRuleHandlerHelper,
 			),
 		)
 	}

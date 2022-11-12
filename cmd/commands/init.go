@@ -172,8 +172,8 @@ func initFilesWithConfig(config *cfg.Config) error {
 				}
 			}()
 
-			govRules := genesis.DefaultGenesisGovRules()
-			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, govRules)
+			govRule := genesis.DefaultGenesisGovRule()
+			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, govRule)
 			if err != nil {
 				return err
 			}

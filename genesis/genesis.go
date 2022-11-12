@@ -23,7 +23,7 @@ func (gh *GenesisAssetHolder) Hash() []byte {
 	return hasher.Sum(nil)
 }
 
-type GenesisGovRules struct {
+type GenesisGovRule struct {
 	Version            int64  `json:"version"`
 	MaxValidatorCnt    int64  `json:"maxValidatorCnt"`
 	AmountPerPower     string `json:"amountPerPower"`
@@ -32,9 +32,9 @@ type GenesisGovRules struct {
 	LazyApplyingBlocks int64  `json:"lazyApplyingBlocks"`
 }
 
-func DefaultGenesisGovRules() *GenesisGovRules {
-	gr := gov.DefaultGovRules()
-	return &GenesisGovRules{
+func DefaultGenesisGovRule() *GenesisGovRule {
+	gr := gov.DefaultGovRule()
+	return &GenesisGovRule{
 		Version:            gr.Version,
 		MaxValidatorCnt:    gr.MaxValidatorCnt,
 		AmountPerPower:     gr.AmountPerPower.String(),
@@ -43,7 +43,7 @@ func DefaultGenesisGovRules() *GenesisGovRules {
 	}
 }
 
-func (gr *GenesisGovRules) Hash() []byte {
+func (gr *GenesisGovRule) Hash() []byte {
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint32(buf, uint32(gr.Version))
 
@@ -56,13 +56,13 @@ func (gr *GenesisGovRules) Hash() []byte {
 
 type GenesisAppState struct {
 	AssetHolders []*GenesisAssetHolder `json:"assetHolders"`
-	GovRules     *GenesisGovRules      `json:"govRules"`
+	GovRule      *GenesisGovRule       `json:"govRule"`
 }
 
 func (ga *GenesisAppState) Hash() ([]byte, error) {
 	hasher := crypto.DefaultHasher()
 
-	hasher.Write(ga.GovRules.Hash())
+	hasher.Write(ga.GovRule.Hash())
 	for _, h := range ga.AssetHolders {
 		hasher.Write(h.Hash())
 	}
@@ -70,10 +70,10 @@ func (ga *GenesisAppState) Hash() ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govRules *GenesisGovRules) (*tmtypes.GenesisDoc, error) {
+func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govRule *GenesisGovRule) (*tmtypes.GenesisDoc, error) {
 	appState := GenesisAppState{
 		AssetHolders: assetHolders,
-		GovRules:     govRules,
+		GovRule:      govRule,
 	}
 	appStateJsonBlob, err := tmjson.Marshal(appState)
 	if err != nil {

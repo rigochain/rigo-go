@@ -10,7 +10,6 @@ import (
 var (
 	DBDIR        = filepath.Join(os.TempDir(), "gov-ctrler-test")
 	govCtrler, _ = NewGovCtrler(DBDIR, tmlog.NewNopLogger())
-	govRules     = DefaultGovRules()
 )
 
 func TestMain(m *testing.M) {

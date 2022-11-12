@@ -3,7 +3,6 @@ package stake_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/ctrlers/stake"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/stretchr/testify/require"
@@ -16,17 +15,10 @@ import (
 )
 
 var (
-	DBDIR            = filepath.Join(os.TempDir(), "stake-ctrler-unstaking-test")
-	acctCtrlerHelper = &AccountHelper{}
-	stakeCtrler, _   = stake.NewStakeCtrler(DBDIR, tmlog.NewNopLogger())
-	testGovRules     = &gov.GovRules{
-		Version:            0,
-		MaxValidatorCnt:    21,
-		AmountPerPower:     big.NewInt(1000),
-		RewardPerPower:     big.NewInt(10),
-		LazyRewardBlocks:   10,
-		LazyApplyingBlocks: 10,
-	}
+	DBDIR                = filepath.Join(os.TempDir(), "stake-ctrler-unstaking-test")
+	acctHandlerHelper    = &accountHandler{}
+	govRuleHandlerHelper = &govRuleHandler{}
+	stakeCtrler, _       = stake.NewStakeCtrler(DBDIR, tmlog.NewNopLogger())
 
 	Wallets              []*TestWallet
 	DelegateeWallets     []*TestWallet
@@ -41,8 +33,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-
-	Wallets = makeTestWallets(rand.Intn(100) + int(testGovRules.GetMaxValidatorCount()))
+	Wallets = makeTestWallets(rand.Intn(100) + int(govRuleHandlerHelper.GetMaxValidatorCount()))
 
 	for i := 0; i < 5; i++ {
 		if txctx, err := randMakeStakingToSelfTrxContext(); err != nil {
@@ -104,7 +95,7 @@ func TestStakingToSelfByTx(t *testing.T) {
 		require.NoError(t, err)
 
 		sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += txctx.GovRules.AmountToPower(txctx.Tx.Amount)
+		sumPower += txctx.GovRuleHandler.AmountToPower(txctx.Tx.Amount)
 	}
 
 	require.Equal(t, sumAmt.String(), stakeCtrler.GetTotalAmount().String())
@@ -120,7 +111,7 @@ func TestStakingByTx(t *testing.T) {
 		require.NoError(t, err)
 
 		sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += txctx.GovRules.AmountToPower(txctx.Tx.Amount)
+		sumPower += txctx.GovRuleHandler.AmountToPower(txctx.Tx.Amount)
 	}
 
 	require.Equal(t, sumAmt.String(), stakeCtrler.GetTotalAmount().String())
@@ -142,7 +133,7 @@ func TestUnstakingByTx(t *testing.T) {
 		stakingTxCtx := findStakingTxCtx(stakingTxHash)
 
 		sumUnstakingAmt.Add(sumUnstakingAmt, stakingTxCtx.Tx.Amount)
-		sumUnstakingPower += txctx.GovRules.AmountToPower(stakingTxCtx.Tx.Amount)
+		sumUnstakingPower += txctx.GovRuleHandler.AmountToPower(stakingTxCtx.Tx.Amount)
 	}
 
 	require.Equal(t, new(big.Int).Sub(sumAmt0, sumUnstakingAmt).String(), stakeCtrler.GetTotalAmount().String())
@@ -164,8 +155,8 @@ func TestUnstakingByTx(t *testing.T) {
 	require.Equal(t, sumFrozenPower, sumUnstakingPower)
 
 	// test lazy rewarding
-	lastHeight += testGovRules.GetLazyRewardBlocks()
-	err := stakeCtrler.ProcessFrozenStakesAt(lastHeight, acctCtrlerHelper)
+	lastHeight += govRuleHandlerHelper.GetLazyRewardBlocks()
+	err := stakeCtrler.ProcessFrozenStakesAt(lastHeight, acctHandlerHelper)
 	require.NoError(t, err)
 
 	stakeCtrler.Commit()
@@ -176,11 +167,11 @@ func TestUnstakingByTx(t *testing.T) {
 
 func TestUpdateValidators(t *testing.T) {
 
-	valUpdates0 := stakeCtrler.UpdateValidators(int(testGovRules.GetMaxValidatorCount())) // sort
+	valUpdates0 := stakeCtrler.UpdateValidators(int(govRuleHandlerHelper.GetMaxValidatorCount())) // sort
 	require.True(t, len(valUpdates0) > 0)
 	require.True(t, stakeCtrler.GetLastValidatorCnt() > 0)
 
-	valUpdates1 := stakeCtrler.UpdateValidators(int(testGovRules.GetMaxValidatorCount())) // sort
+	valUpdates1 := stakeCtrler.UpdateValidators(int(govRuleHandlerHelper.GetMaxValidatorCount())) // sort
 	require.True(t, len(valUpdates1) == 0)
 	require.True(t, stakeCtrler.GetLastValidatorCnt() > 0)
 

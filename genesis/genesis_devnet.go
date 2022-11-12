@@ -123,7 +123,7 @@ var jsonBlobDevnetGenesis = []byte(`{
         "balance": "1000000000000000000000000000"
       }
     ], 
-	"govRules": {
+	"govRule": {
 		"version": "0",
 		"amountPerPower": "1000000000000000000",
 		"rewardPerPower": "1000000000"

@@ -6,11 +6,11 @@ import (
 )
 
 func TestCodec(t *testing.T) {
-	rule0 := DefaultGovRules()
+	rule0 := DefaultGovRule()
 	bz, err := rule0.Encode()
 	require.NoError(t, err)
 
-	rule1, err := DecodeGovRules(bz)
+	rule1, err := DecodeGovRule(bz)
 	require.NoError(t, err)
 
 	require.Equal(t, rule0, rule1)

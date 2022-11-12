@@ -12,15 +12,15 @@ import (
 	"strings"
 )
 
-type stakerHelper struct {
+type stakerHandler struct {
 	powers map[string]int64
 }
 
-func (s *stakerHelper) GetTotalAmount() *big.Int {
-	return govRules.PowerToAmount(s.GetTotalPower())
+func (s *stakerHandler) GetTotalAmount() *big.Int {
+	return govCtrler.PowerToAmount(s.GetTotalPower())
 }
 
-func (s *stakerHelper) GetTotalPower() int64 {
+func (s *stakerHandler) GetTotalPower() int64 {
 	sum := int64(0)
 	for _, v := range s.powers {
 		sum += v
@@ -28,11 +28,11 @@ func (s *stakerHelper) GetTotalPower() int64 {
 	return sum
 }
 
-func (s *stakerHelper) GetTotalPowerOf(addr types.Address) int64 {
+func (s *stakerHandler) GetTotalPowerOf(addr types.Address) int64 {
 	return s.powers[addr.String()]
 }
 
-func (s *stakerHelper) IsValidator(addr types.Address) bool {
+func (s *stakerHandler) IsValidator(addr types.Address) bool {
 	addrStr := addr.String()
 	for k, _ := range s.powers {
 		if strings.Compare(k, addrStr) == 0 {
@@ -42,7 +42,7 @@ func (s *stakerHelper) IsValidator(addr types.Address) bool {
 	return false
 }
 
-func (s *stakerHelper) PickAddress(i int) types.Address {
+func (s *stakerHandler) PickAddress(i int) types.Address {
 	var addrs []string
 	for k, _ := range s.powers {
 		addrs = append(addrs, k)
@@ -51,9 +51,9 @@ func (s *stakerHelper) PickAddress(i int) types.Address {
 	return ret
 }
 
-type accountHelper struct{}
+type accountHandler struct{}
 
-func (a *accountHelper) FindAccount(addr types.Address, exec bool) types.IAccount {
+func (a *accountHandler) FindAccount(addr types.Address, exec bool) types.IAccount {
 	acctKey := types.ToAcctKey(addr)
 	if acct, ok := accountMap[acctKey]; ok {
 		return acct
@@ -66,7 +66,7 @@ func (a *accountHelper) FindAccount(addr types.Address, exec bool) types.IAccoun
 }
 
 var (
-	stakerCtrler = &stakerHelper{
+	stakerHandlerHelper = &stakerHandler{
 		powers: map[string]int64{
 			libs.RandAddress().String(): 10,
 			libs.RandAddress().String(): 10,
@@ -91,9 +91,9 @@ var (
 			libs.RandAddress().String(): 10,
 		},
 	}
-	accountCtrler    = &accountHelper{}
-	accountMap       = make(map[types.AcctKey]types.IAccount)
-	proposalGovRules = &GovRules{
+	accountHandlerHelper = &accountHandler{}
+	accountMap           = make(map[types.AcctKey]types.IAccount)
+	govRuleProposal      = &GovRule{
 		Version:            1,
 		MaxValidatorCnt:    11,
 		AmountPerPower:     big.NewInt(2_000000000_000000000),
@@ -103,16 +103,15 @@ var (
 	}
 )
 
-func makeProposalTrxCtx(from, to types.Address, gas *big.Int) *trxs.TrxContext {
-	bz, _ := proposalGovRules.Encode()
-	tx := client.NewTrxGovRulesProposal(
-		from, to, gas, 1, "test govrules proposal", bz)
+func makeProposalTrxCtx(from, to types.Address, gas *big.Int, bzProposal []byte) *trxs.TrxContext {
+	tx := client.NewTrxGovRuleProposal(
+		from, to, gas, 1, "test govrule proposal", bzProposal)
 
 	txbz, _ := tx.Encode()
 	txctx, _ := trxs.NewTrxContextEx(txbz, 10, false, func(_txctx *trxs.TrxContext) error {
 		_tx := _txctx.Tx
 		// find sender account
-		acct := accountCtrler.FindAccount(_tx.From, _txctx.Exec)
+		acct := accountHandlerHelper.FindAccount(_tx.From, _txctx.Exec)
 		if acct == nil {
 			return xerrors.ErrNotFoundAccount
 		}
@@ -131,8 +130,8 @@ func makeProposalTrxCtx(from, to types.Address, gas *big.Int) *trxs.TrxContext {
 		}
 		_txctx.NeedAmt = needFund
 
-		_txctx.GovRules = DefaultGovRules()
-		_txctx.StakeCtrler = stakerCtrler
+		_txctx.GovRuleHandler = govCtrler
+		_txctx.StakeHandler = stakerHandlerHelper
 
 		return nil
 	})
@@ -148,7 +147,7 @@ func makeVotingTrxCtx(proposalTxHash types.HexBytes, choice int32) *trxs.TrxCont
 	txctx, _ := trxs.NewTrxContextEx(txbz, 10, false, func(_txctx *trxs.TrxContext) error {
 		_tx := _txctx.Tx
 		// find sender account
-		acct := accountCtrler.FindAccount(_tx.From, _txctx.Exec)
+		acct := accountHandlerHelper.FindAccount(_tx.From, _txctx.Exec)
 		if acct == nil {
 			return xerrors.ErrNotFoundAccount
 		}
@@ -167,8 +166,8 @@ func makeVotingTrxCtx(proposalTxHash types.HexBytes, choice int32) *trxs.TrxCont
 		}
 		_txctx.NeedAmt = needFund
 
-		_txctx.GovRules = DefaultGovRules()
-		_txctx.StakeCtrler = stakerCtrler
+		_txctx.GovRuleHandler = govCtrler
+		_txctx.StakeHandler = stakerHandlerHelper
 
 		return nil
 	})

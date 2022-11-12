@@ -30,8 +30,8 @@ func TestNewGenesis(t *testing.T) {
 		}
 	}
 
-	govRules := DefaultGenesisGovRules()
-	genDoc, err := NewGenesisDoc("TestChainID", validators, holders, govRules)
+	govRule := DefaultGenesisGovRule()
+	genDoc, err := NewGenesisDoc("TestChainID", validators, holders, govRule)
 	require.NoError(t, err)
 
 	bzJson, err := tmjson.MarshalIndent(genDoc, "", "   ")
@@ -48,7 +48,7 @@ func TestDevnetGenesisUnmarshal(t *testing.T) {
 	err = tmjson.Unmarshal(genDoc.AppState, appState)
 	require.NoError(t, err)
 
-	require.Equal(t, int64(0), appState.GovRules.Version)
-	require.Equal(t, "1000000000000000000", appState.GovRules.AmountPerPower)
-	require.Equal(t, "1000000000", appState.GovRules.RewardPerPower)
+	require.Equal(t, int64(0), appState.GovRule.Version)
+	require.Equal(t, "1000000000000000000", appState.GovRule.AmountPerPower)
+	require.Equal(t, "1000000000", appState.GovRule.RewardPerPower)
 }

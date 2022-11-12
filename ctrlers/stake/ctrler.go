@@ -279,9 +279,9 @@ func (ctrler *StakeCtrler) applyStaking(ctx *trxs.TrxContext) error {
 			return xerrors.ErrNotFoundStaker
 		}
 
-		s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovRules)
+		s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovRuleHandler)
 		expectedPower := ctrler.GetTotalPower() + s0.Power
-		if expectedPower < 0 || expectedPower > ctx.GovRules.MaxTotalPower() {
+		if expectedPower < 0 || expectedPower > ctx.GovRuleHandler.MaxTotalPower() {
 			return xerrors.ErrTooManyPower
 		}
 
@@ -313,7 +313,7 @@ func (ctrler *StakeCtrler) applyUnstakingByTxHash(ctx *trxs.TrxContext) error {
 			return xerrors.ErrNotFoundStake
 		}
 
-		s0.RefundHeight = ctx.Height + ctx.GovRules.GetLazyRewardBlocks()
+		s0.RefundHeight = ctx.Height + ctx.GovRuleHandler.GetLazyRewardBlocks()
 		// ctrler.frozenStakes is ordered by RefundHeight
 		ctrler.newFrozenStakes = append(ctrler.newFrozenStakes, s0)
 
@@ -363,7 +363,7 @@ func (ctrler *StakeCtrler) applyUnstaking(ctx *trxs.TrxContext) error {
 				_ = staker.DelStake(s0.TxHash) // returns `*Stake` same as `s0`
 				damt = new(big.Int).Sub(damt, s0.Amount)
 
-				s0.RefundHeight = ctx.Height + ctx.GovRules.GetLazyRewardBlocks()
+				s0.RefundHeight = ctx.Height + ctx.GovRuleHandler.GetLazyRewardBlocks()
 
 				// ctrler.frozenStakes is ordered by RefundHeight
 				ctrler.newFrozenStakes = append(ctrler.newFrozenStakes, s0)
@@ -502,6 +502,15 @@ func (ctrler *StakeCtrler) UpdateValidators(maxVals int) []tmtypes.ValidatorUpda
 	return valUps
 }
 
+func (ctrler *StakeCtrler) IsValidator(addr types.Address) bool {
+	for _, val := range ctrler.lastValidators {
+		if bytes.Compare(val.Address, addr) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func validatorUpdates(existing, newers ValidatorInfoList) []tmtypes.ValidatorUpdate {
 	valUpdates := make(tmtypes.ValidatorUpdates, 0, len(existing)+len(newers))
 
@@ -605,7 +614,8 @@ func (ctrler *StakeCtrler) Close() error {
 }
 
 var _ trxs.ITrxHandler = (*StakeCtrler)(nil)
-var _ types.ILedgerCtrler = (*StakeCtrler)(nil)
+var _ types.ILedgerHandler = (*StakeCtrler)(nil)
+var _ types.IStakeHandler = (*StakeCtrler)(nil)
 
 type DelegateeArray []*Delegatee
 

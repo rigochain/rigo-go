@@ -5,12 +5,12 @@ import (
 	"math/big"
 )
 
-type ILedgerCtrler interface {
+type ILedgerHandler interface {
 	Commit() ([]byte, int64, error)
 	Close() error
 }
 
-type IStakeCtrler interface {
+type IStakeHandler interface {
 	GetTotalAmount() *big.Int
 	GetTotalPower() int64
 	GetTotalPowerOf(types.Address) int64

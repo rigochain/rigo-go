@@ -14,17 +14,17 @@ var (
 )
 
 func TestNewStake(t *testing.T) {
-	amt := libs.RandBigIntN(testGovRules.MaxStakeAmount())
+	amt := libs.RandBigIntN(govRuleHandlerHelper.MaxStakeAmount())
 	s0 := stake.NewStakeWithAmount(
 		addr0,
 		addr1,
 		amt, 1, nil,
-		testGovRules)
+		govRuleHandlerHelper)
 
 	require.True(t, s0.Power > int64(0))
-	require.Equal(t, testGovRules.AmountToPower(amt), s0.Power)
+	require.Equal(t, govRuleHandlerHelper.AmountToPower(amt), s0.Power)
 	require.True(t, s0.BlockReward.Sign() > 0)
-	require.Equal(t, testGovRules.PowerToReward(s0.Power), s0.BlockReward)
+	require.Equal(t, govRuleHandlerHelper.PowerToReward(s0.Power), s0.BlockReward)
 	require.Equal(t, big.NewInt(0), s0.Reward)
 }
 
@@ -32,13 +32,13 @@ func TestApplyRewardByStake(t *testing.T) {
 	stakes := make([]*stake.Stake, 1000)
 
 	for i := 0; i < 1000; i++ {
-		amt := libs.RandBigIntN(new(big.Int).Div(testGovRules.MaxStakeAmount(), big.NewInt(1000)))
+		amt := libs.RandBigIntN(new(big.Int).Div(govRuleHandlerHelper.MaxStakeAmount(), big.NewInt(1000)))
 		txhash := libs.RandBytes(32)
 		stakes[i] = stake.NewStakeWithAmount(
 			addr0,
 			addr1,
 			amt, 1, txhash,
-			testGovRules)
+			govRuleHandlerHelper)
 	}
 
 	for i := 0; i < 1000; i++ {

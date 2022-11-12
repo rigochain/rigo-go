@@ -17,30 +17,44 @@ type Case struct {
 	err   xerrors.XError
 }
 
-var cases []*Case
+var (
+	cases []*Case
+)
 
 func init() {
+
+	bz, err := govRuleProposal.Encode()
+	if err != nil {
+		panic(err)
+	}
 	cases = []*Case{
-		{txctx: makeProposalTrxCtx(stakerCtrler.PickAddress(rand.Int()), libs.ZeroAddress(), big.NewInt(10)), err: nil},
-		{txctx: makeProposalTrxCtx(libs.RandAddress(), libs.ZeroAddress(), big.NewInt(10)), err: xerrors.New("error")},
+		{txctx: makeProposalTrxCtx(stakerHandlerHelper.PickAddress(rand.Int()), libs.ZeroAddress(), big.NewInt(10), bz), err: nil},
+		{txctx: makeProposalTrxCtx(libs.RandAddress(), libs.ZeroAddress(), big.NewInt(10), bz), err: xerrors.New("error")},
 	}
 }
 
-func TestProposalAndSaving(t *testing.T) {
-	proposed := 0
+func TestAddProposal(t *testing.T) {
+	successes := 0
 	for _, c := range cases {
-		err := govCtrler.Apply(c.txctx)
+		err := govCtrler.Validate(c.txctx)
 		if c.err == nil {
 			require.NoError(t, err)
-			proposed++
 		} else {
 			require.Error(t, err)
+			continue
 		}
-	}
 
-	originProposals := govCtrler.updatedProposals
-	require.Equal(t, proposed, len(govCtrler.allProposals))
-	require.Equal(t, proposed, len(govCtrler.updatedProposals))
+		err = govCtrler.Apply(c.txctx)
+		require.NoError(t, err)
+		successes++
+	}
+	require.Equal(t, successes, len(govCtrler.allProposals))
+	require.Equal(t, successes, len(govCtrler.updatedProposals))
+
+}
+
+func TestSaveProposal(t *testing.T) {
+	successPorposals := govCtrler.updatedProposals
 
 	_, _, err := govCtrler.Commit()
 	require.NoError(t, err)
@@ -48,15 +62,14 @@ func TestProposalAndSaving(t *testing.T) {
 	err = govCtrler.Close()
 	require.NoError(t, err)
 
-	govCtrler, err = NewGovCtrler(DBDIR, tmlog.NewNopLogger())
+	govCtrler2, err := NewGovCtrler(DBDIR, tmlog.NewNopLogger())
 	require.NoError(t, err)
 
-	require.Equal(t, proposed, len(govCtrler.allProposals))
-	require.Equal(t, 0, len(govCtrler.updatedProposals))
+	require.Equal(t, len(successPorposals), len(govCtrler2.allProposals))
+	require.Equal(t, 0, len(govCtrler2.updatedProposals))
 
-	for i := 0; i < proposed; i++ {
-		p0 := originProposals[i]
-		p1 := govCtrler.allProposals[types.HexBytes(p0.ID()).Array32()]
+	for _, p0 := range successPorposals {
+		p1 := govCtrler2.allProposals[types.HexBytes(p0.ID()).Array32()]
 		require.Equal(t, p0, p1)
 	}
 }

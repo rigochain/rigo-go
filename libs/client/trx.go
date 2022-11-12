@@ -51,8 +51,8 @@ func NewTrxProposal(from, to types.Address, gas *big.Int, nonce uint64, msg stri
 		})
 }
 
-func NewTrxGovRulesProposal(from, to types.Address, gas *big.Int, nonce uint64, msg string, option []byte) *trxs.Trx {
-	return NewTrxProposal(from, to, gas, nonce, msg, 10, types.PROPOSAL_GOVRULES, [][]byte{option})
+func NewTrxGovRuleProposal(from, to types.Address, gas *big.Int, nonce uint64, msg string, option []byte) *trxs.Trx {
+	return NewTrxProposal(from, to, gas, nonce, msg, 10, types.PROPOSAL_GOVRULE, [][]byte{option})
 }
 
 func NewTrxVoting(from, to types.Address, gas *big.Int, nonce uint64, txHash types.HexBytes, choice int32) *trxs.Trx {

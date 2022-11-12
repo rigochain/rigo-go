@@ -5,7 +5,7 @@ import (
 	"math/big"
 )
 
-type IGovRules interface {
+type IGovRuleHandler interface {
 	GetMaxValidatorCount() int64
 	GetLazyRewardBlocks() int64
 	GetLazyApplyingBlocks() int64
@@ -17,7 +17,7 @@ type IGovRules interface {
 }
 
 const (
-	PROPOSAL_GOVRULES = 1 + iota
+	PROPOSAL_GOVRULE = 1 + iota
 	PROPOSAL_OTHERS
 )
 

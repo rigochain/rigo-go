@@ -1,19 +1,22 @@
 package gov
 
 import (
+	"fmt"
 	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
+	tmtypes "github.com/tendermint/tendermint/types"
 	tmdb "github.com/tendermint/tm-db"
+	"math/big"
 	"sync"
 )
 
 type GovCtrler struct {
 	govDB tmdb.DB
 
-	rules types.IGovRules
+	rules *GovRule
 
 	allProposals     map[[32]byte]types.IProposable
 	updatedProposals []types.IProposable
@@ -38,7 +41,7 @@ func NewGovCtrler(dbDir string, logger log.Logger) (*GovCtrler, error) {
 	for ; iter.Valid(); iter.Next() {
 		k := iter.Key()
 		v := iter.Value()
-		p := &GovRulesProposal{}
+		p := &GovRuleProposal{}
 		if err := tmjson.Unmarshal(v, p); err != nil {
 			return nil, err
 		}
@@ -51,19 +54,29 @@ func NewGovCtrler(dbDir string, logger log.Logger) (*GovCtrler, error) {
 	return &GovCtrler{govDB: govDB, allProposals: allProposals, logger: logger}, nil
 }
 
-func (ctrler *GovCtrler) SetRules(rules types.IGovRules) {
-	ctrler.rules = rules
+func (ctrler *GovCtrler) SetRules(r *GovRule) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	ctrler.rules = r
 }
 
-func (ctrler *GovCtrler) GetRules() types.IGovRules {
+func (ctrler *GovCtrler) GetRules() *GovRule {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
 	return ctrler.rules
 }
 
 func (ctrler *GovCtrler) ImportRules(cb func() []byte) error {
+
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	bz := cb()
 	if bz == nil {
 		return xerrors.New("rule blob is nil")
-	} else if rules, err := DecodeGovRules(bz); err != nil {
+	} else if rules, err := DecodeGovRule(bz); err != nil {
 		return xerrors.NewFrom(err)
 	} else {
 		ctrler.rules = rules
@@ -72,10 +85,21 @@ func (ctrler *GovCtrler) ImportRules(cb func() []byte) error {
 }
 
 var _ trxs.ITrxHandler = (*GovCtrler)(nil)
-var _ types.ILedgerCtrler = (*GovCtrler)(nil)
+var _ types.ILedgerHandler = (*GovCtrler)(nil)
 
-func (ctrler *GovCtrler) Validate(context *trxs.TrxContext) error {
-	// todo: only validators can propose
+func (ctrler *GovCtrler) Validate(ctx *trxs.TrxContext) error {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	switch ctx.Tx.GetType() {
+	case trxs.TRX_PROPOSAL, trxs.TRX_VOTING:
+		if ctx.StakeHandler.IsValidator(ctx.Tx.From) == false {
+			return xerrors.New("wrong proposer")
+		}
+	default:
+		return xerrors.New("unknown transaction type")
+	}
+
 	return nil
 }
 
@@ -97,9 +121,9 @@ func (ctrler *GovCtrler) applyProposal(ctx *trxs.TrxContext) error {
 	if txpayload, ok := ctx.Tx.Payload.(*trxs.TrxPayloadProposal); !ok {
 		return xerrors.New("unknown transaction payload")
 	} else {
-		var rules []*GovRules
+		var rules []*GovRule
 		for _, opt := range txpayload.Options {
-			if r, err := DecodeGovRules(opt); err != nil {
+			if r, err := DecodeGovRule(opt); err != nil {
 				return err
 			} else {
 				rules = append(rules, r)
@@ -111,12 +135,12 @@ func (ctrler *GovCtrler) applyProposal(ctx *trxs.TrxContext) error {
 			return xerrors.New("there is already the txhash in allProposals")
 		}
 
-		proposal := &GovRulesProposal{
+		proposal := &GovRuleProposal{
 			TxHash:            ctx.TxHash,
 			StartVotingHeight: ctx.Height + 1,
 			LastVotingHeight:  ctx.Height + txpayload.VotingBlocks,
-			ApplyingHeight:    ctx.Height + txpayload.VotingBlocks + ctx.GovRules.GetLazyApplyingBlocks(),
-			MajorityPower:     ctx.StakeCtrler.GetTotalPower() * int64(2) / int64(3),
+			ApplyingHeight:    ctx.Height + txpayload.VotingBlocks + ctx.GovRuleHandler.GetLazyApplyingBlocks(),
+			MajorityPower:     ctx.StakeHandler.GetTotalPower() * int64(2) / int64(3),
 			Votes:             make(map[string]int64),
 			Rules:             rules,
 		}
@@ -137,12 +161,15 @@ func (ctrler *GovCtrler) applyVote(ctx *trxs.TrxContext) error {
 		return xerrors.New("already voted")
 	}
 
-	proposal.DoVote(ctx.Tx.From, ctx.StakeCtrler.GetTotalPowerOf(ctx.Tx.From))
+	proposal.DoVote(ctx.Tx.From, ctx.StakeHandler.GetTotalPowerOf(ctx.Tx.From))
 	ctrler.updatedProposals = append(ctrler.updatedProposals, proposal)
 	return nil
 }
 
 func (ctrler *GovCtrler) Commit() ([]byte, int64, error) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	for _, proposal := range ctrler.updatedProposals {
 		if bz, err := proposal.Encode(); err != nil {
 			return nil, -1, err
@@ -167,3 +194,76 @@ func (ctrler *GovCtrler) Close() error {
 	ctrler.govDB = nil
 	return nil
 }
+
+// implements IGovRuleHandler
+func (ctrler *GovCtrler) GetMaxValidatorCount() int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.rules.MaxValidatorCnt
+}
+
+// MaxStakeAmount means the max of amount which could be deposited.
+// tmtypes.MaxTotalVotingPower = int64(math.MaxInt64) / 8
+// When the type of voting power is `int64`and VP:XCO = 1:1,
+// the MAXSTAKEsau becomes `int64(math.MaxInt64) / 8 * 10^18` (~= 922경 XCO)
+func (ctrler *GovCtrler) MaxStakeAmount() *big.Int {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return new(big.Int).Mul(big.NewInt(tmtypes.MaxTotalVotingPower), ctrler.rules.AmountPerPower)
+}
+
+func (ctrler *GovCtrler) MaxTotalPower() int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return tmtypes.MaxTotalVotingPower
+}
+
+func (ctrler *GovCtrler) AmountToPower(amt *big.Int) int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	// 1 VotingPower == 1 XCO
+	_vp := new(big.Int).Quo(amt, ctrler.rules.AmountPerPower)
+	vp := _vp.Int64()
+	if vp < 0 {
+		panic(fmt.Sprintf("voting power is negative: %v", vp))
+	}
+	return vp
+}
+
+func (ctrler *GovCtrler) PowerToAmount(power int64) *big.Int {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	// 1 VotingPower == 1 XCO
+	return new(big.Int).Mul(big.NewInt(power), ctrler.rules.AmountPerPower)
+}
+
+func (ctrler *GovCtrler) PowerToReward(power int64) *big.Int {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	if power < 0 {
+		panic(fmt.Sprintf("power is negative: %v", power))
+	}
+	return new(big.Int).Mul(big.NewInt(power), ctrler.rules.RewardPerPower)
+}
+
+func (ctrler *GovCtrler) GetLazyRewardBlocks() int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.rules.LazyRewardBlocks
+}
+
+func (ctrler *GovCtrler) GetLazyApplyingBlocks() int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.rules.LazyApplyingBlocks
+}
+
+var _ types.IGovRuleHandler = (*GovCtrler)(nil)

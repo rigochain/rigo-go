@@ -64,8 +64,14 @@ func NewChainCtrler(dbDir string, logger log.Logger) *ChainCtrler {
 		acctCtrler:  acctCtrler,
 		stakeCtrler: stakeCtrler,
 		govCtrler:   govCtrler,
-		trxExecutor: NewTrxExecutor(logger, acctCtrler, stakeCtrler, govCtrler),
-		logger:      logger,
+		trxExecutor: NewTrxExecutor(map[int32][]trxs.ITrxHandler{
+			trxs.TRX_TRANSFER:  {acctCtrler},
+			trxs.TRX_STAKING:   {stakeCtrler},
+			trxs.TRX_UNSTAKING: {stakeCtrler},
+			trxs.TRX_PROPOSAL:  {govCtrler},
+			trxs.TRX_VOTING:    {govCtrler},
+		}, logger),
+		logger: logger,
 	}
 }
 
@@ -128,22 +134,22 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 	}
 
 	if err = ctrler.govCtrler.ImportRules(func() []byte {
-		amtPower, _ := new(big.Int).SetString(appState.GovRules.AmountPerPower, 10)
-		rwdPower, _ := new(big.Int).SetString(appState.GovRules.RewardPerPower, 10)
-		govRules := &gov.GovRules{
-			Version:        appState.GovRules.Version,
+		amtPower, _ := new(big.Int).SetString(appState.GovRule.AmountPerPower, 10)
+		rwdPower, _ := new(big.Int).SetString(appState.GovRule.RewardPerPower, 10)
+		govRule := &gov.GovRule{
+			Version:        appState.GovRule.Version,
 			AmountPerPower: amtPower,
 			RewardPerPower: rwdPower,
 		}
 
-		if govRulesCode, err := govRules.Encode(); err != nil {
+		if govRuleCode, err := govRule.Encode(); err != nil {
 			panic(err)
 		} else {
 			// create account for gov rules and save it
-			govRulesAddr := libs.ZeroBytes(tmcrypto.AddressSize)
-			govRulesAcct := ctrler.acctCtrler.FindOrNewAccount(govRulesAddr, true)
-			govRulesAcct.SetCode(govRulesCode) // will be saved at commit
-			return govRulesCode
+			govRuleAddr := libs.ZeroBytes(tmcrypto.AddressSize)
+			govRuleAcct := ctrler.acctCtrler.FindOrNewAccount(govRuleAddr, true)
+			govRuleAcct.SetCode(govRuleCode) // will be saved at commit
+			return govRuleCode
 		}
 	}); err != nil {
 		panic(err)
@@ -157,7 +163,7 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 			panic(err)
 		}
 		staker := ctrler.stakeCtrler.AddDelegateeWith(addr, pubKeyBytes)
-		stake0 := stake.NewStakeWithPower(staker.Addr, staker.Addr, validator.Power, 0, libs.ZeroBytes(32), ctrler.govCtrler.GetRules())
+		stake0 := stake.NewStakeWithPower(staker.Addr, staker.Addr, validator.Power, 0, libs.ZeroBytes(32), ctrler.govCtrler)
 		staker.AppendStake(stake0)
 	}
 
@@ -218,8 +224,8 @@ func (ctrler *ChainCtrler) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respo
 				}
 				_txctx.NeedAmt = needFund
 
-				_txctx.GovRules = ctrler.govCtrler.GetRules()
-				_txctx.StakeCtrler = ctrler.stakeCtrler
+				_txctx.GovRuleHandler = ctrler.govCtrler
+				_txctx.StakeHandler = ctrler.stakeCtrler
 
 				return nil
 			}); err != nil {
@@ -298,8 +304,8 @@ func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.R
 			}
 			_txctx.NeedAmt = needFund
 
-			_txctx.GovRules = ctrler.govCtrler.GetRules()
-			_txctx.StakeCtrler = ctrler.stakeCtrler
+			_txctx.GovRuleHandler = ctrler.govCtrler
+			_txctx.StakeHandler = ctrler.stakeCtrler
 
 			return nil
 		}); err != nil {
@@ -352,7 +358,7 @@ func (ctrler *ChainCtrler) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Res
 		ctrler.stakeCtrler.ApplyReward(lastBlockGasInfo.Owner, lastBlockGasInfo.Gas)
 	}
 
-	updatedValidators := ctrler.stakeCtrler.UpdateValidators(int(ctrler.govCtrler.GetRules().GetMaxValidatorCount()))
+	updatedValidators := ctrler.stakeCtrler.UpdateValidators(int(ctrler.govCtrler.GetMaxValidatorCount()))
 
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates: updatedValidators,
