@@ -28,6 +28,11 @@ type TrxContext struct {
 	Error          xerrors.XError
 }
 
+type ITrxHandler interface {
+	Validate(*TrxContext) error
+	Execute(*TrxContext) error
+}
+
 type NewTrxContextCb func(*TrxContext) error
 
 func NewTrxContextEx(txbz []byte, height int64, exec bool, cbfns ...NewTrxContextCb) (*TrxContext, error) {

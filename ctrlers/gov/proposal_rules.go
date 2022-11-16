@@ -16,7 +16,7 @@ type GovRuleProposal struct {
 	ApplyingHeight    int64            `json:"applyingHeight"`
 	MajorityPower     int64            `json:"majorityPower"`
 	Votes             map[string]int64 `json:"votes"`
-	Rules             []*GovRule       `json:"rules"`
+	Rules             []*GovRule       `json:"govRule"`
 }
 
 func (p *GovRuleProposal) ID() []byte {

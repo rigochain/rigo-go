@@ -388,7 +388,7 @@ func (ctrler *StakeCtrler) applyUnstaking(ctx *trxs.TrxContext) error {
 	return nil
 }
 
-func (ctrler *StakeCtrler) Apply(ctx *trxs.TrxContext) error {
+func (ctrler *StakeCtrler) Execute(ctx *trxs.TrxContext) error {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -445,13 +445,6 @@ func (ctrler *StakeCtrler) ProcessFrozenStakesAt(height int64, acctFinder types.
 	return nil
 }
 
-func (ctrler *StakeCtrler) GetLastValidatorCnt() int {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	return len(ctrler.lastValidators)
-}
-
 func (ctrler *StakeCtrler) GetTotalAmount() *big.Int {
 	// todo: improve performance
 	amt := big.NewInt(0)
@@ -502,7 +495,17 @@ func (ctrler *StakeCtrler) UpdateValidators(maxVals int) []tmtypes.ValidatorUpda
 	return valUps
 }
 
+func (ctrler *StakeCtrler) GetLastValidatorCnt() int {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return len(ctrler.lastValidators)
+}
+
 func (ctrler *StakeCtrler) IsValidator(addr types.Address) bool {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
 	for _, val := range ctrler.lastValidators {
 		if bytes.Compare(val.Address, addr) == 0 {
 			return true

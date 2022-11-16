@@ -25,7 +25,7 @@ func (txe *TrxExecutor) Execute(ctx *trxs.TrxContext) error {
 		for _, h := range handlers {
 			if err := h.Validate(ctx); err != nil {
 				return err
-			} else if err := h.Apply(ctx); err != nil {
+			} else if err := h.Execute(ctx); err != nil {
 				return err
 			}
 		}

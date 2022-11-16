@@ -8,11 +8,17 @@ import (
 )
 
 var (
-	DBDIR        = filepath.Join(os.TempDir(), "gov-ctrler-test")
-	govCtrler, _ = NewGovCtrler(DBDIR, tmlog.NewNopLogger())
+	DBDIR     = filepath.Join(os.TempDir(), "gov-ctrler-test")
+	govCtrler *GovCtrler
 )
 
 func TestMain(m *testing.M) {
+
+	var err error
+	if govCtrler, err = NewGovCtrler(DBDIR, tmlog.NewNopLogger()); err != nil {
+		panic(err)
+	}
+	govCtrler.SetRules(DefaultGovRule())
 
 	exitCode := m.Run()
 

@@ -198,7 +198,7 @@ func (ctrler *AccountCtrler) Validate(ctx *trxs.TrxContext) error {
 	return nil
 }
 
-func (ctrler *AccountCtrler) Apply(ctx *trxs.TrxContext) error {
+func (ctrler *AccountCtrler) Execute(ctx *trxs.TrxContext) error {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 

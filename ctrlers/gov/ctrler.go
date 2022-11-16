@@ -16,7 +16,7 @@ import (
 type GovCtrler struct {
 	govDB tmdb.DB
 
-	rules *GovRule
+	govRule *GovRule
 
 	allProposals     map[[32]byte]types.IProposable
 	updatedProposals []types.IProposable
@@ -58,14 +58,14 @@ func (ctrler *GovCtrler) SetRules(r *GovRule) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.rules = r
+	ctrler.govRule = r
 }
 
 func (ctrler *GovCtrler) GetRules() *GovRule {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	return ctrler.rules
+	return ctrler.govRule
 }
 
 func (ctrler *GovCtrler) ImportRules(cb func() []byte) error {
@@ -76,10 +76,10 @@ func (ctrler *GovCtrler) ImportRules(cb func() []byte) error {
 	bz := cb()
 	if bz == nil {
 		return xerrors.New("rule blob is nil")
-	} else if rules, err := DecodeGovRule(bz); err != nil {
+	} else if rule, err := DecodeGovRule(bz); err != nil {
 		return xerrors.NewFrom(err)
 	} else {
-		ctrler.rules = rules
+		ctrler.govRule = rule
 	}
 	return nil
 }
@@ -103,7 +103,7 @@ func (ctrler *GovCtrler) Validate(ctx *trxs.TrxContext) error {
 	return nil
 }
 
-func (ctrler *GovCtrler) Apply(ctx *trxs.TrxContext) error {
+func (ctrler *GovCtrler) Execute(ctx *trxs.TrxContext) error {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -139,7 +139,7 @@ func (ctrler *GovCtrler) applyProposal(ctx *trxs.TrxContext) error {
 			TxHash:            ctx.TxHash,
 			StartVotingHeight: ctx.Height + 1,
 			LastVotingHeight:  ctx.Height + txpayload.VotingBlocks,
-			ApplyingHeight:    ctx.Height + txpayload.VotingBlocks + ctx.GovRuleHandler.GetLazyApplyingBlocks(),
+			ApplyingHeight:    ctx.Height + txpayload.VotingBlocks + ctrler.govRule.LazyApplyingBlocks,
 			MajorityPower:     ctx.StakeHandler.GetTotalPower() * int64(2) / int64(3),
 			Votes:             make(map[string]int64),
 			Rules:             rules,
@@ -200,7 +200,7 @@ func (ctrler *GovCtrler) GetMaxValidatorCount() int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	return ctrler.rules.MaxValidatorCnt
+	return ctrler.govRule.MaxValidatorCnt
 }
 
 // MaxStakeAmount means the max of amount which could be deposited.
@@ -211,7 +211,7 @@ func (ctrler *GovCtrler) MaxStakeAmount() *big.Int {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	return new(big.Int).Mul(big.NewInt(tmtypes.MaxTotalVotingPower), ctrler.rules.AmountPerPower)
+	return new(big.Int).Mul(big.NewInt(tmtypes.MaxTotalVotingPower), ctrler.govRule.AmountPerPower)
 }
 
 func (ctrler *GovCtrler) MaxTotalPower() int64 {
@@ -226,7 +226,7 @@ func (ctrler *GovCtrler) AmountToPower(amt *big.Int) int64 {
 	defer ctrler.mtx.RUnlock()
 
 	// 1 VotingPower == 1 XCO
-	_vp := new(big.Int).Quo(amt, ctrler.rules.AmountPerPower)
+	_vp := new(big.Int).Quo(amt, ctrler.govRule.AmountPerPower)
 	vp := _vp.Int64()
 	if vp < 0 {
 		panic(fmt.Sprintf("voting power is negative: %v", vp))
@@ -239,7 +239,7 @@ func (ctrler *GovCtrler) PowerToAmount(power int64) *big.Int {
 	defer ctrler.mtx.RUnlock()
 
 	// 1 VotingPower == 1 XCO
-	return new(big.Int).Mul(big.NewInt(power), ctrler.rules.AmountPerPower)
+	return new(big.Int).Mul(big.NewInt(power), ctrler.govRule.AmountPerPower)
 }
 
 func (ctrler *GovCtrler) PowerToReward(power int64) *big.Int {
@@ -249,21 +249,21 @@ func (ctrler *GovCtrler) PowerToReward(power int64) *big.Int {
 	if power < 0 {
 		panic(fmt.Sprintf("power is negative: %v", power))
 	}
-	return new(big.Int).Mul(big.NewInt(power), ctrler.rules.RewardPerPower)
+	return new(big.Int).Mul(big.NewInt(power), ctrler.govRule.RewardPerPower)
 }
 
 func (ctrler *GovCtrler) GetLazyRewardBlocks() int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	return ctrler.rules.LazyRewardBlocks
+	return ctrler.govRule.LazyRewardBlocks
 }
 
 func (ctrler *GovCtrler) GetLazyApplyingBlocks() int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	return ctrler.rules.LazyApplyingBlocks
+	return ctrler.govRule.LazyApplyingBlocks
 }
 
 var _ types.IGovRuleHandler = (*GovCtrler)(nil)

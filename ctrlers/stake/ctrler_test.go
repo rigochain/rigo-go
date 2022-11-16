@@ -91,7 +91,7 @@ func TestStakingToSelfByTx(t *testing.T) {
 	sumPower := int64(0)
 
 	for _, txctx := range stakingToSelfTrxCtxs {
-		err := stakeCtrler.Apply(txctx)
+		err := stakeCtrler.Execute(txctx)
 		require.NoError(t, err)
 
 		sumAmt.Add(sumAmt, txctx.Tx.Amount)
@@ -107,7 +107,7 @@ func TestStakingByTx(t *testing.T) {
 	sumPower := stakeCtrler.GetTotalPower()
 
 	for _, txctx := range stakingTrxCtxs {
-		err := stakeCtrler.Apply(txctx)
+		err := stakeCtrler.Execute(txctx)
 		require.NoError(t, err)
 
 		sumAmt.Add(sumAmt, txctx.Tx.Amount)
@@ -127,7 +127,7 @@ func TestUnstakingByTx(t *testing.T) {
 	for _, txctx := range unstakingTrxCtxs {
 		stakingTxHash := txctx.Tx.Payload.(*trxs.TrxPayloadUnstaking).TxHash
 
-		err := stakeCtrler.Apply(txctx)
+		err := stakeCtrler.Execute(txctx)
 		require.NoError(t, err)
 
 		stakingTxCtx := findStakingTxCtx(stakingTxHash)

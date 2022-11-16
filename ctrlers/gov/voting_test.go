@@ -10,6 +10,6 @@ func TestVoting(t *testing.T) {
 	//
 	//require.NotNil(t, txctx)
 	//
-	//err := govCtrler.Apply(txctx)
+	//err := govCtrler.Execute(txctx)
 	//require.NoError(t, err)
 }

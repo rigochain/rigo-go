@@ -2,19 +2,7 @@ package types
 
 import (
 	"github.com/tendermint/tendermint/types"
-	"math/big"
 )
-
-type IGovRuleHandler interface {
-	GetMaxValidatorCount() int64
-	GetLazyRewardBlocks() int64
-	GetLazyApplyingBlocks() int64
-	MaxStakeAmount() *big.Int
-	MaxTotalPower() int64
-	AmountToPower(*big.Int) int64
-	PowerToAmount(int64) *big.Int
-	PowerToReward(int64) *big.Int
-}
 
 const (
 	PROPOSAL_GOVRULE = 1 + iota

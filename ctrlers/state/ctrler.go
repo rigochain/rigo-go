@@ -99,9 +99,9 @@ func (ctrler *ChainCtrler) Info(info abcitypes.RequestInfo) abcitypes.ResponseIn
 		err := ctrler.govCtrler.ImportRules(func() []byte {
 			_acct := ctrler.acctCtrler.FindAccount(libs.ZeroBytes(tmcrypto.AddressSize), false)
 			if _acct == nil {
-				panic(errors.New("the account of governance rules is not found"))
+				panic(errors.New("the account of governance rule is not found"))
 			} else if len(_acct.GetCode()) == 0 {
-				panic(errors.New("the account of governance rules has no code"))
+				panic(errors.New("the account of governance rule has no code"))
 			}
 			return _acct.GetCode()
 		})
@@ -145,7 +145,7 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 		if govRuleCode, err := govRule.Encode(); err != nil {
 			panic(err)
 		} else {
-			// create account for gov rules and save it
+			// create account for gov rule and save it
 			govRuleAddr := libs.ZeroBytes(tmcrypto.AddressSize)
 			govRuleAcct := ctrler.acctCtrler.FindOrNewAccount(govRuleAddr, true)
 			govRuleAcct.SetCode(govRuleCode) // will be saved at commit

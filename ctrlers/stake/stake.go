@@ -24,9 +24,9 @@ type Stake struct {
 	mtx sync.RWMutex
 }
 
-func NewStakeWithAmount(from, to types.Address, amt *big.Int, height int64, txhash types.HexBytes, rules types.IGovRuleHandler) *Stake {
-	power := rules.AmountToPower(amt)
-	blockReward := rules.PowerToReward(power)
+func NewStakeWithAmount(from, to types.Address, amt *big.Int, height int64, txhash types.HexBytes, govRuleHandler types.IGovRuleHandler) *Stake {
+	power := govRuleHandler.AmountToPower(amt)
+	blockReward := govRuleHandler.PowerToReward(power)
 	return &Stake{
 		From:         from,
 		To:           to,
@@ -40,9 +40,9 @@ func NewStakeWithAmount(from, to types.Address, amt *big.Int, height int64, txha
 	}
 }
 
-func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhash types.HexBytes, rules types.IGovRuleHandler) *Stake {
-	amt := rules.PowerToAmount(power)
-	blockReward := rules.PowerToReward(power)
+func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhash types.HexBytes, govRuleHandler types.IGovRuleHandler) *Stake {
+	amt := govRuleHandler.PowerToAmount(power)
+	blockReward := govRuleHandler.PowerToReward(power)
 	return &Stake{
 		From:         owner,
 		To:           to,

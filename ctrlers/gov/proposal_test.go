@@ -44,7 +44,7 @@ func TestAddProposal(t *testing.T) {
 			continue
 		}
 
-		err = govCtrler.Apply(c.txctx)
+		err = govCtrler.Execute(c.txctx)
 		require.NoError(t, err)
 		successes++
 	}
