@@ -22,7 +22,6 @@ var (
 )
 
 func init() {
-
 	bz, err := govRuleProposal.Encode()
 	if err != nil {
 		panic(err)

@@ -12,6 +12,44 @@ import (
 	"strings"
 )
 
+var (
+	stakerHandlerHelper = &stakerHandler{
+		powers: map[string]int64{
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+			libs.RandAddress().String(): 10,
+		},
+	}
+	accountHandlerHelper = &accountHandler{}
+	accountMap           = make(map[types.AcctKey]types.IAccount)
+	govRuleProposal      = &GovRule{
+		Version:            1,
+		MaxValidatorCnt:    11,
+		AmountPerPower:     big.NewInt(2_000000000_000000000),
+		RewardPerPower:     big.NewInt(2_000000000),
+		LazyRewardBlocks:   20,
+		LazyApplyingBlocks: 20,
+	}
+)
+
 type stakerHandler struct {
 	powers map[string]int64
 }
@@ -65,44 +103,6 @@ func (a *accountHandler) FindAccount(addr types.Address, exec bool) types.IAccou
 	}
 }
 
-var (
-	stakerHandlerHelper = &stakerHandler{
-		powers: map[string]int64{
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-			libs.RandAddress().String(): 10,
-		},
-	}
-	accountHandlerHelper = &accountHandler{}
-	accountMap           = make(map[types.AcctKey]types.IAccount)
-	govRuleProposal      = &GovRule{
-		Version:            1,
-		MaxValidatorCnt:    11,
-		AmountPerPower:     big.NewInt(2_000000000_000000000),
-		RewardPerPower:     big.NewInt(2_000000000),
-		LazyRewardBlocks:   20,
-		LazyApplyingBlocks: 20,
-	}
-)
-
 func makeProposalTrxCtx(from, to types.Address, gas *big.Int, bzProposal []byte) *trxs.TrxContext {
 	tx := client.NewTrxGovRuleProposal(
 		from, to, gas, 1, "test govrule proposal", bzProposal)
@@ -116,32 +116,18 @@ func makeProposalTrxCtx(from, to types.Address, gas *big.Int, bzProposal []byte)
 			return xerrors.ErrNotFoundAccount
 		}
 		_txctx.Sender = acct
-
-		// check sender account nonce
-		if xerr := acct.CheckNonce(_tx.Nonce); xerr != nil {
-			return xerr
-		}
-		acct.AddNonce()
-
-		// check sender account balance
-		needFund := new(big.Int).Add(_tx.Amount, _tx.Gas)
-		if xerr := acct.CheckBalance(needFund); xerr != nil {
-			return xerr
-		}
-		_txctx.NeedAmt = needFund
-
+		_txctx.NeedAmt = new(big.Int).Add(_tx.Amount, _tx.Gas)
 		_txctx.GovRuleHandler = govCtrler
 		_txctx.StakeHandler = stakerHandlerHelper
-
 		return nil
 	})
 
 	return txctx
 }
 
-func makeVotingTrxCtx(proposalTxHash types.HexBytes, choice int32) *trxs.TrxContext {
+func makeVotingTrxCtx(from types.Address, proposalTxHash types.HexBytes, choice int32) *trxs.TrxContext {
 	tx := client.NewTrxVoting(
-		libs.RandAddress(), libs.ZeroBytes(types.AddrSize), big.NewInt(10), 1, proposalTxHash, choice)
+		from, libs.ZeroBytes(types.AddrSize), big.NewInt(10), 1, proposalTxHash, choice)
 
 	txbz, _ := tx.Encode()
 	txctx, _ := trxs.NewTrxContextEx(txbz, 10, false, func(_txctx *trxs.TrxContext) error {
@@ -152,23 +138,9 @@ func makeVotingTrxCtx(proposalTxHash types.HexBytes, choice int32) *trxs.TrxCont
 			return xerrors.ErrNotFoundAccount
 		}
 		_txctx.Sender = acct
-
-		// check sender account nonce
-		if xerr := acct.CheckNonce(_tx.Nonce); xerr != nil {
-			return xerr
-		}
-		acct.AddNonce()
-
-		// check sender account balance
-		needFund := new(big.Int).Add(_tx.Amount, _tx.Gas)
-		if xerr := acct.CheckBalance(needFund); xerr != nil {
-			return xerr
-		}
-		_txctx.NeedAmt = needFund
-
+		_txctx.NeedAmt = new(big.Int).Add(_tx.Amount, _tx.Gas)
 		_txctx.GovRuleHandler = govCtrler
 		_txctx.StakeHandler = stakerHandlerHelper
-
 		return nil
 	})
 

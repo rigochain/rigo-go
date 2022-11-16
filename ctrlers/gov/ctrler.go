@@ -1,6 +1,7 @@
 package gov
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/trxs"
@@ -109,15 +110,15 @@ func (ctrler *GovCtrler) Execute(ctx *trxs.TrxContext) error {
 
 	switch ctx.Tx.GetType() {
 	case trxs.TRX_PROPOSAL:
-		return ctrler.applyProposal(ctx)
+		return ctrler.addProposal(ctx)
 	case trxs.TRX_VOTING:
-		return ctrler.applyVote(ctx)
+		return ctrler.doVote(ctx)
 	default:
 		return xerrors.New("unknown transaction type")
 	}
 }
 
-func (ctrler *GovCtrler) applyProposal(ctx *trxs.TrxContext) error {
+func (ctrler *GovCtrler) addProposal(ctx *trxs.TrxContext) error {
 	if txpayload, ok := ctx.Tx.Payload.(*trxs.TrxPayloadProposal); !ok {
 		return xerrors.New("unknown transaction payload")
 	} else {
@@ -150,7 +151,7 @@ func (ctrler *GovCtrler) applyProposal(ctx *trxs.TrxContext) error {
 	return nil
 }
 
-func (ctrler *GovCtrler) applyVote(ctx *trxs.TrxContext) error {
+func (ctrler *GovCtrler) doVote(ctx *trxs.TrxContext) error {
 	votingPayload := ctx.Tx.Payload.(*trxs.TrxPayloadVoting)
 	proposal, ok := ctrler.allProposals[votingPayload.TxHash.Array32()]
 	if !ok {
@@ -163,6 +164,29 @@ func (ctrler *GovCtrler) applyVote(ctx *trxs.TrxContext) error {
 
 	proposal.DoVote(ctx.Tx.From, ctx.StakeHandler.GetTotalPowerOf(ctx.Tx.From))
 	ctrler.updatedProposals = append(ctrler.updatedProposals, proposal)
+	return nil
+}
+
+func (ctrler *GovCtrler) GetProposals() []types.IProposable {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	var proposals []types.IProposable
+	for _, v := range ctrler.allProposals {
+		proposals = append(proposals, v)
+	}
+	return proposals
+}
+
+func (ctrler *GovCtrler) FindProposals(txhash types.HexBytes) types.IProposable {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	for k, v := range ctrler.allProposals {
+		if bytes.Compare(k[:], txhash) == 0 {
+			return v
+		}
+	}
 	return nil
 }
 

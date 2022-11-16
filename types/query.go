@@ -8,6 +8,7 @@ import (
 const (
 	QUERY_ACCOUNT int16 = 1 + iota
 	QUERY_STAKES
+	QUERY_PROPOSALS
 )
 
 type QueryData struct {
@@ -15,7 +16,7 @@ type QueryData struct {
 	Params  []byte
 }
 
-func DecodeQueryData(bz []byte) (*QueryData, error) {
+func DecodeQueryData(bz []byte) (*QueryData, xerrors.XError) {
 	if len(bz) < 2 {
 		return nil, xerrors.ErrInvalidQueryCmd
 	}

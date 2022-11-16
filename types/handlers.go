@@ -1,11 +1,13 @@
 package types
 
 import (
+	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/tendermint/tendermint/types"
 	"math/big"
 )
 
 type ILedgerHandler interface {
+	Query(*QueryData) ([]byte, xerrors.XError)
 	Commit() ([]byte, int64, error)
 	Close() error
 }

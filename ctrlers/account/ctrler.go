@@ -206,10 +206,6 @@ func (ctrler *AccountCtrler) Execute(ctx *trxs.TrxContext) error {
 	if err := ctrler.Transfer(ctx.Sender, receiverAcct, ctx.Tx.Amount); err != nil {
 		return err
 	}
-	if err := ctx.Sender.SubBalance(ctx.Tx.Gas); err != nil {
-		return err
-	}
-	ctx.GasUsed = ctx.Tx.Gas
 	return nil
 }
 

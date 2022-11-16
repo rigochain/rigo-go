@@ -13,7 +13,7 @@ type TrxPayloadVoting struct {
 var _ ITrxPayload = (*TrxPayloadVoting)(nil)
 
 func (tx *TrxPayloadVoting) Type() int32 {
-	return TRX_PROPOSAL
+	return TRX_VOTING
 }
 
 func (tx *TrxPayloadVoting) Decode(bz []byte) error {

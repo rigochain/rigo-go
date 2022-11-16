@@ -19,6 +19,16 @@ func NewTrxExecutor(handlers map[int32][]trxs.ITrxHandler, logger log.Logger) *T
 }
 
 func (txe *TrxExecutor) Execute(ctx *trxs.TrxContext) error {
+	// check sender account nonce
+	if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
+		return xerr
+	}
+
+	// check sender account balance
+	if xerr := ctx.Sender.CheckBalance(ctx.NeedAmt); xerr != nil {
+		return xerr
+	}
+
 	if handlers, ok := txe.handlerMap[ctx.Tx.Type]; !ok {
 		return xerrors.ErrInvalidTrxType
 	} else {
@@ -30,5 +40,12 @@ func (txe *TrxExecutor) Execute(ctx *trxs.TrxContext) error {
 			}
 		}
 	}
+
+	if err := ctx.Sender.SubBalance(ctx.Tx.Gas); err != nil {
+		return err
+	}
+	ctx.GasUsed = ctx.Tx.Gas
+	ctx.Sender.AddNonce()
+
 	return nil
 }

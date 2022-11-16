@@ -210,23 +210,9 @@ func (ctrler *ChainCtrler) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respo
 					return xerrors.ErrNotFoundAccount
 				}
 				_txctx.Sender = acct
-
-				// check sender account nonce
-				if xerr := acct.CheckNonce(_tx.Nonce); xerr != nil {
-					return xerr
-				}
-				acct.AddNonce()
-
-				// check sender account balance
-				needFund := new(big.Int).Add(_tx.Amount, _tx.Gas)
-				if xerr := acct.CheckBalance(needFund); xerr != nil {
-					return xerr
-				}
-				_txctx.NeedAmt = needFund
-
+				_txctx.NeedAmt = new(big.Int).Add(_tx.Amount, _tx.Gas)
 				_txctx.GovRuleHandler = ctrler.govCtrler
 				_txctx.StakeHandler = ctrler.stakeCtrler
-
 				return nil
 			}); err != nil {
 
@@ -290,23 +276,9 @@ func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.R
 				return xerrors.ErrNotFoundAccount
 			}
 			_txctx.Sender = acct
-
-			// check sender account nonce
-			if xerr := acct.CheckNonce(_tx.Nonce); xerr != nil {
-				return xerr
-			}
-			acct.AddNonce()
-
-			// check sender account balance
-			needFund := new(big.Int).Add(_tx.Amount, _tx.Gas)
-			if xerr := acct.CheckBalance(needFund); xerr != nil {
-				return xerr
-			}
-			_txctx.NeedAmt = needFund
-
+			_txctx.NeedAmt = new(big.Int).Add(_tx.Amount, _tx.Gas)
 			_txctx.GovRuleHandler = ctrler.govCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
-
 			return nil
 		}); err != nil {
 
