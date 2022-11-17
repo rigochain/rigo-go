@@ -13,8 +13,8 @@ type Account struct {
 	Address types.Address `json:"address"`
 	Name    string        `json:"name,omitempty"`
 	Nonce   uint64        `json:"nonce"`
-	Balance *big.Int      `json:"balance"`
-	Code    []byte        `json:"code"`
+	Balance *big.Int      `json:"balance,string"`
+	Code    []byte        `json:"code,omitempty"`
 
 	mtx sync.RWMutex
 }

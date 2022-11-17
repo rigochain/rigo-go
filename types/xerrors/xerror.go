@@ -19,6 +19,7 @@ const (
 	ErrCodeNotFoundTx
 	ErrCodeNotFoundStaker
 	ErrCodeNotFoundStake
+	ErrCodeNotFoundProposal
 )
 
 type xerr2 error
@@ -53,6 +54,7 @@ var (
 	ErrNotFoundTx              = NewWith(ErrCodeNotFoundTx, "not found tx")
 	ErrNotFoundStaker          = NewWith(ErrCodeNotFoundStaker, "not found staker")
 	ErrNotFoundStake           = NewWith(ErrCodeNotFoundStake, "not found stake")
+	ErrNotFoundProposal        = NewWith(ErrCodeNotFoundProposal, "not found proposal")
 
 	ErrInvalidQueryCmd    = NewWith(ErrCodeInvalidQueryCmd, "invalid query command")
 	ErrInvalidQueryParams = NewWith(ErrCodeInvalidQueryParams, "invalid query parameters")

@@ -2,11 +2,9 @@ package rpc
 
 import (
 	"encoding/hex"
-	"github.com/kysee/arcanus/ctrlers/account"
-	"github.com/kysee/arcanus/ctrlers/stake"
+	"encoding/json"
 	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/xerrors"
-	"github.com/tendermint/tendermint/libs/json"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	tmrpccoretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
@@ -16,7 +14,7 @@ import (
 
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
-func queryAccount(ctx *tmrpctypes.Context, addr string) (types.IAccount, error) {
+func QueryAccount(ctx *tmrpctypes.Context, addr string) (json.RawMessage, error) {
 	bzAddr, err := types.AddressFromHex(addr)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
@@ -34,46 +32,13 @@ func queryAccount(ctx *tmrpctypes.Context, addr string) (types.IAccount, error) 
 	}
 
 	if resp.Response.Code == xerrors.ErrCodeSuccess {
-		acct, err := account.DecodeAccount(resp.Response.Value)
-		if err != nil {
-			return nil, err
-		}
-		return acct, nil
+		return resp.Response.Value, nil
 	} else {
 		return nil, xerrors.NewWith(resp.Response.Code, resp.Response.Log)
 	}
 }
 
-func QueryAccount(ctx *tmrpctypes.Context, addr string) (*account.Account, error) {
-	acct, err := queryAccount(ctx, addr)
-	if err != nil {
-		if xerr, ok := err.(xerrors.XError); ok && xerr.Code() == xerrors.ErrNotFoundAccount.Code() {
-			addrbz, _ := hex.DecodeString(addr)
-			acct = account.NewAccountWithName(addrbz, "")
-		} else {
-			return nil, err
-		}
-	}
-
-	switch acct.Type() {
-	case types.ACCT_COMMON_TYPE:
-		return acct.(*account.Account), nil
-	default:
-		return nil, xerrors.New("error account type: unknown account type")
-	}
-}
-
-func QueryAcctNonce(ctx *tmrpctypes.Context, addr string) (*ResponseAcctNonce, error) {
-	acct, err := queryAccount(ctx, addr)
-	if err != nil {
-		return nil, err
-	}
-	return &ResponseAcctNonce{
-		Nonce: acct.GetNonce(),
-	}, nil
-}
-
-func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.Delegatee, error) {
+func QueryStakes(ctx *tmrpctypes.Context, addr string) (json.RawMessage, error) {
 	bzAddr, err := types.AddressFromHex(addr)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
@@ -92,23 +57,35 @@ func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.Delegatee, error)
 	}
 
 	if resp.Response.Code == xerrors.ErrCodeSuccess {
-		sset := &stake.Delegatee{}
-		err := json.Unmarshal(resp.Response.Value, sset)
-		if err != nil {
-			return nil, err
-		}
-		return sset, nil
+		return resp.Response.Value, nil
 	} else {
 		return nil, xerrors.NewWith(resp.Response.Code, resp.Response.Log)
 	}
 }
 
-func QueryStakes(ctx *tmrpctypes.Context, addr string) (*stake.Delegatee, error) {
-	staker, err := queryStakes(ctx, addr)
+func QueryProposal(ctx *tmrpctypes.Context, txhash string) (json.RawMessage, error) {
+	bzTxHash, err := hex.DecodeString(txhash)
 	if err != nil {
+		return nil, xerrors.NewFrom(err)
+	}
+
+	qd := &types.QueryData{
+		Command: types.QUERY_PROPOSALS,
+		Params:  bzTxHash,
+	}
+
+	resp, err := tmrpccore.ABCIQuery(ctx, ctx.HTTPReq.RequestURI, qd.Encode(), 0, false)
+	if err != nil {
+		// not reachable
+		// ABCIQuery never returns error
 		return nil, err
 	}
-	return staker, nil
+
+	if resp.Response.Code == xerrors.ErrCodeSuccess {
+		return resp.Response.Value, nil
+	} else {
+		return nil, xerrors.NewWith(resp.Response.Code, resp.Response.Log)
+	}
 }
 
 func Subscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultSubscribe, error) {

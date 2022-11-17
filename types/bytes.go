@@ -10,19 +10,19 @@ import (
 type HexBytes []byte
 
 // Marshal needed for protobuf compatibility
-func (bz HexBytes) Marshal() ([]byte, error) {
-	return bz, nil
+func (hb HexBytes) Marshal() ([]byte, error) {
+	return hb, nil
 }
 
 // Unmarshal needed for protobuf compatibility
-func (bz *HexBytes) Unmarshal(data []byte) error {
-	*bz = data
+func (hb *HexBytes) Unmarshal(data []byte) error {
+	*hb = data
 	return nil
 }
 
 // This is the point of Bytes.
-func (bz HexBytes) MarshalJSON() ([]byte, error) {
-	s := strings.ToUpper(hex.EncodeToString(bz))
+func (hb HexBytes) MarshalJSON() ([]byte, error) {
+	s := strings.ToUpper(hex.EncodeToString(hb))
 	jbz := make([]byte, len(s)+2)
 	jbz[0] = '"'
 	copy(jbz[1:], s)
@@ -31,7 +31,7 @@ func (bz HexBytes) MarshalJSON() ([]byte, error) {
 }
 
 // This is the point of Bytes.
-func (bz *HexBytes) UnmarshalJSON(data []byte) error {
+func (hb *HexBytes) UnmarshalJSON(data []byte) error {
 	if len(data) < 2 || data[0] != '"' || data[len(data)-1] != '"' {
 		return fmt.Errorf("invalid hex string: %s", data)
 	}
@@ -39,47 +39,47 @@ func (bz *HexBytes) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	*bz = bz2
+	*hb = bz2
 	return nil
 }
 
 // Bytes fulfills various interfaces in light-client, etc...
-func (bz HexBytes) Bytes() []byte {
-	return bz
+func (hb HexBytes) Bytes() []byte {
+	return hb
 }
 
-func (bz HexBytes) Array20() [20]byte {
+func (hb HexBytes) Array20() [20]byte {
 	var ret [20]byte
 	n := len(ret)
-	if len(bz) < n {
-		n = len(bz)
+	if len(hb) < n {
+		n = len(hb)
 	}
-	copy(ret[:], bz[:n])
+	copy(ret[:], hb[:n])
 	return ret
 }
 
-func (bz HexBytes) Array32() [32]byte {
+func (hb HexBytes) Array32() [32]byte {
 	var ret [32]byte
 	n := len(ret)
-	if len(bz) < n {
-		n = len(bz)
+	if len(hb) < n {
+		n = len(hb)
 	}
-	copy(ret[:], bz[:n])
+	copy(ret[:], hb[:n])
 	return ret
 }
 
-func (bz HexBytes) String() string {
-	return strings.ToUpper(hex.EncodeToString(bz))
+func (hb HexBytes) String() string {
+	return strings.ToUpper(hex.EncodeToString(hb))
 }
 
 // Format writes either address of 0th element in a slice in base 16 notation,
 // with leading 0x (%p), or casts HexBytes to bytes and writes as hexadecimal
 // string to s.
-func (bz HexBytes) Format(s fmt.State, verb rune) {
+func (hb HexBytes) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 'p':
-		s.Write([]byte(fmt.Sprintf("%p", bz)))
+		s.Write([]byte(fmt.Sprintf("%p", hb)))
 	default:
-		s.Write([]byte(fmt.Sprintf("%X", []byte(bz))))
+		s.Write([]byte(fmt.Sprintf("%X", []byte(hb))))
 	}
 }
