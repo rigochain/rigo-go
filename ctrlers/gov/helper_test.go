@@ -2,10 +2,10 @@ package gov
 
 import (
 	"encoding/hex"
-	"github.com/kysee/arcanus/ctrlers/account"
 	"github.com/kysee/arcanus/libs"
 	"github.com/kysee/arcanus/libs/client"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
 	"math/big"
@@ -39,7 +39,7 @@ var (
 		},
 	}
 	accountHandlerHelper = &accountHandler{}
-	accountMap           = make(map[types.AcctKey]types.IAccount)
+	accountMap           = make(map[account.AcctKey]*account.Account)
 	govRuleProposal      = &GovRule{
 		Version:            1,
 		MaxValidatorCnt:    11,
@@ -66,11 +66,11 @@ func (s *stakerHandler) GetTotalPower() int64 {
 	return sum
 }
 
-func (s *stakerHandler) GetTotalPowerOf(addr types.Address) int64 {
+func (s *stakerHandler) GetTotalPowerOf(addr account.Address) int64 {
 	return s.powers[addr.String()]
 }
 
-func (s *stakerHandler) IsValidator(addr types.Address) bool {
+func (s *stakerHandler) IsValidator(addr account.Address) bool {
 	addrStr := addr.String()
 	for k, _ := range s.powers {
 		if strings.Compare(k, addrStr) == 0 {
@@ -80,7 +80,7 @@ func (s *stakerHandler) IsValidator(addr types.Address) bool {
 	return false
 }
 
-func (s *stakerHandler) PickAddress(i int) types.Address {
+func (s *stakerHandler) PickAddress(i int) account.Address {
 	var addrs []string
 	for k, _ := range s.powers {
 		addrs = append(addrs, k)
@@ -91,8 +91,8 @@ func (s *stakerHandler) PickAddress(i int) types.Address {
 
 type accountHandler struct{}
 
-func (a *accountHandler) FindAccount(addr types.Address, exec bool) types.IAccount {
-	acctKey := types.ToAcctKey(addr)
+func (a *accountHandler) FindAccount(addr account.Address, exec bool) *account.Account {
+	acctKey := account.ToAcctKey(addr)
 	if acct, ok := accountMap[acctKey]; ok {
 		return acct
 	} else {
@@ -103,7 +103,7 @@ func (a *accountHandler) FindAccount(addr types.Address, exec bool) types.IAccou
 	}
 }
 
-func makeProposalTrxCtx(from, to types.Address, gas *big.Int, bzProposal []byte) *trxs.TrxContext {
+func makeProposalTrxCtx(from, to account.Address, gas *big.Int, bzProposal []byte) *trxs.TrxContext {
 	tx := client.NewTrxGovRuleProposal(
 		from, to, gas, 1, "test govrule proposal", bzProposal)
 
@@ -125,9 +125,9 @@ func makeProposalTrxCtx(from, to types.Address, gas *big.Int, bzProposal []byte)
 	return txctx
 }
 
-func makeVotingTrxCtx(from types.Address, proposalTxHash types.HexBytes, choice int32) *trxs.TrxContext {
+func makeVotingTrxCtx(from account.Address, proposalTxHash types.HexBytes, choice int32) *trxs.TrxContext {
 	tx := client.NewTrxVoting(
-		from, libs.ZeroBytes(types.AddrSize), big.NewInt(10), 1, proposalTxHash, choice)
+		from, libs.ZeroBytes(account.AddrSize), big.NewInt(10), 1, proposalTxHash, choice)
 
 	txbz, _ := tx.Encode()
 	txctx, _ := trxs.NewTrxContextEx(txbz, 10, false, func(_txctx *trxs.TrxContext) error {

@@ -2,7 +2,7 @@ package state
 
 import (
 	"encoding/binary"
-	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/tendermint/tendermint/libs/json"
 	tmdb "github.com/tendermint/tm-db"
 	"math/big"
@@ -16,9 +16,9 @@ const (
 )
 
 type BlockGasInfo struct {
-	Height int64         `json:"height"`
-	Gas    *big.Int      `json:"gas"`
-	Owner  types.Address `json:"owner"`
+	Height int64           `json:"height"`
+	Gas    *big.Int        `json:"gas"`
+	Owner  account.Address `json:"owner"`
 }
 
 type StateDB struct {

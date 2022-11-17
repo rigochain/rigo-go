@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/libs/crypto"
-	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -12,8 +12,8 @@ import (
 )
 
 type GenesisAssetHolder struct {
-	Address types.Address `json:"address"`
-	Balance string        `json:"balance"`
+	Address account.Address `json:"address"`
+	Balance string          `json:"balance"`
 }
 
 func (gh *GenesisAssetHolder) Hash() []byte {

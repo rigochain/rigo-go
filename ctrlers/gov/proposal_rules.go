@@ -2,11 +2,12 @@ package gov
 
 import (
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 )
 
 type Vote struct {
-	addr  types.Address
+	addr  account.Address
 	power int64
 }
 type GovRuleProposal struct {
@@ -63,7 +64,7 @@ func (p *GovRuleProposal) GetVotesFor(optidx int32) int64 {
 	return votes
 }
 
-func (p *GovRuleProposal) GetVotesOf(addr types.Address, optidx int32) int64 {
+func (p *GovRuleProposal) GetVotesOf(addr account.Address, optidx int32) int64 {
 	v, ok := p.Votes[addr.String()]
 	if !ok {
 		v = 0
@@ -71,7 +72,7 @@ func (p *GovRuleProposal) GetVotesOf(addr types.Address, optidx int32) int64 {
 	return v
 }
 
-func (p *GovRuleProposal) DoVote(addr types.Address, power int64) {
+func (p *GovRuleProposal) DoVote(addr account.Address, power int64) {
 	if power > 0 {
 		p.Votes[addr.String()] = power
 	}

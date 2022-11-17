@@ -4,38 +4,40 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/kysee/arcanus/ctrlers/account"
 	"github.com/kysee/arcanus/libs"
 	"github.com/kysee/arcanus/libs/client"
 	"github.com/kysee/arcanus/libs/crypto"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/trxs"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"math/big"
 	"math/rand"
 )
 
-type TestWallet struct {
-	types.IAccount
-	W *client.Wallet
-}
-
 type accountHandler struct{}
 
-func (a *accountHandler) FindOrNewAccount(addr types.Address, b bool) types.IAccount {
+func (a *accountHandler) FindOrNewAccount(addr account.Address, b bool) *account.Account {
 	panic("Don't use this method")
 }
 
-func (a *accountHandler) FindAccount(addr types.Address, b bool) types.IAccount {
+func (a *accountHandler) FindAccount(addr account.Address, b bool) *account.Account {
+	if w := FindWallet(addr); w != nil {
+		return w.GetAccount()
+	}
+	return nil
+}
+
+var _ account.IAccountFinder = (*accountHandler)(nil)
+
+func FindWallet(addr account.Address) *client.Wallet {
 	for _, w := range Wallets {
-		if bytes.Compare(addr, w.W.Address()) == 0 {
+		if bytes.Compare(addr, w.Address()) == 0 {
 			return w
 		}
 	}
 	return nil
 }
-
-var _ types.IAccountFinder = (*accountHandler)(nil)
 
 type govRuleHandler struct{}
 
@@ -88,15 +90,14 @@ func (g govRuleHandler) PowerToReward(power int64) *big.Int {
 
 var _ types.IGovRuleHandler = (*govRuleHandler)(nil)
 
-func makeTestWallets(n int) []*TestWallet {
-	wallets := make([]*TestWallet, n)
+func makeTestWallets(n int) []*client.Wallet {
+	wallets := make([]*client.Wallet, n)
 	for i := 0; i < n; i++ {
 		w := client.NewWallet([]byte("1"))
+		w.GetAccount().AddBalance(types.ToSAU(100000000))
 		w.Unlock([]byte("1"))
-		a := account.NewAccount(w.Address())
-		a.AddBalance(types.ToSAU(100000000))
 
-		wallets[i] = &TestWallet{a, w}
+		wallets[i] = w
 	}
 	return wallets
 }
@@ -122,10 +123,10 @@ func randMakeStakingTrxContext() (*trxs.TrxContext, error) {
 	return makeStakingTrxContext(from, to, power)
 }
 
-func makeStakingTrxContext(from, to *TestWallet, power int64) (*trxs.TrxContext, error) {
+func makeStakingTrxContext(from, to *client.Wallet, power int64) (*trxs.TrxContext, error) {
 	amt := govRuleHandlerHelper.PowerToAmount(power)
 
-	tx := client.NewTrxStaking(from.W.Address(), to.W.Address(), dummyGas, amt, dummyNonce)
+	tx := client.NewTrxStaking(from.Address(), to.Address(), dummyGas, amt, dummyNonce)
 	bz, err := tx.Encode()
 	if err != nil {
 		return nil, err
@@ -136,9 +137,9 @@ func makeStakingTrxContext(from, to *TestWallet, power int64) (*trxs.TrxContext,
 		Tx:             tx,
 		TxHash:         crypto.DefaultHash(bz),
 		Height:         lastHeight,
-		SenderPubKey:   from.W.GetPubKey(),
-		Sender:         from,
-		Receiver:       to,
+		SenderPubKey:   from.GetPubKey(),
+		Sender:         from.GetAccount(),
+		Receiver:       to.GetAccount(),
 		NeedAmt:        nil,
 		GasUsed:        nil,
 		GovRuleHandler: govRuleHandlerHelper,
@@ -159,22 +160,22 @@ func randMakeUnstakingTrxContext() (*trxs.TrxContext, error) {
 	rn := rand.Intn(len(stakingTrxCtxs))
 	stakingTxCtx := stakingTrxCtxs[rn]
 
-	from := acctHandlerHelper.FindAccount(stakingTxCtx.Tx.From, true)
+	from := FindWallet(stakingTxCtx.Tx.From)
 	if from == nil {
 		return nil, errors.New("not found test account for " + stakingTxCtx.Tx.From.String())
 	}
-	to := acctHandlerHelper.FindAccount(stakingTxCtx.Tx.To, true)
+	to := FindWallet(stakingTxCtx.Tx.To)
 	if to == nil {
 		return nil, errors.New("not found test account for " + stakingTxCtx.Tx.To.String())
 	}
 
-	return makeUnstakingTrxContext(from.(*TestWallet), to.(*TestWallet), stakingTxCtx.TxHash)
+	return makeUnstakingTrxContext(from, to, stakingTxCtx.TxHash)
 }
 
-func makeUnstakingTrxContext(from, to *TestWallet, txhash types.HexBytes) (*trxs.TrxContext, error) {
+func makeUnstakingTrxContext(from, to *client.Wallet, txhash types.HexBytes) (*trxs.TrxContext, error) {
 
-	tx := client.NewTrxUnstaking(from.W.Address(), to.W.Address(), dummyGas, dummyNonce, txhash)
-	tzbz, _, err := from.W.SignTrx(tx)
+	tx := client.NewTrxUnstaking(from.Address(), to.Address(), dummyGas, dummyNonce, txhash)
+	tzbz, _, err := from.SignTrx(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -184,9 +185,9 @@ func makeUnstakingTrxContext(from, to *TestWallet, txhash types.HexBytes) (*trxs
 		Tx:             tx,
 		TxHash:         crypto.DefaultHash(tzbz),
 		Height:         lastHeight,
-		SenderPubKey:   from.W.GetPubKey(),
-		Sender:         from,
-		Receiver:       to,
+		SenderPubKey:   from.GetPubKey(),
+		Sender:         from.GetAccount(),
+		Receiver:       to.GetAccount(),
 		GovRuleHandler: govRuleHandlerHelper,
 	}, nil
 }

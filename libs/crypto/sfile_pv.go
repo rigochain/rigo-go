@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/kysee/arcanus/libs"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -45,9 +46,9 @@ func voteToStep(vote *tmproto.Vote) int8 {
 
 // SFilePVKey stores the immutable part of PrivValidator.
 type SFilePVKey struct {
-	Address types.Address  `json:"address"`
-	PubKey  crypto.PubKey  `json:"pub_key"`
-	PrivKey crypto.PrivKey `json:"priv_key"`
+	Address account.Address `json:"address"`
+	PubKey  crypto.PubKey   `json:"pub_key"`
+	PrivKey crypto.PrivKey  `json:"priv_key"`
 
 	filePath string
 }
@@ -287,7 +288,7 @@ func LoadOrGenSFilePV(keyFilePath, stateFilePath string, s []byte) *SFilePV {
 
 // GetAddress returns the address of the validator.
 // Implements PrivValidator.
-func (pv *SFilePV) GetAddress() types.Address {
+func (pv *SFilePV) GetAddress() account.Address {
 	return pv.Key.Address
 }
 

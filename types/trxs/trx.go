@@ -3,6 +3,7 @@ package trxs
 import (
 	"github.com/golang/protobuf/proto"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/xerrors"
 	"math/big"
 	"time"
@@ -31,19 +32,19 @@ type ITrxPayload interface {
 }
 
 type Trx struct {
-	Version uint32         `json:"version,omitempty"`
-	Time    int64          `json:"time"`
-	Nonce   uint64         `json:"nonce"`
-	From    types.Address  `json:"from"`
-	To      types.Address  `json:"to"`
-	Amount  *big.Int       `json:"amount"`
-	Gas     *big.Int       `json:"gas"`
-	Type    int32          `json:"type"`
-	Payload ITrxPayload    `json:"payload,omitempty"`
-	Sig     types.HexBytes `json:"sig"`
+	Version uint32          `json:"version,omitempty"`
+	Time    int64           `json:"time"`
+	Nonce   uint64          `json:"nonce"`
+	From    account.Address `json:"from"`
+	To      account.Address `json:"to"`
+	Amount  *big.Int        `json:"amount"`
+	Gas     *big.Int        `json:"gas"`
+	Type    int32           `json:"type"`
+	Payload ITrxPayload     `json:"payload,omitempty"`
+	Sig     types.HexBytes  `json:"sig"`
 }
 
-func NewTrx(ver uint32, from, to types.Address, nonce uint64, amt, gas *big.Int, payload ITrxPayload) *Trx {
+func NewTrx(ver uint32, from, to account.Address, nonce uint64, amt, gas *big.Int, payload ITrxPayload) *Trx {
 	return &Trx{
 		Version: ver,
 		Time:    time.Now().Round(0).UTC().UnixNano(),

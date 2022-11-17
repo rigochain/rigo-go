@@ -2,11 +2,12 @@ package client
 
 import (
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/trxs"
 	"math/big"
 )
 
-func NewTrxTransfer(from, to types.Address, amt, gas *big.Int, nonce uint64) *trxs.Trx {
+func NewTrxTransfer(from, to account.Address, amt, gas *big.Int, nonce uint64) *trxs.Trx {
 	return trxs.NewTrx(
 		uint32(1),
 		from, to,
@@ -16,7 +17,7 @@ func NewTrxTransfer(from, to types.Address, amt, gas *big.Int, nonce uint64) *tr
 		&trxs.TrxPayloadAssetTransfer{})
 }
 
-func NewTrxStaking(from, to types.Address, gas, amt *big.Int, nonce uint64) *trxs.Trx {
+func NewTrxStaking(from, to account.Address, gas, amt *big.Int, nonce uint64) *trxs.Trx {
 	return trxs.NewTrx(
 		uint32(1),
 		from, to,
@@ -26,7 +27,7 @@ func NewTrxStaking(from, to types.Address, gas, amt *big.Int, nonce uint64) *trx
 		&trxs.TrxPayloadStaking{})
 }
 
-func NewTrxUnstaking(from, to types.Address, gas *big.Int, nonce uint64, txhash types.HexBytes) *trxs.Trx {
+func NewTrxUnstaking(from, to account.Address, gas *big.Int, nonce uint64, txhash types.HexBytes) *trxs.Trx {
 	return trxs.NewTrx(
 		uint32(1),
 		from, to,
@@ -36,7 +37,7 @@ func NewTrxUnstaking(from, to types.Address, gas *big.Int, nonce uint64, txhash 
 		&trxs.TrxPayloadUnstaking{TxHash: txhash})
 }
 
-func NewTrxProposal(from, to types.Address, gas *big.Int, nonce uint64, msg string, blocks int64, propType int32, options [][]byte) *trxs.Trx {
+func NewTrxProposal(from, to account.Address, gas *big.Int, nonce uint64, msg string, blocks int64, propType int32, options [][]byte) *trxs.Trx {
 	return trxs.NewTrx(
 		uint32(1),
 		from, to,
@@ -51,11 +52,11 @@ func NewTrxProposal(from, to types.Address, gas *big.Int, nonce uint64, msg stri
 		})
 }
 
-func NewTrxGovRuleProposal(from, to types.Address, gas *big.Int, nonce uint64, msg string, option []byte) *trxs.Trx {
+func NewTrxGovRuleProposal(from, to account.Address, gas *big.Int, nonce uint64, msg string, option []byte) *trxs.Trx {
 	return NewTrxProposal(from, to, gas, nonce, msg, 10, types.PROPOSAL_GOVRULE, [][]byte{option})
 }
 
-func NewTrxVoting(from, to types.Address, gas *big.Int, nonce uint64, txHash types.HexBytes, choice int32) *trxs.Trx {
+func NewTrxVoting(from, to account.Address, gas *big.Int, nonce uint64, txHash types.HexBytes, choice int32) *trxs.Trx {
 	return trxs.NewTrx(
 		uint32(1),
 		from, to,

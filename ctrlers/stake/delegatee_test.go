@@ -13,7 +13,7 @@ var (
 )
 
 func TestAppendStake(t *testing.T) {
-	delegatee = stake.NewDelegatee(Wallets[0].GetAddress(), Wallets[0].W.GetPubKey())
+	delegatee = stake.NewDelegatee(Wallets[0].Address(), Wallets[0].GetPubKey())
 
 	amt0 := libs.RandBigIntN(govRuleHandlerHelper.MaxStakeAmount())
 	power0 := govRuleHandlerHelper.AmountToPower(amt0)
@@ -57,7 +57,7 @@ func TestAppendStake(t *testing.T) {
 }
 
 func TestApplyReward(t *testing.T) {
-	delegatee := stake.NewDelegatee(Wallets[1].GetAddress(), Wallets[1].W.GetPubKey())
+	delegatee := stake.NewDelegatee(Wallets[1].Address(), Wallets[1].GetPubKey())
 
 	// staking
 	amt0 := libs.RandBigIntN(govRuleHandlerHelper.MaxStakeAmount())
@@ -85,7 +85,7 @@ func TestApplyReward(t *testing.T) {
 }
 
 func BenchmarkApplyReward(b *testing.B) {
-	delegatee := stake.NewDelegatee(Wallets[1].GetAddress(), Wallets[1].W.GetPubKey())
+	delegatee := stake.NewDelegatee(Wallets[1].Address(), Wallets[1].GetPubKey())
 	for i := 0; i < 10000; i++ {
 		// staking
 		power := libs.RandInt63n(1000000000)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"math/big"
 	"sort"
 	"sync"
@@ -45,9 +46,9 @@ func (slst refundHeightOrder) Swap(i, j int) {
 var _ sort.Interface = (refundHeightOrder)(nil)
 
 type Delegatee struct {
-	Addr   types.Address  `json:"address"`
-	PubKey types.HexBytes `json:"pubKey"`
-	Stakes []*Stake       `json:"stakes"`
+	Addr   account.Address `json:"address"`
+	PubKey types.HexBytes  `json:"pubKey"`
+	Stakes []*Stake        `json:"stakes"`
 
 	SelfAmount  *big.Int `json:"selfAmount"`
 	SelfPower   int64    `json:"selfPower"`
@@ -59,7 +60,7 @@ type Delegatee struct {
 	mtx sync.RWMutex
 }
 
-func NewDelegatee(addr types.Address, pubKey types.HexBytes) *Delegatee {
+func NewDelegatee(addr account.Address, pubKey types.HexBytes) *Delegatee {
 	return &Delegatee{
 		Addr:        addr,
 		PubKey:      pubKey,
@@ -213,7 +214,7 @@ func (sset *Delegatee) findStake(txhash types.HexBytes) (int, *Stake) {
 	return -1, nil
 }
 
-func (sset *Delegatee) StakesOf(addr types.Address) []*Stake {
+func (sset *Delegatee) StakesOf(addr account.Address) []*Stake {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
@@ -247,7 +248,7 @@ func (sset *Delegatee) GetTotalAmount() *big.Int {
 	return sset.TotalAmount
 }
 
-func (sset *Delegatee) SumAmountOf(addr types.Address) *big.Int {
+func (sset *Delegatee) SumAmountOf(addr account.Address) *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
@@ -289,7 +290,7 @@ func (sset *Delegatee) GetTotalPower() int64 {
 	return sset.TotalPower
 }
 
-func (sset *Delegatee) SumPowerOf(addr types.Address) int64 {
+func (sset *Delegatee) SumPowerOf(addr account.Address) int64 {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 
@@ -324,7 +325,7 @@ func (sset *Delegatee) GetTotalReward() *big.Int {
 	return new(big.Int).Set(sset.TotalReward)
 }
 
-func (sset *Delegatee) SumRewardOf(addr types.Address) *big.Int {
+func (sset *Delegatee) SumRewardOf(addr account.Address) *big.Int {
 	sset.mtx.RLock()
 	defer sset.mtx.RUnlock()
 

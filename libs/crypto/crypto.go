@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/xerrors"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	"hash"
@@ -35,7 +36,7 @@ func VerifySig(pubkey, msg, sig []byte) bool {
 	return ethcrypto.VerifySignature(pubkey, hmsg, sig)
 }
 
-func Pub2Addr(pub *ecdsa.PublicKey) types.Address {
+func Pub2Addr(pub *ecdsa.PublicKey) account.Address {
 	// todo: generate address like as ethereum style
 
 	//a := ethcrypto.PubkeyToAddress(*pub)
@@ -47,7 +48,7 @@ func Pub2Addr(pub *ecdsa.PublicKey) types.Address {
 }
 
 // pubBytes is 33 bytes compressed format
-func PubBytes2Addr(pubBytes []byte) (types.Address, error) {
+func PubBytes2Addr(pubBytes []byte) (account.Address, error) {
 	// ethereum style
 	//pub, err := ethcrypto.DecompressPubkey(pubBytes)
 	//if err != nil {
@@ -67,7 +68,7 @@ func DecompressPubkey(bz []byte) (*ecdsa.PublicKey, error) {
 	return ethcrypto.DecompressPubkey(bz)
 }
 
-func Sig2Addr(msg, sig []byte) (types.Address, types.HexBytes, error) {
+func Sig2Addr(msg, sig []byte) (account.Address, types.HexBytes, error) {
 	hmsg := DefaultHash(msg)
 	pubKey, err := ethcrypto.SigToPub(hmsg, sig)
 	if err != nil {

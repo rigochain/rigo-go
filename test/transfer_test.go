@@ -3,7 +3,7 @@ package test
 import (
 	"github.com/kysee/arcanus/libs"
 	"github.com/kysee/arcanus/libs/client"
-	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"math/big"
@@ -16,7 +16,7 @@ var (
 	WALKEYDIR  = ".tmp/walkeys"
 	TESTPASS   = []byte("1")
 	wallets    []*client.Wallet
-	walletsMap map[types.AcctKey]*client.Wallet
+	walletsMap map[account.AcctKey]*client.Wallet
 	W0         *client.Wallet
 	W1         *client.Wallet
 	amt        = libs.RandBigIntN(big.NewInt(1000))
@@ -30,7 +30,7 @@ func init() {
 		panic(err)
 	}
 
-	walletsMap = make(map[types.AcctKey]*client.Wallet)
+	walletsMap = make(map[account.AcctKey]*client.Wallet)
 
 	for _, file := range files {
 		if !file.IsDir() {
@@ -40,7 +40,7 @@ func init() {
 			} else {
 				wallets = append(wallets, w)
 
-				acctKey := types.ToAcctKey(w.Address())
+				acctKey := account.ToAcctKey(w.Address())
 				walletsMap[acctKey] = w
 			}
 		}
