@@ -13,31 +13,43 @@ import (
 
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
-func QueryAccount(ctx *tmrpctypes.Context, addr string) (*tmrpccoretypes.ResultABCIQuery, error) {
+func QueryAccount(ctx *tmrpctypes.Context, addr string) (*QueryResponse, error) {
 	bzAddr, err := types.AddressFromHex(addr)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
 	}
 
-	return tmrpccore.ABCIQuery(ctx, "account", bzAddr, 0, false)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "account", bzAddr, 0, false); err != nil {
+		return nil, err
+	} else {
+		return ToQueryResponse(&resp.Response), nil
+	}
 }
 
-func QueryStakes(ctx *tmrpctypes.Context, addr string) (*tmrpccoretypes.ResultABCIQuery, error) {
+func QueryStakes(ctx *tmrpctypes.Context, addr string) (*QueryResponse, error) {
 	bzAddr, err := types.AddressFromHex(addr)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
 	}
 
-	return tmrpccore.ABCIQuery(ctx, "stakes", bzAddr, 0, false)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes", bzAddr, 0, false); err != nil {
+		return nil, err
+	} else {
+		return ToQueryResponse(&resp.Response), nil
+	}
 }
 
-func QueryProposal(ctx *tmrpctypes.Context, txhash string) (*tmrpccoretypes.ResultABCIQuery, error) {
+func QueryProposals(ctx *tmrpctypes.Context, txhash string) (*QueryResponse, error) {
 	bzTxHash, err := hex.DecodeString(txhash)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
 	}
 
-	return tmrpccore.ABCIQuery(ctx, "proposal", bzTxHash, 0, false)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "proposals", bzTxHash, 0, false); err != nil {
+		return nil, err
+	} else {
+		return ToQueryResponse(&resp.Response), nil
+	}
 }
 
 func Subscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultSubscribe, error) {

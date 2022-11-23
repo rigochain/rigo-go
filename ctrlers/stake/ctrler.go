@@ -62,8 +62,10 @@ type StakeCtrler struct {
 	stakesTree    *iavl.MutableTree
 	updatedStakes []*Stake // updated + newer
 
-	allDelegatees    DelegateeArray
-	allDelegateesMap map[types.AcctKey]*Delegatee // the key is staker's account key
+	delegateesDB      db.DB
+	delegateesDBBatch db.Batch
+	allDelegatees     DelegateeArray
+	allDelegateesMap  map[types.AcctKey]*Delegatee // the key is delegatee's account key
 
 	lastValidators ValidatorInfoList
 
@@ -91,13 +93,46 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 		return nil, err
 	}
 
-	var allStakers DelegateeArray
-	allStakersMap := make(map[types.AcctKey]*Delegatee)
+	// for all delegatees
+	delegateesDB, err := db.NewDB("delegatees", "govleveldb", dbDir)
+	if err != nil {
+		return nil, err
+	}
 
+	// load delegatees
+	iterDelegatees, err := delegateesDB.Iterator(nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer iterDelegatees.Close()
+
+	var allDelegatees DelegateeArray
+	allDelegateesMap := make(map[types.AcctKey]*Delegatee)
+
+	for ; iterDelegatees.Valid(); iterDelegatees.Next() {
+		k := iterDelegatees.Key()
+		if _, ok := allDelegateesMap[types.ToAcctKey(k)]; ok {
+			return nil, xerrors.New("duplicated delegatee")
+		}
+		v := iterDelegatees.Value()
+		dgtee := &Delegatee{}
+		if err := json.Unmarshal(v, dgtee); err != nil {
+			return nil, err
+		}
+		allDelegatees = append(allDelegatees, dgtee)
+		allDelegateesMap[types.ToAcctKey(k)] = dgtee
+
+	}
+	if err := iterDelegatees.Error(); err != nil {
+		return nil, err
+	}
+	sort.Sort(powerOrderedDelegatees(allDelegatees))
+
+	// load stakes
 	stopped, err := stakesTree.Iterate(func(key []byte, value []byte) bool {
 		s0 := &Stake{}
 		if err := json.Unmarshal(value, s0); err != nil {
-			logger.Error("Unable to load staker", "address", types.HexBytes(key), "error", err)
+			logger.Error("Unable to load stake", "txhash", types.HexBytes(key), "error", err)
 			return true
 		}
 
@@ -107,13 +142,10 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 		}
 
 		addrKey := types.ToAcctKey(s0.To)
-		delegatee, ok := allStakersMap[addrKey]
+		delegatee, ok := allDelegateesMap[addrKey]
 		if !ok {
-			delegatee = &Delegatee{
-				Addr: s0.To,
-			}
-			allStakers = append(allStakers, delegatee)
-			allStakersMap[addrKey] = delegatee
+			logger.Error("Not found delegatee", "address", types.HexBytes(s0.To))
+			return true
 		}
 
 		if err := delegatee.AppendStake(s0); err != nil {
@@ -129,41 +161,41 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 		return nil, xerrors.New("Stop to load stakers tree")
 	}
 
-	sort.Sort(powerOrderedDelegatees(allStakers))
-
 	frozenDB, err := db.NewDB("frozen", "goleveldb", dbDir)
 	if err != nil {
 		return nil, err
 	}
 
-	iter, err := frozenDB.Iterator(nil, nil)
+	iterFrozenDB, err := frozenDB.Iterator(nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer iter.Close()
+	defer iterFrozenDB.Close()
 
 	var allFrozenStakes []*Stake
-	for ; iter.Valid(); iter.Next() {
-		v := iter.Value()
+	for ; iterFrozenDB.Valid(); iterFrozenDB.Next() {
+		v := iterFrozenDB.Value()
 		s0 := &Stake{}
 		if err := json.Unmarshal(v, s0); err != nil {
 			return nil, err
 		}
 		allFrozenStakes = append(allFrozenStakes, s0)
 	}
-	if err := iter.Error(); err != nil {
+	if err := iterFrozenDB.Error(); err != nil {
 		return nil, err
 	}
 	sort.Sort(refundHeightOrder(allFrozenStakes))
 
 	ret := &StakeCtrler{
-		stakesDB:         stakeDB,
-		stakesTree:       stakesTree,
-		allDelegatees:    allStakers,
-		allDelegateesMap: allStakersMap,
-		frozenStakesDB:   frozenDB,
-		allFrozenStakes:  allFrozenStakes,
-		logger:           logger,
+		stakesDB:          stakeDB,
+		stakesTree:        stakesTree,
+		delegateesDB:      delegateesDB,
+		delegateesDBBatch: delegateesDB.NewBatch(),
+		allDelegatees:     allDelegatees,
+		allDelegateesMap:  allDelegateesMap,
+		frozenStakesDB:    frozenDB,
+		allFrozenStakes:   allFrozenStakes,
+		logger:            logger,
 	}
 	return ret, nil
 }
@@ -179,16 +211,21 @@ func (ctrler *StakeCtrler) AddDelegateeWith(addr types.Address, pubKeyBytes type
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	staker := NewDelegatee(addr, pubKeyBytes)
-	return ctrler.addDelegatee(staker)
+	delegatee := NewDelegatee(addr, pubKeyBytes)
+	return ctrler.addDelegatee(delegatee)
 }
 
-func (ctrler *StakeCtrler) addDelegatee(staker *Delegatee) *Delegatee {
-	addrKey := types.ToAcctKey(staker.Addr)
+func (ctrler *StakeCtrler) addDelegatee(delegatee *Delegatee) *Delegatee {
+	addrKey := types.ToAcctKey(delegatee.Addr)
 	if _, ok := ctrler.allDelegateesMap[addrKey]; !ok {
-		ctrler.allDelegatees = append(ctrler.allDelegatees, staker)
-		ctrler.allDelegateesMap[addrKey] = staker
-		return staker
+		if blob, err := json.Marshal(delegatee); err != nil {
+			panic(err)
+		} else if err := ctrler.delegateesDBBatch.Set(addrKey[:], blob); err != nil {
+			panic(err)
+		}
+		ctrler.allDelegatees = append(ctrler.allDelegatees, delegatee)
+		ctrler.allDelegateesMap[addrKey] = delegatee
+		return delegatee
 	}
 	return nil
 }
@@ -198,6 +235,9 @@ func (ctrler *StakeCtrler) removeDelegatee(addr types.Address) *Delegatee {
 	if _, ok := ctrler.allDelegateesMap[addrKey]; ok {
 		for i, staker := range ctrler.allDelegatees {
 			if bytes.Compare(staker.Addr, addr) == 0 {
+				if err := ctrler.delegateesDBBatch.Delete(addrKey[:]); err != nil {
+					panic(err)
+				}
 				ctrler.allDelegatees = append(ctrler.allDelegatees[:i], ctrler.allDelegatees[i+1:]...)
 				delete(ctrler.allDelegateesMap, addrKey)
 				return staker
@@ -236,8 +276,8 @@ func (ctrler *StakeCtrler) FindDelegatee(addr types.Address) *Delegatee {
 
 func (ctrler *StakeCtrler) findDelegatee(addr types.Address) *Delegatee {
 	addrKey := types.ToAcctKey(addr)
-	if staker, ok := ctrler.allDelegateesMap[addrKey]; ok {
-		return staker
+	if delegatee, ok := ctrler.allDelegateesMap[addrKey]; ok {
+		return delegatee
 	}
 	return nil
 }
@@ -270,12 +310,12 @@ func (ctrler *StakeCtrler) applyStaking(ctx *trxs.TrxContext) error {
 	}
 
 	if ctx.Exec {
-		staker := ctrler.findDelegatee(ctx.Tx.To)
-		if staker == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
-			// new staker (staking to my self)
-			staker = ctrler.addDelegatee(NewDelegatee(ctx.Tx.From, ctx.SenderPubKey))
-		} else if staker == nil {
-			// there is no staker whose address is ctx.Tx.To
+		delegatee := ctrler.findDelegatee(ctx.Tx.To)
+		if delegatee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
+			// new delegatee (staking to my self)
+			delegatee = ctrler.addDelegatee(NewDelegatee(ctx.Tx.From, ctx.SenderPubKey))
+		} else if delegatee == nil {
+			// there is no delegatee whose address is ctx.Tx.To
 			return xerrors.ErrNotFoundStaker
 		}
 
@@ -285,13 +325,14 @@ func (ctrler *StakeCtrler) applyStaking(ctx *trxs.TrxContext) error {
 			return xerrors.ErrTooManyPower
 		}
 
-		if xerr := staker.AppendStake(s0); xerr != nil {
-			// Not reachable. AppendStake() does not return error
-			ctrler.logger.Error("Not reachable", "error", xerr)
-			panic(xerr)
-		}
-
-		ctrler.updatedStakes = append(ctrler.updatedStakes, s0)
+		//if xerr := delegatee.AppendStake(s0); xerr != nil {
+		//	// Not reachable. AppendStake() does not return error
+		//	ctrler.logger.Error("Not reachable", "error", xerr)
+		//	panic(xerr)
+		//}
+		//
+		//ctrler.updatedStakes = append(ctrler.updatedStakes, s0)
+		ctrler.delegateStake(delegatee, s0)
 	}
 
 	return nil
@@ -407,15 +448,32 @@ func (ctrler *StakeCtrler) ApplyReward(feeOwner types.Address, fee *big.Int) *bi
 	defer ctrler.mtx.Unlock()
 
 	reward := big.NewInt(0)
-	for _, staker := range ctrler.allDelegatees {
-		if bytes.Compare(staker.Addr, feeOwner) == 0 && fee.Sign() > 0 {
-			staker.ApplyFeeReward(fee)
+	for _, dlgtee := range ctrler.allDelegatees {
+		if bytes.Compare(dlgtee.Addr, feeOwner) == 0 && fee.Sign() > 0 {
+			dlgtee.ApplyFeeReward(fee)
 		}
 
 		// reward does not include fee
-		reward = reward.Add(reward, staker.ApplyReward())
+		reward = reward.Add(reward, dlgtee.ApplyReward())
 	}
 	return reward
+}
+
+func (ctrler *StakeCtrler) DelegateStake(to *Delegatee, s0 *Stake) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	ctrler.delegateStake(to, s0)
+}
+
+func (ctrler *StakeCtrler) delegateStake(to *Delegatee, s0 *Stake) {
+	if xerr := to.AppendStake(s0); xerr != nil {
+		// Not reachable. AppendStake() does not return error
+		ctrler.logger.Error("Not reachable", "error", xerr)
+		panic(xerr)
+	}
+
+	ctrler.updatedStakes = append(ctrler.updatedStakes, s0)
 }
 
 func (ctrler *StakeCtrler) GetFrozenStakes() []*Stake {
@@ -556,11 +614,11 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, error) {
 
 	// todo: Commit() should be atomic operation
 
-	batch := ctrler.frozenStakesDB.NewBatch()
-	defer batch.Close()
+	frozenBatch := ctrler.frozenStakesDB.NewBatch()
+	defer frozenBatch.Close()
 
 	for _, s := range ctrler.delFrozenStakes {
-		if err := batch.Delete(s.TxHash); err != nil {
+		if err := frozenBatch.Delete(s.TxHash); err != nil {
 			return nil, -1, err
 		}
 	}
@@ -569,7 +627,7 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, error) {
 	for _, s := range ctrler.newFrozenStakes {
 		if bz, err := json.Marshal(s); err != nil {
 			return nil, -1, xerrors.NewFrom(err)
-		} else if err := batch.Set(s.TxHash, bz); err != nil {
+		} else if err := frozenBatch.Set(s.TxHash, bz); err != nil {
 			return nil, -1, xerrors.NewFrom(err)
 		} else if _, _, err := ctrler.stakesTree.Remove(s.TxHash); err != nil {
 			return nil, -1, xerrors.NewFrom(err)
@@ -589,9 +647,17 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, error) {
 	}
 	ctrler.updatedStakes = nil
 
-	if err := batch.Write(); err != nil {
+	if err := frozenBatch.Write(); err != nil {
 		return nil, -1, err
 	}
+
+	if err := ctrler.delegateesDBBatch.Write(); err != nil {
+		return nil, -1, err
+	} else if err := ctrler.delegateesDBBatch.Close(); err != nil {
+		panic(err)
+	}
+	ctrler.delegateesDBBatch = ctrler.delegateesDB.NewBatch()
+
 	return ctrler.stakesTree.SaveVersion()
 }
 
