@@ -326,13 +326,6 @@ func (ctrler *StakeCtrler) applyStaking(ctx *trxs.TrxContext) error {
 			return xerrors.ErrTooManyPower
 		}
 
-		//if xerr := delegatee.AppendStake(s0); xerr != nil {
-		//	// Not reachable. AppendStake() does not return error
-		//	ctrler.logger.Error("Not reachable", "error", xerr)
-		//	panic(xerr)
-		//}
-		//
-		//ctrler.updatedStakes = append(ctrler.updatedStakes, s0)
 		ctrler.delegateStake(delegatee, s0)
 	}
 
