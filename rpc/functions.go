@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/xerrors"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
@@ -14,78 +13,31 @@ import (
 
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
-func QueryAccount(ctx *tmrpctypes.Context, addr string) (json.RawMessage, error) {
+func QueryAccount(ctx *tmrpctypes.Context, addr string) (*tmrpccoretypes.ResultABCIQuery, error) {
 	bzAddr, err := types.AddressFromHex(addr)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
 	}
 
-	qd := &types.QueryData{
-		Command: types.QUERY_ACCOUNT,
-		Params:  bzAddr,
-	}
-	resp, err := tmrpccore.ABCIQuery(ctx, ctx.HTTPReq.RequestURI, qd.Encode(), 0, false)
-	if err != nil {
-		// not reachable
-		// ABCIQuery never returns error
-		return nil, err
-	}
-
-	if resp.Response.Code == xerrors.ErrCodeSuccess {
-		return resp.Response.Value, nil
-	} else {
-		return nil, xerrors.NewWith(resp.Response.Code, resp.Response.Log)
-	}
+	return tmrpccore.ABCIQuery(ctx, "account", bzAddr, 0, false)
 }
 
-func QueryStakes(ctx *tmrpctypes.Context, addr string) (json.RawMessage, error) {
+func QueryStakes(ctx *tmrpctypes.Context, addr string) (*tmrpccoretypes.ResultABCIQuery, error) {
 	bzAddr, err := types.AddressFromHex(addr)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
 	}
 
-	qd := &types.QueryData{
-		Command: types.QUERY_STAKES,
-		Params:  bzAddr,
-	}
-
-	resp, err := tmrpccore.ABCIQuery(ctx, ctx.HTTPReq.RequestURI, qd.Encode(), 0, false)
-	if err != nil {
-		// not reachable
-		// ABCIQuery never returns error
-		return nil, err
-	}
-
-	if resp.Response.Code == xerrors.ErrCodeSuccess {
-		return resp.Response.Value, nil
-	} else {
-		return nil, xerrors.NewWith(resp.Response.Code, resp.Response.Log)
-	}
+	return tmrpccore.ABCIQuery(ctx, "stakes", bzAddr, 0, false)
 }
 
-func QueryProposal(ctx *tmrpctypes.Context, txhash string) (json.RawMessage, error) {
+func QueryProposal(ctx *tmrpctypes.Context, txhash string) (*tmrpccoretypes.ResultABCIQuery, error) {
 	bzTxHash, err := hex.DecodeString(txhash)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
 	}
 
-	qd := &types.QueryData{
-		Command: types.QUERY_PROPOSALS,
-		Params:  bzTxHash,
-	}
-
-	resp, err := tmrpccore.ABCIQuery(ctx, ctx.HTTPReq.RequestURI, qd.Encode(), 0, false)
-	if err != nil {
-		// not reachable
-		// ABCIQuery never returns error
-		return nil, err
-	}
-
-	if resp.Response.Code == xerrors.ErrCodeSuccess {
-		return resp.Response.Value, nil
-	} else {
-		return nil, xerrors.NewWith(resp.Response.Code, resp.Response.Log)
-	}
+	return tmrpccore.ABCIQuery(ctx, "proposal", bzTxHash, 0, false)
 }
 
 func Subscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultSubscribe, error) {

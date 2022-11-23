@@ -3,12 +3,13 @@ package types
 import (
 	"encoding/json"
 	"github.com/kysee/arcanus/types/xerrors"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/types"
 	"math/big"
 )
 
 type ILedgerHandler interface {
-	Query(*QueryData) (json.RawMessage, xerrors.XError)
+	Query(abcitypes.RequestQuery) (json.RawMessage, xerrors.XError)
 	Commit() ([]byte, int64, error)
 	Close() error
 }

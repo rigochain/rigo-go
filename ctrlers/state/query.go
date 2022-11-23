@@ -1,7 +1,6 @@
 package state
 
 import (
-	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
@@ -11,20 +10,23 @@ func (ctrler *ChainCtrler) Query(req abcitypes.RequestQuery) abcitypes.ResponseQ
 		Code: abcitypes.CodeTypeOK,
 		Key:  req.Data,
 	}
-	if qd, xerr := types.DecodeQueryData(req.Data); xerr != nil {
+
+	var xerr xerrors.XError
+
+	switch req.Path {
+	case "account":
+		response.Value, xerr = ctrler.acctCtrler.Query(req)
+	case "stakes":
+		response.Value, xerr = ctrler.stakeCtrler.Query(req)
+	case "proposals":
+		response.Value, xerr = ctrler.govCtrler.Query(req)
+	default:
+		response.Value, xerr = nil, xerrors.ErrInvalidQueryPath
+	}
+
+	if xerr != nil {
 		response.Code = xerr.Code()
 		response.Log = xerr.Error()
-	} else {
-		switch qd.Command {
-		case types.QUERY_ACCOUNT:
-			response.Value, xerr = ctrler.acctCtrler.Query(qd)
-		case types.QUERY_STAKES:
-			response.Value, xerr = ctrler.stakeCtrler.Query(qd)
-		case types.QUERY_PROPOSALS:
-			response.Value, xerr = ctrler.govCtrler.Query(qd)
-		default:
-			response.Value, xerr = nil, xerrors.ErrInvalidQueryCmd
-		}
 	}
 	return response
 }

@@ -26,7 +26,7 @@ type xerr2 error
 
 const (
 	ErrCodeQuery uint32 = 1000 + iota
-	ErrCodeInvalidQueryCmd
+	ErrCodeInvalidQueryPath
 	ErrCodeInvalidQueryParams
 	ErrLast
 )
@@ -56,7 +56,7 @@ var (
 	ErrNotFoundStake           = NewWith(ErrCodeNotFoundStake, "not found stake")
 	ErrNotFoundProposal        = NewWith(ErrCodeNotFoundProposal, "not found proposal")
 
-	ErrInvalidQueryCmd    = NewWith(ErrCodeInvalidQueryCmd, "invalid query command")
+	ErrInvalidQueryPath   = NewWith(ErrCodeInvalidQueryPath, "invalid query path")
 	ErrInvalidQueryParams = NewWith(ErrCodeInvalidQueryParams, "invalid query parameters")
 )
 
