@@ -5,17 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"math/big"
 	"sync"
 )
 
 type Stake struct {
-	From        types.Address `json:"owner"`
-	To          types.Address `json:"to"`
-	Amount      *big.Int      `json:"amount"`
-	Power       int64         `json:"power"`
-	BlockReward *big.Int      `json:"blockReward"`
-	Reward      *big.Int      `json:"receivedReward"`
+	From        account.Address `json:"owner"`
+	To          account.Address `json:"to"`
+	Amount      *big.Int        `json:"amount"`
+	Power       int64           `json:"power"`
+	BlockReward *big.Int        `json:"blockReward"`
+	Reward      *big.Int        `json:"receivedReward"`
 
 	TxHash       types.HexBytes `json:"txhash"`
 	StartHeight  int64          `json:"startHeight"`
@@ -24,7 +25,7 @@ type Stake struct {
 	mtx sync.RWMutex
 }
 
-func NewStakeWithAmount(from, to types.Address, amt *big.Int, height int64, txhash types.HexBytes, govRuleHandler types.IGovRuleHandler) *Stake {
+func NewStakeWithAmount(from, to account.Address, amt *big.Int, height int64, txhash types.HexBytes, govRuleHandler types.IGovRuleHandler) *Stake {
 	power := govRuleHandler.AmountToPower(amt)
 	blockReward := govRuleHandler.PowerToReward(power)
 	return &Stake{
@@ -40,7 +41,7 @@ func NewStakeWithAmount(from, to types.Address, amt *big.Int, height int64, txha
 	}
 }
 
-func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhash types.HexBytes, govRuleHandler types.IGovRuleHandler) *Stake {
+func NewStakeWithPower(owner, to account.Address, power int64, height int64, txhash types.HexBytes, govRuleHandler types.IGovRuleHandler) *Stake {
 	amt := govRuleHandler.PowerToAmount(power)
 	blockReward := govRuleHandler.PowerToReward(power)
 	return &Stake{

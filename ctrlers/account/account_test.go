@@ -3,6 +3,7 @@ package account_test
 import (
 	"github.com/kysee/arcanus/ctrlers/account"
 	"github.com/kysee/arcanus/libs/crypto"
+	account2 "github.com/kysee/arcanus/types/account"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -12,7 +13,7 @@ func TestAccountEncoding(t *testing.T) {
 	require.NoError(t, err)
 
 	addr := crypto.Pub2Addr(&prvKey.PublicKey)
-	acct0 := account.NewAccount(addr)
+	acct0 := account2.NewAccount(addr)
 
 	encoded, err := account.EncodeAccount(acct0)
 	require.NoError(t, err)
@@ -28,7 +29,7 @@ func BenchmarkAccountEncoding(b *testing.B) {
 	require.NoError(b, err)
 
 	addr := crypto.Pub2Addr(&prvKey.PublicKey)
-	acct0 := account.NewAccount(addr)
+	acct0 := account2.NewAccount(addr)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -42,7 +43,7 @@ func BenchmarkAccountDecoding(b *testing.B) {
 	require.NoError(b, err)
 
 	addr := crypto.Pub2Addr(&prvKey.PublicKey)
-	acct0 := account.NewAccount(addr)
+	acct0 := account2.NewAccount(addr)
 
 	encoded, err := account.EncodeAccount(acct0)
 	require.NoError(b, err)
@@ -59,7 +60,7 @@ func BenchmarkAccountToProto(b *testing.B) {
 	require.NoError(b, err)
 
 	addr := crypto.Pub2Addr(&prvKey.PublicKey)
-	acct0 := account.NewAccount(addr)
+	acct0 := account2.NewAccount(addr)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -72,7 +73,7 @@ func BenchmarkAccountFromProto(b *testing.B) {
 	require.NoError(b, err)
 
 	addr := crypto.Pub2Addr(&prvKey.PublicKey)
-	acct0 := account.NewAccount(addr)
+	acct0 := account2.NewAccount(addr)
 	pm := account.ToProto(acct0)
 
 	b.ResetTimer()

@@ -3,23 +3,22 @@ package account
 import (
 	"errors"
 	"fmt"
-	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/xerrors"
 	"math/big"
 	"sync"
 )
 
 type Account struct {
-	Address types.Address `json:"address"`
-	Name    string        `json:"name,omitempty"`
-	Nonce   uint64        `json:"nonce"`
-	Balance *big.Int      `json:"balance,string"`
-	Code    []byte        `json:"code,omitempty"`
+	Address Address  `json:"address"`
+	Name    string   `json:"name,omitempty"`
+	Nonce   uint64   `json:"nonce"`
+	Balance *big.Int `json:"balance,string"`
+	Code    []byte   `json:"code,omitempty"`
 
 	mtx sync.RWMutex
 }
 
-func NewAccount(addr types.Address) *Account {
+func NewAccount(addr Address) *Account {
 	return &Account{
 		Address: addr,
 		Nonce:   0,
@@ -27,7 +26,7 @@ func NewAccount(addr types.Address) *Account {
 	}
 }
 
-func NewAccountWithName(addr types.Address, name string) *Account {
+func NewAccountWithName(addr Address, name string) *Account {
 	return &Account{
 		Address: addr,
 		Name:    name,
@@ -37,17 +36,17 @@ func NewAccountWithName(addr types.Address, name string) *Account {
 }
 
 func (acct *Account) Type() int16 {
-	return types.ACCT_COMMON_TYPE
+	return ACCT_COMMON_TYPE
 }
 
-func (acct *Account) Key() types.AcctKey {
+func (acct *Account) Key() AcctKey {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
-	return types.ToAcctKey(acct.GetAddress())
+	return ToAcctKey(acct.GetAddress())
 }
 
-func (acct *Account) GetAddress() types.Address {
+func (acct *Account) GetAddress() Address {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
@@ -147,4 +146,17 @@ func (acct *Account) GetCode() []byte {
 	return acct.Code
 }
 
-var _ types.IAccount = (*Account)(nil)
+type FindAccountCb func(Address, bool) *Account
+
+type IAccountFinder interface {
+	FindOrNewAccount(Address, bool) *Account
+	FindAccount(Address, bool) *Account
+}
+
+type INonceChecker interface {
+	CheckNonce(*Account, uint64) error
+}
+
+type IBalanceChecker interface {
+	CheckBalance(*Account, *big.Int) error
+}

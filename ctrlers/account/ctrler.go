@@ -3,6 +3,7 @@ package account
 import (
 	"github.com/cosmos/iavl"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/tendermint/tendermint/libs/log"
@@ -16,8 +17,8 @@ type AccountCtrler struct {
 	acctDB   db.DB
 	acctTree *iavl.MutableTree
 
-	simuAccounts map[types.AcctKey]types.IAccount
-	execAccounts map[types.AcctKey]types.IAccount
+	simuAccounts map[account.AcctKey]*account.Account
+	execAccounts map[account.AcctKey]*account.Account
 
 	logger log.Logger
 	mtx    sync.RWMutex
@@ -39,21 +40,21 @@ func NewAccountCtrler(dbDir string, logger log.Logger) (*AccountCtrler, error) {
 	ret := &AccountCtrler{
 		acctDB:       acctDB,
 		acctTree:     acctTree,
-		simuAccounts: make(map[types.AcctKey]types.IAccount),
-		execAccounts: make(map[types.AcctKey]types.IAccount),
+		simuAccounts: make(map[account.AcctKey]*account.Account),
+		execAccounts: make(map[account.AcctKey]*account.Account),
 		logger:       logger,
 	}
 	return ret, nil
 }
 
-func (ctrler *AccountCtrler) PutAccount(acct types.IAccount, exec bool) {
+func (ctrler *AccountCtrler) PutAccount(acct *account.Account, exec bool) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	ctrler.putAccount(acct, exec)
 }
 
-func (ctrler *AccountCtrler) putAccount(acct types.IAccount, exec bool) {
+func (ctrler *AccountCtrler) putAccount(acct *account.Account, exec bool) {
 	acctSet := ctrler.simuAccounts
 	if exec {
 		acctSet = ctrler.execAccounts
@@ -61,27 +62,27 @@ func (ctrler *AccountCtrler) putAccount(acct types.IAccount, exec bool) {
 	acctSet[acct.Key()] = acct
 }
 
-func (ctrler *AccountCtrler) FindAccount(addr types.Address, exec bool) types.IAccount {
+func (ctrler *AccountCtrler) FindAccount(addr account.Address, exec bool) *account.Account {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
 	return ctrler.findAccount(addr, exec)
 }
 
-func (ctrler *AccountCtrler) FindOrNewAccount(addr types.Address, exec bool) types.IAccount {
+func (ctrler *AccountCtrler) FindOrNewAccount(addr account.Address, exec bool) *account.Account {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	return ctrler.findOrNewAccount(addr, exec)
 }
 
-func (ctrler *AccountCtrler) findAccount(addr types.Address, exec bool) types.IAccount {
+func (ctrler *AccountCtrler) findAccount(addr account.Address, exec bool) *account.Account {
 	acctSet := ctrler.simuAccounts
 	if exec {
 		acctSet = ctrler.execAccounts
 	}
 
-	k := types.ToAcctKey(addr)
+	k := account.ToAcctKey(addr)
 	if acct, ok := acctSet[k]; ok {
 		return acct
 	}
@@ -94,24 +95,24 @@ func (ctrler *AccountCtrler) findAccount(addr types.Address, exec bool) types.IA
 	return nil
 }
 
-func (ctrler *AccountCtrler) findOrNewAccount(addr types.Address, exec bool) types.IAccount {
+func (ctrler *AccountCtrler) findOrNewAccount(addr account.Address, exec bool) *account.Account {
 	if acct := ctrler.findAccount(addr, exec); acct != nil {
-		return acct.(types.IAccount)
+		return acct
 	}
 
-	acct := NewAccountWithName(addr, "")
+	acct := account.NewAccountWithName(addr, "")
 	ctrler.putAccount(acct, exec)
 	return acct
 }
 
-func (ctrler *AccountCtrler) ReadAccount(addr types.Address) types.IAccount {
+func (ctrler *AccountCtrler) ReadAccount(addr account.Address) *account.Account {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
 	return ctrler.readAccount(addr)
 }
 
-func (ctrler *AccountCtrler) readAccount(addr types.Address) types.IAccount {
+func (ctrler *AccountCtrler) readAccount(addr account.Address) *account.Account {
 	if bz, err := ctrler.acctTree.Get(addr); err != nil {
 		panic(err)
 	} else if bz == nil {
@@ -123,7 +124,7 @@ func (ctrler *AccountCtrler) readAccount(addr types.Address) types.IAccount {
 	}
 }
 
-func (ctrler *AccountCtrler) Transfer(from, to types.IAccount, amt *big.Int) error {
+func (ctrler *AccountCtrler) Transfer(from, to *account.Account, amt *big.Int) error {
 	// don't need locking,
 	// because assetAccount does its own locking
 
@@ -144,7 +145,7 @@ func (ctrler *AccountCtrler) Commit() ([]byte, int64, error) {
 	// accounts must be saved in order of their key.
 	// if the order of accounts is not same,
 	// each node has different iavl tree root hash.
-	var acctKeys types.AcctKeyList
+	var acctKeys account.AcctKeyList
 	for ak := range ctrler.execAccounts {
 		acctKeys = append(acctKeys, ak)
 	}
@@ -162,14 +163,14 @@ func (ctrler *AccountCtrler) Commit() ([]byte, int64, error) {
 			// DON'T USE the variable 'k' directly.
 			// Next iteration, when the k's value is updated to next value,
 			// the key of ctrler.acctTree will be updated too.
-			var vk types.AcctKey
+			var vk account.AcctKey
 			copy(vk[:], k[:])
 			ctrler.acctTree.Set(vk[:], v)
 		}
 	}
 
 	ctrler.simuAccounts = ctrler.execAccounts
-	ctrler.execAccounts = make(map[types.AcctKey]types.IAccount)
+	ctrler.execAccounts = make(map[account.AcctKey]*account.Account)
 
 	return ctrler.acctTree.SaveVersion()
 }

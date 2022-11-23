@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/kysee/arcanus/libs/crypto"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/xerrors"
 	"math/big"
 )
@@ -14,12 +15,12 @@ type TrxContext struct {
 	TxHash types.HexBytes
 
 	Height   int64
-	Proposer types.Address
+	Proposer account.Address
 	Exec     bool
 
 	SenderPubKey []byte
-	Sender       types.IAccount
-	Receiver     types.IAccount
+	Sender       *account.Account
+	Receiver     *account.Account
 	NeedAmt      *big.Int
 	GasUsed      *big.Int
 

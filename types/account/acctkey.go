@@ -1,4 +1,4 @@
-package types
+package account
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/tendermint/tendermint/crypto"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"math/big"
 	"sort"
 	"strings"
 )
@@ -70,34 +69,20 @@ func (a AcctKeyList) Swap(i, j int) {
 
 var _ sort.Interface = AcctKeyList(nil)
 
-type IAccount interface {
-	Type() int16
-	Key() AcctKey
-	GetAddress() Address
-	SetName(string)
-	GetName() string
-	AddNonce()
-	GetNonce() uint64
-	CheckNonce(uint64) error
-	AddBalance(*big.Int) error
-	SubBalance(*big.Int) error
-	GetBalance() *big.Int
-	CheckBalance(*big.Int) error
-	SetCode([]byte)
-	GetCode() []byte
-}
-
-type FindAccountCb func(Address, bool) IAccount
-
-type IAccountFinder interface {
-	FindOrNewAccount(Address, bool) IAccount
-	FindAccount(Address, bool) IAccount
-}
-
-type INonceChecker interface {
-	CheckNonce(IAccount, uint64) error
-}
-
-type IBalanceChecker interface {
-	CheckBalance(IAccount, *big.Int) error
-}
+//
+//type IAccount interface {
+//	Type() int16
+//	Key() AcctKey
+//	GetAddress() Address
+//	SetName(string)
+//	GetName() string
+//	AddNonce()
+//	GetNonce() uint64
+//	CheckNonce(uint64) error
+//	AddBalance(*big.Int) error
+//	SubBalance(*big.Int) error
+//	GetBalance() *big.Int
+//	CheckBalance(*big.Int) error
+//	SetCode([]byte)
+//	GetCode() []byte
+//}

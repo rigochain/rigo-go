@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/kysee/arcanus/ctrlers/stake"
+	"github.com/kysee/arcanus/libs/client"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/stretchr/testify/require"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -20,8 +21,8 @@ var (
 	govRuleHandlerHelper = &govRuleHandler{}
 	stakeCtrler, _       = stake.NewStakeCtrler(DBDIR, tmlog.NewNopLogger())
 
-	Wallets              []*TestWallet
-	DelegateeWallets     []*TestWallet
+	Wallets              []*client.Wallet
+	DelegateeWallets     []*client.Wallet
 	stakingToSelfTrxCtxs []*trxs.TrxContext
 	stakingTrxCtxs       []*trxs.TrxContext
 	unstakingTrxCtxs     []*trxs.TrxContext

@@ -3,7 +3,7 @@ package rpc
 import (
 	"encoding/json"
 	"github.com/kysee/arcanus/ctrlers/account"
-	"github.com/kysee/arcanus/types"
+	accttypes "github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -35,7 +35,7 @@ func getRpcClient() *JSONRpcClient {
 	return rpcClient[idx%4]
 }
 
-func GetBalance(addr types.Address) *big.Int {
+func GetBalance(addr accttypes.Address) *big.Int {
 	if req, err := NewRequest("account", addr.String()); err != nil {
 		panic(err)
 	} else if resp, err := getRpcClient().call(req); err != nil {
@@ -47,8 +47,8 @@ func GetBalance(addr types.Address) *big.Int {
 	}
 }
 
-func GetAccount(addr types.Address) (types.IAccount, error) {
-	acct := account.NewAccount(nil)
+func GetAccount(addr accttypes.Address) (*accttypes.Account, error) {
+	acct := accttypes.NewAccount(nil)
 	if req, err := NewRequest("account", addr.String()); err != nil {
 		panic(err)
 	} else if resp, err := getRpcClient().call(req); err != nil {

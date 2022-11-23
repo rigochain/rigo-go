@@ -2,7 +2,7 @@ package test
 
 import (
 	"encoding/hex"
-	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"math/big"
@@ -13,7 +13,7 @@ func TestStaking(t *testing.T) {
 	addr, err := hex.DecodeString("4754BD89C3E067A5405F0FCF1158EB1A252362D8")
 	require.NoError(t, err)
 
-	acctKey := types.ToAcctKey(addr)
+	acctKey := account.ToAcctKey(addr)
 	w, ok := walletsMap[acctKey]
 	require.True(t, ok)
 	require.NoError(t, w.SyncAccount())

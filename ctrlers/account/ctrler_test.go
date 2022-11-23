@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/kysee/arcanus/ctrlers/account"
 	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/types"
+	account2 "github.com/kysee/arcanus/types/account"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/libs/log"
 	"math/big"
@@ -21,18 +21,18 @@ var (
 )
 
 func TestAccountMapMarshal(t *testing.T) {
-	addrs := make([]types.Address, 10)
+	addrs := make([]account2.Address, 10)
 	for i, _ := range addrs {
 		addrs[i] = libs.RandAddress()
 	}
 
 	accts := &struct {
-		Map1 map[types.AcctKey]*account.Account `json:"map1"`
+		Map1 map[account2.AcctKey]*account2.Account `json:"map1"`
 	}{
-		Map1: make(map[types.AcctKey]*account.Account),
+		Map1: make(map[account2.AcctKey]*account2.Account),
 	}
 	for _, addr := range addrs {
-		accts.Map1[types.ToAcctKey(addr)] = &account.Account{}
+		accts.Map1[account2.ToAcctKey(addr)] = &account2.Account{}
 	}
 
 	_, err := json.Marshal(accts)
@@ -89,7 +89,7 @@ func TestAccountCtrler_Find0(t *testing.T) {
 }
 
 func TestAccountCtrler_AppHash(t *testing.T) {
-	var addrList [100]types.Address
+	var addrList [100]account2.Address
 	for i := 0; i < len(addrList); i++ {
 		addrList[i] = libs.RandAddress()
 	}

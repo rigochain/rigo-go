@@ -9,7 +9,7 @@ import (
 	"fmt"
 	ethec "github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/xerrors"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -48,7 +48,7 @@ type dkParams struct {
 
 type WalletKey struct {
 	Version          int               `json:"version"`
-	Address          types.Address     `json:"address"`
+	Address          account.Address   `json:"address"`
 	Algo             string            `json:"algo"`
 	CipherTextParams *cipherTextParams `json:"cp"`
 	DKParams         *dkParams         `json:"dkp"`

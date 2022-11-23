@@ -4,6 +4,7 @@ import (
 	"github.com/kysee/arcanus/libs/client/rpc"
 	"github.com/kysee/arcanus/libs/crypto"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/trxs"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -14,7 +15,7 @@ import (
 
 type Wallet struct {
 	wkey *crypto.WalletKey
-	acct types.IAccount
+	acct *account.Account
 
 	mtx sync.RWMutex
 }
@@ -42,11 +43,18 @@ func OpenWallet(r io.Reader) (*Wallet, error) {
 	return ret, nil
 }
 
-func (w *Wallet) Address() types.Address {
+func (w *Wallet) Address() account.Address {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
 	return w.wkey.Address
+}
+
+func (w *Wallet) GetAccount() *account.Account {
+	w.mtx.RLock()
+	defer w.mtx.RUnlock()
+
+	return w.acct
 }
 
 func (w *Wallet) syncAccount() error {
@@ -106,13 +114,13 @@ func (w *Wallet) SyncBalance() error {
 }
 
 func (w *Wallet) GetBalance() *big.Int {
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
+	w.mtx.RLock()
+	defer w.mtx.RUnlock()
 
-	if acct, ok := w.acct.(types.IAccount); !ok {
+	if w.acct == nil {
 		return big.NewInt(0)
 	} else {
-		return acct.GetBalance()
+		return w.acct.GetBalance()
 	}
 }
 
@@ -151,7 +159,7 @@ func (w *Wallet) SignTrx(tx *trxs.Trx) (types.HexBytes, types.HexBytes, error) {
 	}
 }
 
-func (w *Wallet) TransferSync(to types.Address, amt, gas *big.Int) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) TransferSync(to account.Address, amt, gas *big.Int) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
 		gas, amt,
@@ -163,7 +171,7 @@ func (w *Wallet) TransferSync(to types.Address, amt, gas *big.Int) (*coretypes.R
 	}
 }
 
-func (w *Wallet) StakingSync(to types.Address, amt, gas *big.Int) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) StakingSync(to account.Address, amt, gas *big.Int) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxStaking(
 		w.Address(), to,
 		gas, amt,

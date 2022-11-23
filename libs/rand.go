@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"math/big"
 	mrand "math/rand"
 )
@@ -28,17 +29,17 @@ func RandHexString(n int) string {
 	return "0x" + hex.EncodeToString(bz)
 }
 
-func RandAddress() types.Address {
-	return RandBytes(types.AddrSize)
+func RandAddress() account.Address {
+	return RandBytes(account.AddrSize)
 }
 
-func ZeroAddress() types.Address {
-	return ZeroBytes(types.AddrSize)
+func ZeroAddress() account.Address {
+	return ZeroBytes(account.AddrSize)
 }
 
-func RandAddrKey() types.AcctKey {
-	var k types.AcctKey
-	copy(k[:], RandBytes(types.AddrSize))
+func RandAddrKey() account.AcctKey {
+	var k account.AcctKey
+	copy(k[:], RandBytes(account.AddrSize))
 	return k
 }
 
