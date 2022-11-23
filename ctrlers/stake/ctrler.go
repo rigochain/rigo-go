@@ -5,6 +5,7 @@ import (
 	"github.com/cosmos/iavl"
 	"github.com/kysee/arcanus/libs"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
 	tmtypes "github.com/tendermint/tendermint/abci/types"
@@ -17,7 +18,7 @@ import (
 )
 
 type ValidatorInfo struct {
-	Address types.Address
+	Address account.Address
 	PubKey  types.HexBytes
 	Power   int64
 }
@@ -39,7 +40,7 @@ func (vilst ValidatorInfoList) Swap(i, j int) {
 
 var _ sort.Interface = (ValidatorInfoList)(nil)
 
-func (vilst ValidatorInfoList) isExist(addr types.Address) bool {
+func (vilst ValidatorInfoList) isExist(addr account.Address) bool {
 	for _, vi := range vilst {
 		if bytes.Compare(vi.Address, addr) == 0 {
 			return true
@@ -48,7 +49,7 @@ func (vilst ValidatorInfoList) isExist(addr types.Address) bool {
 	return false
 }
 
-func (vilst ValidatorInfoList) find(addr types.Address) *ValidatorInfo {
+func (vilst ValidatorInfoList) find(addr account.Address) *ValidatorInfo {
 	for _, vi := range vilst {
 		if bytes.Compare(vi.Address, addr) == 0 {
 			return vi
@@ -65,7 +66,7 @@ type StakeCtrler struct {
 	delegateesDB      db.DB
 	delegateesDBBatch db.Batch
 	allDelegatees     DelegateeArray
-	allDelegateesMap  map[types.AcctKey]*Delegatee // the key is delegatee's account key
+	allDelegateesMap  map[account.AcctKey]*Delegatee // the key is delegatee's account key
 
 	lastValidators ValidatorInfoList
 
@@ -94,7 +95,7 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 	}
 
 	// for all delegatees
-	delegateesDB, err := db.NewDB("delegatees", "govleveldb", dbDir)
+	delegateesDB, err := db.NewDB("delegatees", "goleveldb", dbDir)
 	if err != nil {
 		return nil, err
 	}
@@ -107,11 +108,11 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 	defer iterDelegatees.Close()
 
 	var allDelegatees DelegateeArray
-	allDelegateesMap := make(map[types.AcctKey]*Delegatee)
+	allDelegateesMap := make(map[account.AcctKey]*Delegatee)
 
 	for ; iterDelegatees.Valid(); iterDelegatees.Next() {
 		k := iterDelegatees.Key()
-		if _, ok := allDelegateesMap[types.ToAcctKey(k)]; ok {
+		if _, ok := allDelegateesMap[account.ToAcctKey(k)]; ok {
 			return nil, xerrors.New("duplicated delegatee")
 		}
 		v := iterDelegatees.Value()
@@ -120,7 +121,7 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 			return nil, err
 		}
 		allDelegatees = append(allDelegatees, dgtee)
-		allDelegateesMap[types.ToAcctKey(k)] = dgtee
+		allDelegateesMap[account.ToAcctKey(k)] = dgtee
 
 	}
 	if err := iterDelegatees.Error(); err != nil {
@@ -141,7 +142,7 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 			return true
 		}
 
-		addrKey := types.ToAcctKey(s0.To)
+		addrKey := account.ToAcctKey(s0.To)
 		delegatee, ok := allDelegateesMap[addrKey]
 		if !ok {
 			logger.Error("Not found delegatee", "address", types.HexBytes(s0.To))
@@ -207,7 +208,7 @@ func (ctrler *StakeCtrler) AddDelegatee(delegatee *Delegatee) *Delegatee {
 	return ctrler.addDelegatee(delegatee)
 }
 
-func (ctrler *StakeCtrler) AddDelegateeWith(addr types.Address, pubKeyBytes types.HexBytes) *Delegatee {
+func (ctrler *StakeCtrler) AddDelegateeWith(addr account.Address, pubKeyBytes types.HexBytes) *Delegatee {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -216,7 +217,7 @@ func (ctrler *StakeCtrler) AddDelegateeWith(addr types.Address, pubKeyBytes type
 }
 
 func (ctrler *StakeCtrler) addDelegatee(delegatee *Delegatee) *Delegatee {
-	addrKey := types.ToAcctKey(delegatee.Addr)
+	addrKey := account.ToAcctKey(delegatee.Addr)
 	if _, ok := ctrler.allDelegateesMap[addrKey]; !ok {
 		if blob, err := json.Marshal(delegatee); err != nil {
 			panic(err)
@@ -230,8 +231,8 @@ func (ctrler *StakeCtrler) addDelegatee(delegatee *Delegatee) *Delegatee {
 	return nil
 }
 
-func (ctrler *StakeCtrler) removeDelegatee(addr types.Address) *Delegatee {
-	addrKey := types.ToAcctKey(addr)
+func (ctrler *StakeCtrler) removeDelegatee(addr account.Address) *Delegatee {
+	addrKey := account.ToAcctKey(addr)
 	if _, ok := ctrler.allDelegateesMap[addrKey]; ok {
 		for i, staker := range ctrler.allDelegatees {
 			if bytes.Compare(staker.Addr, addr) == 0 {
@@ -267,15 +268,15 @@ func (ctrler *StakeCtrler) DelegateeLen() int {
 	return len(ctrler.allDelegatees)
 }
 
-func (ctrler *StakeCtrler) FindDelegatee(addr types.Address) *Delegatee {
+func (ctrler *StakeCtrler) FindDelegatee(addr account.Address) *Delegatee {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
 	return ctrler.findDelegatee(addr)
 }
 
-func (ctrler *StakeCtrler) findDelegatee(addr types.Address) *Delegatee {
-	addrKey := types.ToAcctKey(addr)
+func (ctrler *StakeCtrler) findDelegatee(addr account.Address) *Delegatee {
+	addrKey := account.ToAcctKey(addr)
 	if delegatee, ok := ctrler.allDelegateesMap[addrKey]; ok {
 		return delegatee
 	}
@@ -443,7 +444,7 @@ func (ctrler *StakeCtrler) Execute(ctx *trxs.TrxContext) error {
 	}
 }
 
-func (ctrler *StakeCtrler) ApplyReward(feeOwner types.Address, fee *big.Int) *big.Int {
+func (ctrler *StakeCtrler) ApplyReward(feeOwner account.Address, fee *big.Int) *big.Int {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -483,7 +484,7 @@ func (ctrler *StakeCtrler) GetFrozenStakes() []*Stake {
 	return ctrler.allFrozenStakes
 }
 
-func (ctrler *StakeCtrler) ProcessFrozenStakesAt(height int64, acctFinder types.IAccountFinder) error {
+func (ctrler *StakeCtrler) ProcessFrozenStakesAt(height int64, acctFinder account.IAccountFinder) error {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -521,9 +522,9 @@ func (ctrler *StakeCtrler) GetTotalPower() int64 {
 	return power
 }
 
-func (ctrler *StakeCtrler) GetTotalPowerOf(addr types.Address) int64 {
+func (ctrler *StakeCtrler) GetTotalPowerOf(addr account.Address) int64 {
 	power := int64(0)
-	if delegatee, ok := ctrler.allDelegateesMap[types.ToAcctKey(addr)]; ok {
+	if delegatee, ok := ctrler.allDelegateesMap[account.ToAcctKey(addr)]; ok {
 		power += delegatee.GetTotalPower()
 	}
 	return power
@@ -560,7 +561,7 @@ func (ctrler *StakeCtrler) GetLastValidatorCnt() int {
 	return len(ctrler.lastValidators)
 }
 
-func (ctrler *StakeCtrler) IsValidator(addr types.Address) bool {
+func (ctrler *StakeCtrler) IsValidator(addr account.Address) bool {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 

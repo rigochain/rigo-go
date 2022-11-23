@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"math/big"
 	"sort"
 	"sync"
@@ -45,9 +46,9 @@ func (slst refundHeightOrder) Swap(i, j int) {
 var _ sort.Interface = (refundHeightOrder)(nil)
 
 type Delegatee struct {
-	Addr   types.Address  `json:"address"`
-	PubKey types.HexBytes `json:"pubKey"`
-	Stakes []*Stake       `json:"stakes"`
+	Addr   account.Address `json:"address"`
+	PubKey types.HexBytes  `json:"pubKey"`
+	Stakes []*Stake        `json:"stakes"`
 
 	SelfAmount  *big.Int `json:"selfAmount"`
 	SelfPower   int64    `json:"selfPower"`
@@ -59,7 +60,7 @@ type Delegatee struct {
 	mtx sync.RWMutex
 }
 
-func NewDelegatee(addr types.Address, pubKey types.HexBytes) *Delegatee {
+func NewDelegatee(addr account.Address, pubKey types.HexBytes) *Delegatee {
 	return &Delegatee{
 		Addr:        addr,
 		PubKey:      pubKey,
@@ -213,7 +214,7 @@ func (delegatee *Delegatee) findStake(txhash types.HexBytes) (int, *Stake) {
 	return -1, nil
 }
 
-func (delegatee *Delegatee) StakesOf(addr types.Address) []*Stake {
+func (delegatee *Delegatee) StakesOf(addr account.Address) []*Stake {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
@@ -247,7 +248,7 @@ func (delegatee *Delegatee) GetTotalAmount() *big.Int {
 	return delegatee.TotalAmount
 }
 
-func (delegatee *Delegatee) SumAmountOf(addr types.Address) *big.Int {
+func (delegatee *Delegatee) SumAmountOf(addr account.Address) *big.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
@@ -289,7 +290,7 @@ func (delegatee *Delegatee) GetTotalPower() int64 {
 	return delegatee.TotalPower
 }
 
-func (delegatee *Delegatee) SumPowerOf(addr types.Address) int64 {
+func (delegatee *Delegatee) SumPowerOf(addr account.Address) int64 {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
@@ -324,7 +325,7 @@ func (delegatee *Delegatee) GetTotalReward() *big.Int {
 	return new(big.Int).Set(delegatee.TotalReward)
 }
 
-func (delegatee *Delegatee) SumRewardOf(addr types.Address) *big.Int {
+func (delegatee *Delegatee) SumRewardOf(addr account.Address) *big.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 

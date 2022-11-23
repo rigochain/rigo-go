@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"encoding/hex"
-	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/xerrors"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	tmrpccoretypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -14,7 +14,7 @@ import (
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
 func QueryAccount(ctx *tmrpctypes.Context, addr string) (*QueryResponse, error) {
-	bzAddr, err := types.AddressFromHex(addr)
+	bzAddr, err := account.AddressFromHex(addr)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
 	}
@@ -27,7 +27,7 @@ func QueryAccount(ctx *tmrpctypes.Context, addr string) (*QueryResponse, error) 
 }
 
 func QueryStakes(ctx *tmrpctypes.Context, addr string) (*QueryResponse, error) {
-	bzAddr, err := types.AddressFromHex(addr)
+	bzAddr, err := account.AddressFromHex(addr)
 	if err != nil {
 		return nil, xerrors.NewFrom(err)
 	}
