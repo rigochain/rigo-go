@@ -134,15 +134,7 @@ func (ctrler *ChainCtrler) InitChain(chain abcitypes.RequestInitChain) abcitypes
 	}
 
 	if err = ctrler.govCtrler.ImportRules(func() []byte {
-		amtPower, _ := new(big.Int).SetString(appState.GovRule.AmountPerPower, 10)
-		rwdPower, _ := new(big.Int).SetString(appState.GovRule.RewardPerPower, 10)
-		govRule := &gov.GovRule{
-			Version:        appState.GovRule.Version,
-			AmountPerPower: amtPower,
-			RewardPerPower: rwdPower,
-		}
-
-		if govRuleCode, err := govRule.Encode(); err != nil {
+		if govRuleCode, err := appState.GovRule.Encode(); err != nil {
 			panic(err)
 		} else {
 			// create account for gov rule and save it

@@ -15,8 +15,7 @@ import (
 )
 
 type GovCtrler struct {
-	govDB tmdb.DB
-
+	govDB   tmdb.DB
 	govRule *GovRule
 
 	allProposals     map[[32]byte]types.IProposable

@@ -23,8 +23,8 @@ func TestNewStake(t *testing.T) {
 
 	require.True(t, s0.Power > int64(0))
 	require.Equal(t, govRuleHandlerHelper.AmountToPower(amt), s0.Power)
-	require.True(t, s0.BlockReward.Sign() > 0)
-	require.Equal(t, govRuleHandlerHelper.PowerToReward(s0.Power), s0.BlockReward)
+	require.True(t, s0.BlockRewardUnit.Sign() > 0)
+	require.Equal(t, govRuleHandlerHelper.PowerToReward(s0.Power), s0.BlockRewardUnit)
 	require.Equal(t, big.NewInt(0), s0.Reward)
 }
 
@@ -44,12 +44,12 @@ func TestApplyRewardByStake(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		_ = stakes[i].ApplyReward()
 		require.True(t, stakes[i].Reward.Sign() > 0)
-		require.Equal(t, stakes[i].BlockReward, stakes[i].Reward)
+		require.Equal(t, stakes[i].BlockRewardUnit, stakes[i].Reward)
 	}
 
 	for i := 0; i < 1000; i++ {
 		_ = stakes[i].ApplyReward()
-		expected := new(big.Int).Mul(stakes[i].BlockReward, big.NewInt(2))
+		expected := new(big.Int).Mul(stakes[i].BlockRewardUnit, big.NewInt(2))
 		require.Equal(t, expected, stakes[i].Reward)
 	}
 }

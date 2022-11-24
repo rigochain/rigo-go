@@ -11,12 +11,12 @@ import (
 )
 
 type Stake struct {
-	From        account.Address `json:"owner"`
-	To          account.Address `json:"to"`
-	Amount      *big.Int        `json:"amount"`
-	Power       int64           `json:"power"`
-	BlockReward *big.Int        `json:"blockReward"`
-	Reward      *big.Int        `json:"receivedReward"`
+	From            account.Address `json:"owner"`
+	To              account.Address `json:"to"`
+	Amount          *big.Int        `json:"amount"`
+	Power           int64           `json:"power"`
+	BlockRewardUnit *big.Int        `json:"blockRewardUnit"`
+	Reward          *big.Int        `json:"receivedReward"`
 
 	TxHash       types.HexBytes `json:"txhash"`
 	StartHeight  int64          `json:"startHeight"`
@@ -29,15 +29,15 @@ func NewStakeWithAmount(from, to account.Address, amt *big.Int, height int64, tx
 	power := govRuleHandler.AmountToPower(amt)
 	blockReward := govRuleHandler.PowerToReward(power)
 	return &Stake{
-		From:         from,
-		To:           to,
-		Amount:       amt,
-		Power:        power,
-		BlockReward:  blockReward,
-		Reward:       big.NewInt(0),
-		StartHeight:  height,
-		RefundHeight: 0,
-		TxHash:       txhash,
+		From:            from,
+		To:              to,
+		Amount:          amt,
+		Power:           power,
+		BlockRewardUnit: blockReward,
+		Reward:          big.NewInt(0),
+		StartHeight:     height,
+		RefundHeight:    0,
+		TxHash:          txhash,
 	}
 }
 
@@ -45,15 +45,15 @@ func NewStakeWithPower(owner, to account.Address, power int64, height int64, txh
 	amt := govRuleHandler.PowerToAmount(power)
 	blockReward := govRuleHandler.PowerToReward(power)
 	return &Stake{
-		From:         owner,
-		To:           to,
-		Amount:       amt,
-		Power:        power,
-		BlockReward:  blockReward,
-		Reward:       big.NewInt(0),
-		StartHeight:  height,
-		RefundHeight: 0,
-		TxHash:       txhash,
+		From:            owner,
+		To:              to,
+		Amount:          amt,
+		Power:           power,
+		BlockRewardUnit: blockReward,
+		Reward:          big.NewInt(0),
+		StartHeight:     height,
+		RefundHeight:    0,
+		TxHash:          txhash,
 	}
 }
 
@@ -73,14 +73,14 @@ func (s *Stake) Copy() *Stake {
 	defer s.mtx.RUnlock()
 
 	return &Stake{
-		From:         append(s.From, nil...),
-		To:           append(s.To, nil...),
-		Amount:       new(big.Int).Set(s.Amount),
-		Power:        s.Power,
-		BlockReward:  new(big.Int).Set(s.BlockReward),
-		Reward:       new(big.Int).Set(s.Reward),
-		StartHeight:  s.StartHeight,
-		RefundHeight: s.RefundHeight,
+		From:            append(s.From, nil...),
+		To:              append(s.To, nil...),
+		Amount:          new(big.Int).Set(s.Amount),
+		Power:           s.Power,
+		BlockRewardUnit: new(big.Int).Set(s.BlockRewardUnit),
+		Reward:          new(big.Int).Set(s.Reward),
+		StartHeight:     s.StartHeight,
+		RefundHeight:    s.RefundHeight,
 	}
 }
 
@@ -92,8 +92,8 @@ func (s *Stake) ApplyReward() *big.Int {
 }
 
 func (s *Stake) applyReward() *big.Int {
-	s.Reward = new(big.Int).Add(s.Reward, s.BlockReward)
-	return s.BlockReward
+	s.Reward = new(big.Int).Add(s.Reward, s.BlockRewardUnit)
+	return s.BlockRewardUnit
 }
 
 func (s *Stake) IsSelfStake() bool {

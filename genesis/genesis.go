@@ -1,7 +1,6 @@
 package genesis
 
 import (
-	"encoding/binary"
 	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/libs/crypto"
 	"github.com/kysee/arcanus/types/account"
@@ -23,54 +22,28 @@ func (gh *GenesisAssetHolder) Hash() []byte {
 	return hasher.Sum(nil)
 }
 
-type GenesisGovRule struct {
-	Version            int64  `json:"version"`
-	MaxValidatorCnt    int64  `json:"maxValidatorCnt"`
-	AmountPerPower     string `json:"amountPerPower"`
-	RewardPerPower     string `json:"rewardPerPower"`
-	LazyRewardBlocks   int64  `json:"lazyRewardBlocks"`
-	LazyApplyingBlocks int64  `json:"lazyApplyingBlocks"`
-}
-
-func DefaultGenesisGovRule() *GenesisGovRule {
-	gr := gov.DefaultGovRule()
-	return &GenesisGovRule{
-		Version:            gr.Version,
-		MaxValidatorCnt:    gr.MaxValidatorCnt,
-		AmountPerPower:     gr.AmountPerPower.String(),
-		RewardPerPower:     gr.RewardPerPower.String(),
-		LazyApplyingBlocks: gr.LazyApplyingBlocks,
-	}
-}
-
-func (gr *GenesisGovRule) Hash() []byte {
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint32(buf, uint32(gr.Version))
-
-	hasher := crypto.DefaultHasher()
-	hasher.Write(buf)
-	hasher.Write([]byte(gr.AmountPerPower))
-	hasher.Write([]byte(gr.RewardPerPower))
-	return hasher.Sum(nil)
-}
-
 type GenesisAppState struct {
 	AssetHolders []*GenesisAssetHolder `json:"assetHolders"`
-	GovRule      *GenesisGovRule       `json:"govRule"`
+	GovRule      *gov.GovRule          `json:"govRule"`
 }
 
 func (ga *GenesisAppState) Hash() ([]byte, error) {
 	hasher := crypto.DefaultHasher()
-
-	hasher.Write(ga.GovRule.Hash())
-	for _, h := range ga.AssetHolders {
-		hasher.Write(h.Hash())
+	if bz, err := ga.GovRule.Encode(); err != nil {
+		return nil, err
+	} else if _, err := hasher.Write(bz); err != nil {
+		return nil, err
+	} else {
+		for _, h := range ga.AssetHolders {
+			if _, err := hasher.Write(h.Hash()); err != nil {
+				return nil, err
+			}
+		}
 	}
-
 	return hasher.Sum(nil), nil
 }
 
-func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govRule *GenesisGovRule) (*tmtypes.GenesisDoc, error) {
+func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govRule *gov.GovRule) (*tmtypes.GenesisDoc, error) {
 	appState := GenesisAppState{
 		AssetHolders: assetHolders,
 		GovRule:      govRule,

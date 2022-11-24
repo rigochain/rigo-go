@@ -72,15 +72,15 @@ func TestApplyReward(t *testing.T) {
 		),
 	)
 	// first reward
-	reward0 := delegatee.ApplyReward()
+	reward0 := delegatee.ApplyBlockReward()
 	require.Equal(t, reward0, delegatee.GetTotalReward())
-	require.Equal(t, delegatee.SumReward(), delegatee.GetTotalReward())
+	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalReward())
 
 	// second reward
-	reward1 := delegatee.ApplyReward()
+	reward1 := delegatee.ApplyBlockReward()
 	require.Equal(t, reward0, reward1)
 	require.Equal(t, new(big.Int).Add(reward0, reward1), delegatee.GetTotalReward())
-	require.Equal(t, delegatee.SumReward(), delegatee.GetTotalReward())
+	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalReward())
 	require.True(t, delegatee.GetTotalReward().Sign() > 0)
 }
 
@@ -103,7 +103,7 @@ func BenchmarkApplyReward(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rewarded := delegatee.ApplyReward()
+		rewarded := delegatee.ApplyBlockReward()
 		require.True(b, rewarded.Sign() > 0)
 	}
 }

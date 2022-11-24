@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/kysee/arcanus/ctrlers/gov"
 	"github.com/kysee/arcanus/genesis"
 	"github.com/kysee/arcanus/libs"
 	"github.com/kysee/arcanus/libs/crypto"
@@ -172,8 +173,7 @@ func initFilesWithConfig(config *cfg.Config) error {
 				}
 			}()
 
-			govRule := genesis.DefaultGenesisGovRule()
-			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, govRule)
+			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, gov.DefaultGovRule())
 			if err != nil {
 				return err
 			}
