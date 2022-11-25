@@ -69,11 +69,15 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 		addrKey := account.ToAcctKey(s0.To)
 		delegatee, ok := allDelegateesMap[addrKey]
 		if !ok {
+
+			// todo: restore delegatee's public key and fee reward (#19)
+
 			delegatee = NewDelegatee(s0.To, nil)
 			allDelegatees = append(allDelegatees, delegatee)
 			allDelegateesMap[addrKey] = delegatee
 		}
 
+		// in AppendStake(), block reward is restored
 		if err := delegatee.AppendStake(s0); err != nil {
 			logger.Error("error in appending stake")
 			return true
@@ -86,7 +90,6 @@ func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
 	} else if stopped {
 		return nil, xerrors.New("Stop to load stakers tree")
 	}
-	sort.Sort(powerOrderedDelegatees(allDelegatees))
 
 	frozenDB, err := db.NewDB("frozen", "goleveldb", dbDir)
 	if err != nil {
@@ -145,6 +148,9 @@ func (ctrler *StakeCtrler) addDelegatee(delegatee *Delegatee) *Delegatee {
 	if _, ok := ctrler.allDelegateesMap[addrKey]; !ok {
 		ctrler.allDelegatees = append(ctrler.allDelegatees, delegatee)
 		ctrler.allDelegateesMap[addrKey] = delegatee
+
+		// todo: save delegatee's public key (#19)
+
 		return delegatee
 	}
 	return nil
@@ -157,6 +163,9 @@ func (ctrler *StakeCtrler) removeDelegatee(addr account.Address) *Delegatee {
 			if bytes.Compare(staker.Addr, addr) == 0 {
 				ctrler.allDelegatees = append(ctrler.allDelegatees[:i], ctrler.allDelegatees[i+1:]...)
 				delete(ctrler.allDelegateesMap, addrKey)
+
+				// todo: remove delegatee's public key (#19)
+
 				return staker
 			}
 		}
@@ -279,10 +288,10 @@ func (ctrler *StakeCtrler) applyUnstakingByTxHash(ctx *trxs.TrxContext) error {
 
 			// issue #11
 			feeStake := &Stake{
-				From:         delegatee.Addr,
-				To:           delegatee.Addr,
-				Reward:       delegatee.ReceivedReward.GetFeeReward(),
-				RefundHeight: ctx.Height + ctx.GovRuleHandler.GetLazyRewardBlocks(),
+				From:           delegatee.Addr,
+				To:             delegatee.Addr,
+				ReceivedReward: delegatee.ReceivedReward.GetFeeReward(),
+				RefundHeight:   ctx.Height + ctx.GovRuleHandler.GetLazyRewardBlocks(),
 			}
 			ctrler.newFrozenStakes = append(ctrler.newFrozenStakes, feeStake)
 		}
@@ -362,10 +371,11 @@ func (ctrler *StakeCtrler) ApplyReward(feeOwner account.Address, fee *big.Int) *
 		ctrler.logger.Error("not found fee owner", "address", feeOwner)
 	} else {
 		dlgtee.ApplyFeeReward(fee)
+
+		// todo: save delegatee's fee reward (#19)
 	}
 
 	// block reward does not include fee
-	// todo: is it right rewarding to all delegatees ?
 	blockReward := big.NewInt(0)
 	for _, val := range ctrler.lastValidators {
 		blockReward = blockReward.Add(blockReward, val.ApplyBlockReward())
@@ -406,7 +416,7 @@ func (ctrler *StakeCtrler) ProcessFrozenStakesAt(height int64, acctFinder accoun
 		if height >= s0.RefundHeight {
 			if acct := acctFinder.FindAccount(s0.From, true); acct == nil {
 				return xerrors.ErrNotFoundAccount
-			} else if xerr := acct.AddBalance(new(big.Int).Add(s0.Amount, s0.Reward)); xerr != nil {
+			} else if xerr := acct.AddBalance(new(big.Int).Add(s0.Amount, s0.ReceivedReward)); xerr != nil {
 				return xerr
 			}
 			ctrler.delFrozenStakes = append(ctrler.delFrozenStakes, s0)
@@ -443,15 +453,21 @@ func (ctrler *StakeCtrler) GetTotalPowerOf(addr account.Address) int64 {
 	return power
 }
 
+func selectValidators(allDelegatees DelegateeArray, maxVals int) DelegateeArray {
+	sort.Sort(powerOrderedDelegatees(allDelegatees)) // sort by power
+
+	n := libs.MIN(len(allDelegatees), maxVals)
+	validators := make(DelegateeArray, n)
+	copy(validators, allDelegatees[:n])
+
+	return validators
+}
+
 func (ctrler *StakeCtrler) UpdateValidators(maxVals int) []tmtypes.ValidatorUpdate {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	sort.Sort(powerOrderedDelegatees(ctrler.allDelegatees)) // sort by power
-
-	n := libs.MIN(len(ctrler.allDelegatees), maxVals)
-	newValidators := make(DelegateeArray, n)
-	copy(newValidators, ctrler.allDelegatees[:n])
+	newValidators := selectValidators(ctrler.allDelegatees, maxVals)
 	sort.Sort(addressOrderedDelegatees(newValidators)) // sort by address
 
 	ctrler.lastValidators = newValidators

@@ -16,7 +16,7 @@ type Stake struct {
 	Amount          *big.Int        `json:"amount"`
 	Power           int64           `json:"power"`
 	BlockRewardUnit *big.Int        `json:"blockRewardUnit"`
-	Reward          *big.Int        `json:"receivedReward"`
+	ReceivedReward  *big.Int        `json:"ReceivedReward"`
 
 	TxHash       types.HexBytes `json:"txhash"`
 	StartHeight  int64          `json:"startHeight"`
@@ -34,7 +34,7 @@ func NewStakeWithAmount(from, to account.Address, amt *big.Int, height int64, tx
 		Amount:          amt,
 		Power:           power,
 		BlockRewardUnit: blockReward,
-		Reward:          big.NewInt(0),
+		ReceivedReward:  big.NewInt(0),
 		StartHeight:     height,
 		RefundHeight:    0,
 		TxHash:          txhash,
@@ -50,7 +50,7 @@ func NewStakeWithPower(owner, to account.Address, power int64, height int64, txh
 		Amount:          amt,
 		Power:           power,
 		BlockRewardUnit: blockReward,
-		Reward:          big.NewInt(0),
+		ReceivedReward:  big.NewInt(0),
 		StartHeight:     height,
 		RefundHeight:    0,
 		TxHash:          txhash,
@@ -78,7 +78,7 @@ func (s *Stake) Copy() *Stake {
 		Amount:          new(big.Int).Set(s.Amount),
 		Power:           s.Power,
 		BlockRewardUnit: new(big.Int).Set(s.BlockRewardUnit),
-		Reward:          new(big.Int).Set(s.Reward),
+		ReceivedReward:  new(big.Int).Set(s.ReceivedReward),
 		StartHeight:     s.StartHeight,
 		RefundHeight:    s.RefundHeight,
 	}
@@ -92,7 +92,7 @@ func (s *Stake) ApplyReward() *big.Int {
 }
 
 func (s *Stake) applyReward() *big.Int {
-	s.Reward = new(big.Int).Add(s.Reward, s.BlockRewardUnit)
+	s.ReceivedReward = new(big.Int).Add(s.ReceivedReward, s.BlockRewardUnit)
 	return s.BlockRewardUnit
 }
 

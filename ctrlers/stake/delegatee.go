@@ -55,7 +55,7 @@ type Delegatee struct {
 	TotalAmount *big.Int `json:"totalAmount"`
 	TotalPower  int64    `json:"totalPower"`
 
-	ReceivedReward *Reward `json:"receivedReward"`
+	ReceivedReward *Reward `json:"ReceivedReward"`
 
 	mtx sync.RWMutex
 }
@@ -99,7 +99,7 @@ func (delegatee *Delegatee) appendStake(stakes ...*Stake) error {
 		}
 		delegatee.TotalPower += s.Power
 		delegatee.TotalAmount = new(big.Int).Add(delegatee.TotalAmount, s.Amount)
-		delegatee.ReceivedReward.AddBlockReward(s.Reward)
+		delegatee.ReceivedReward.AddBlockReward(s.ReceivedReward)
 	}
 	return nil
 }
@@ -121,8 +121,8 @@ func (delegatee *Delegatee) DelStake(txhash types.HexBytes) *Stake {
 		delegatee.TotalPower -= s.Power
 		delegatee.TotalAmount = new(big.Int).Sub(delegatee.TotalAmount, s.Amount)
 
-		//delegatee.TotalReward = new(big.Int).Sub(delegatee.TotalReward, s.Reward)
-		delegatee.ReceivedReward.SubBlockReward(s.Reward)
+		//delegatee.TotalReward = new(big.Int).Sub(delegatee.TotalReward, s.ReceivedReward)
+		delegatee.ReceivedReward.SubBlockReward(s.ReceivedReward)
 		return s
 	}
 	return nil
@@ -140,8 +140,8 @@ func (delegatee *Delegatee) DelStakeByIdx(idx int) *Stake {
 		delegatee.TotalPower -= s.Power
 		delegatee.TotalAmount = new(big.Int).Sub(delegatee.TotalAmount, s.Amount)
 
-		//delegatee.TotalReward = new(big.Int).Sub(delegatee.TotalReward, s.Reward)
-		delegatee.ReceivedReward.SubBlockReward(s.Reward)
+		//delegatee.TotalReward = new(big.Int).Sub(delegatee.TotalReward, s.ReceivedReward)
+		delegatee.ReceivedReward.SubBlockReward(s.ReceivedReward)
 		return s
 	}
 	return nil
@@ -168,8 +168,8 @@ func (delegatee *Delegatee) DelAllStakes() []*Stake {
 		delegatee.TotalPower -= s.Power
 		delegatee.TotalAmount = new(big.Int).Sub(delegatee.TotalAmount, s.Amount)
 
-		//delegatee.TotalReward = new(big.Int).Sub(delegatee.TotalReward, s.Reward)
-		delegatee.ReceivedReward.SubBlockReward(s.Reward)
+		//delegatee.TotalReward = new(big.Int).Sub(delegatee.TotalReward, s.ReceivedReward)
+		delegatee.ReceivedReward.SubBlockReward(s.ReceivedReward)
 	}
 
 	return stakes
@@ -354,7 +354,7 @@ func (delegatee *Delegatee) SumBlockRewardOf(addr account.Address) *big.Int {
 	ret := big.NewInt(0)
 	for _, s0 := range delegatee.Stakes {
 		if bytes.Compare(s0.From, addr) == 0 {
-			ret = ret.Add(ret, s0.Reward)
+			ret = ret.Add(ret, s0.ReceivedReward)
 		}
 	}
 	return ret
@@ -363,7 +363,7 @@ func (delegatee *Delegatee) SumBlockRewardOf(addr account.Address) *big.Int {
 func (delegatee *Delegatee) sumBlockReward() *big.Int {
 	reward := big.NewInt(0)
 	for _, s := range delegatee.Stakes {
-		_ = reward.Add(reward, s.Reward)
+		_ = reward.Add(reward, s.ReceivedReward)
 	}
 	return reward
 }

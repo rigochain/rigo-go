@@ -108,6 +108,7 @@ func (ctrler *ChainCtrler) Info(info abcitypes.RequestInfo) abcitypes.ResponseIn
 		if err != nil {
 			panic(err)
 		}
+		_ = ctrler.stakeCtrler.UpdateValidators(int(ctrler.govCtrler.GetMaxValidatorCount()))
 	}
 
 	return abcitypes.ResponseInfo{
@@ -316,6 +317,8 @@ func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.R
 func (ctrler *ChainCtrler) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	lastBlockGasInfo := ctrler.stateDB.LastBlockGasInfo()
 	if lastBlockGasInfo != nil {
+		// When lastBlockGasInfo is nil(this block is first block, req.Height is 1),
+		// there is no reward. Because reward of block N is given at block N+1
 		if req.Height != lastBlockGasInfo.Height+1 {
 			panic(fmt.Errorf("error block height: expected(%v), actural(%v)", lastBlockGasInfo.Height+1, req.Height))
 		}
