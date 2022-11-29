@@ -11,40 +11,6 @@ import (
 	"sync"
 )
 
-type startHeightOrder []*Stake
-
-func (slst startHeightOrder) Len() int {
-	return len(slst)
-}
-
-// ascending order
-func (slst startHeightOrder) Less(i, j int) bool {
-	return slst[i].StartHeight < slst[j].StartHeight
-}
-
-func (slst startHeightOrder) Swap(i, j int) {
-	slst[i], slst[j] = slst[j], slst[i]
-}
-
-var _ sort.Interface = (startHeightOrder)(nil)
-
-type refundHeightOrder []*Stake
-
-func (slst refundHeightOrder) Len() int {
-	return len(slst)
-}
-
-// ascending order
-func (slst refundHeightOrder) Less(i, j int) bool {
-	return slst[i].RefundHeight < slst[j].RefundHeight
-}
-
-func (slst refundHeightOrder) Swap(i, j int) {
-	slst[i], slst[j] = slst[j], slst[i]
-}
-
-var _ sort.Interface = (refundHeightOrder)(nil)
-
 type Delegatee struct {
 	Addr   account.Address `json:"address"`
 	PubKey types.HexBytes  `json:"pubKey"`
@@ -55,7 +21,7 @@ type Delegatee struct {
 	TotalAmount *big.Int `json:"totalAmount"`
 	TotalPower  int64    `json:"totalPower"`
 
-	ReceivedReward *Reward `json:"ReceivedReward"`
+	ReceivedReward *Reward `json:"receivedReward"`
 
 	mtx sync.RWMutex
 }
@@ -68,7 +34,7 @@ func NewDelegatee(addr account.Address, pubKey types.HexBytes) *Delegatee {
 		SelfPower:      0,
 		TotalPower:     0,
 		TotalAmount:    big.NewInt(0),
-		ReceivedReward: NewReward(),
+		ReceivedReward: NewReward(pubKey),
 	}
 }
 
@@ -337,7 +303,7 @@ func (delegatee *Delegatee) GetTotalReward() *big.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return delegatee.ReceivedReward.GetTotalReward()
+	return delegatee.ReceivedReward.TotalReward()
 }
 
 func (delegatee *Delegatee) SumBlockReward() *big.Int {
@@ -381,7 +347,6 @@ func (delegatee *Delegatee) applyBlockReward() *big.Int {
 		reward = new(big.Int).Add(reward, s.applyReward())
 	}
 
-	//delegatee.TotalReward = new(big.Int).Add(delegatee.TotalReward, reward)
 	delegatee.ReceivedReward.AddBlockReward(reward)
 	return reward
 }
@@ -390,6 +355,39 @@ func (delegatee *Delegatee) ApplyFeeReward(fee *big.Int) {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
-	//delegatee.FeeReward = new(big.Int).Add(delegatee.FeeReward, fee)
 	delegatee.ReceivedReward.AddFeeReward(fee)
 }
+
+type startHeightOrder []*Stake
+
+func (slst startHeightOrder) Len() int {
+	return len(slst)
+}
+
+// ascending order
+func (slst startHeightOrder) Less(i, j int) bool {
+	return slst[i].StartHeight < slst[j].StartHeight
+}
+
+func (slst startHeightOrder) Swap(i, j int) {
+	slst[i], slst[j] = slst[j], slst[i]
+}
+
+var _ sort.Interface = (startHeightOrder)(nil)
+
+type refundHeightOrder []*Stake
+
+func (slst refundHeightOrder) Len() int {
+	return len(slst)
+}
+
+// ascending order
+func (slst refundHeightOrder) Less(i, j int) bool {
+	return slst[i].RefundHeight < slst[j].RefundHeight
+}
+
+func (slst refundHeightOrder) Swap(i, j int) {
+	slst[i], slst[j] = slst[j], slst[i]
+}
+
+var _ sort.Interface = (refundHeightOrder)(nil)

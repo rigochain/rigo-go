@@ -322,7 +322,7 @@ func (ctrler *ChainCtrler) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Res
 		if req.Height != lastBlockGasInfo.Height+1 {
 			panic(fmt.Errorf("error block height: expected(%v), actural(%v)", lastBlockGasInfo.Height+1, req.Height))
 		}
-		ctrler.stakeCtrler.ApplyReward(lastBlockGasInfo.Owner, lastBlockGasInfo.Gas)
+		ctrler.stakeCtrler.ApplyReward(lastBlockGasInfo.Owner, big.NewInt(1)) //lastBlockGasInfo.Gas)
 	}
 
 	updatedValidators := ctrler.stakeCtrler.UpdateValidators(int(ctrler.govCtrler.GetMaxValidatorCount()))
