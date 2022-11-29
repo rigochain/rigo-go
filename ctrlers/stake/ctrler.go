@@ -27,7 +27,6 @@ type StakeCtrler struct {
 	allDelegateesMap  map[account.AcctKey]*Delegatee // the key is delegatee's account key
 	lastValidators    DelegateeArray
 	updatedDelegatees DelegateeArray
-	//removedDelegatees DelegateeArray
 
 	frozenStakesDB  db.DB
 	allFrozenStakes []*Stake

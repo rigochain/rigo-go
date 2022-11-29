@@ -29,8 +29,8 @@ func TestAppendStake(t *testing.T) {
 	)
 
 	require.Equal(t, amt0.String(), delegatee.GetSelfAmount().String())
-	require.Equal(t, power0, delegatee.GetSelfPower())
 	require.Equal(t, amt0.String(), delegatee.GetTotalAmount().String())
+	require.Equal(t, power0, delegatee.GetSelfPower())
 	require.Equal(t, power0, delegatee.GetTotalPower())
 
 	from1 := libs.RandAddress()
