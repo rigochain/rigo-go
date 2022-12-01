@@ -17,6 +17,7 @@ import (
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
+	tmproxy "github.com/tendermint/tendermint/proxy"
 	tmver "github.com/tendermint/tendermint/version"
 	"math/big"
 	"sync"
@@ -34,8 +35,9 @@ type ChainCtrler struct {
 	govCtrler        *gov.GovCtrler
 	trxExecutor      *TrxExecutor
 
-	logger log.Logger
-	mtx    sync.Mutex
+	appConn tmproxy.AppConnConsensus
+	logger  log.Logger
+	mtx     sync.Mutex
 }
 
 func NewChainCtrler(dbDir string, logger log.Logger) *ChainCtrler {
@@ -89,6 +91,13 @@ func (ctrler *ChainCtrler) Close() error {
 		return err
 	}
 	return nil
+}
+
+func (ctrler *ChainCtrler) SetAppConnConsensus(conn tmproxy.AppConnConsensus) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	ctrler.appConn = conn
 }
 
 func (ctrler *ChainCtrler) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {

@@ -9,7 +9,6 @@ import (
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmnode "github.com/tendermint/tendermint/node"
 	"github.com/tendermint/tendermint/p2p"
-	"github.com/tendermint/tendermint/proxy"
 )
 
 type Provider func(*cfg.Config, []byte, tmlog.Logger) (*tmnode.Node, error)
@@ -30,7 +29,7 @@ func XChainNewNode(config *cfg.Config, s []byte, logger tmlog.Logger) (*tmnode.N
 	return tmnode.NewNode(config,
 		crypto.LoadOrGenSFilePV(config.PrivValidatorKeyFile(), config.PrivValidatorStateFile(), s),
 		nodeKey,
-		proxy.NewLocalClientCreator(arcanus.NewChainCtrler(config.DBDir(), logger)), //proxy.DefaultClientCreator(config.ProxyApp, config.ABCI, config.DBDir()),
+		arcanus.NewArcanusLocalClientCreator(arcanus.NewChainCtrler(config.DBDir(), logger)), //proxy.NewLocalClientCreator(arcanus.NewChainCtrler(config.DBDir(), logger)), //proxy.DefaultClientCreator(config.ProxyApp, config.ABCI, config.DBDir()),
 		tmnode.DefaultGenesisDocProviderFunc(config),
 		tmnode.DefaultDBProvider,
 		tmnode.DefaultMetricsProvider(config.Instrumentation),
