@@ -13,11 +13,11 @@ import (
 	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/trxs"
 	"github.com/kysee/arcanus/types/xerrors"
+	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
-	tmproxy "github.com/tendermint/tendermint/proxy"
 	tmver "github.com/tendermint/tendermint/version"
 	"math/big"
 	"sync"
@@ -35,9 +35,9 @@ type ChainCtrler struct {
 	govCtrler        *gov.GovCtrler
 	trxExecutor      *TrxExecutor
 
-	appConn tmproxy.AppConnConsensus
-	logger  log.Logger
-	mtx     sync.Mutex
+	localClient abcicli.Client
+	logger      log.Logger
+	mtx         sync.Mutex
 }
 
 func NewChainCtrler(dbDir string, logger log.Logger) *ChainCtrler {
@@ -93,11 +93,11 @@ func (ctrler *ChainCtrler) Close() error {
 	return nil
 }
 
-func (ctrler *ChainCtrler) SetAppConnConsensus(conn tmproxy.AppConnConsensus) {
+func (ctrler *ChainCtrler) SetLocalClient(client abcicli.Client) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.appConn = conn
+	ctrler.localClient = client
 }
 
 func (ctrler *ChainCtrler) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
@@ -261,10 +261,16 @@ func (ctrler *ChainCtrler) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes
 
 	// todo: implement processing for the evidences (req.ByzantineValidators)
 
+	// todo: change new callback function of ctrler.localClient
+	// the new callback should wait that a DeliverTx is completed.
+
 	return abcitypes.ResponseBeginBlock{}
 }
 
 func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+
+	// todo: implement asynchronous DeliverTx()
+
 	response := abcitypes.ResponseDeliverTx{}
 
 	if txctx, err := trxs.NewTrxContextEx(req.Tx,
@@ -320,10 +326,15 @@ func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.R
 		}
 	}
 
+	// todo: notify that this asynchronous DeliverTx() is finished
+
 	return response
 }
 
 func (ctrler *ChainCtrler) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+
+	// todo: wait that all asynchronous DeliverTx() are finished
+
 	lastBlockGasInfo := ctrler.stateDB.LastBlockGasInfo()
 	if lastBlockGasInfo != nil {
 		// When lastBlockGasInfo is nil(this block is first block, req.Height is 1),
