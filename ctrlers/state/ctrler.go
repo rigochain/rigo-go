@@ -267,10 +267,7 @@ func (ctrler *ChainCtrler) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes
 	return abcitypes.ResponseBeginBlock{}
 }
 
-func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-
-	// todo: implement asynchronous DeliverTx()
-
+func (ctrler *ChainCtrler) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	response := abcitypes.ResponseDeliverTx{}
 
 	if txctx, err := trxs.NewTrxContextEx(req.Tx,
@@ -325,10 +322,20 @@ func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.R
 			},
 		}
 	}
+	return response
+}
+
+func (ctrler *ChainCtrler) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+	// todo: implement asynchronous DeliverTx()
 
 	// todo: notify that this asynchronous DeliverTx() is finished
 
-	return response
+	return abcitypes.ResponseDeliverTx{}
+}
+
+func (ctrler *ChainCtrler) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+	// todo: call ctrler.deliverTxAsync() when is implemented.
+	return ctrler.deliverTxSync(req)
 }
 
 func (ctrler *ChainCtrler) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
