@@ -1,11 +1,11 @@
 package client
 
 import (
+	types2 "github.com/kysee/arcanus/ctrlers/types"
 	"github.com/kysee/arcanus/libs/client/rpc"
-	"github.com/kysee/arcanus/libs/crypto"
 	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/account"
-	"github.com/kysee/arcanus/types/trxs"
+	"github.com/kysee/arcanus/types/bytes"
+	"github.com/kysee/arcanus/types/crypto"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"io"
@@ -15,15 +15,17 @@ import (
 
 type Wallet struct {
 	wkey *crypto.WalletKey
-	acct *account.Account
+	acct *types2.Account
 
 	mtx sync.RWMutex
 }
 
 func NewWallet(s []byte) *Wallet {
 	prvKey := tmsecp256k1.GenPrivKey()
+	wkey := crypto.NewWalletKey(prvKey, s)
 	return &Wallet{
-		wkey: crypto.NewWalletKey(prvKey, s),
+		wkey: wkey,
+		acct: types2.NewAccount(wkey.Address),
 	}
 }
 
@@ -43,14 +45,14 @@ func OpenWallet(r io.Reader) (*Wallet, error) {
 	return ret, nil
 }
 
-func (w *Wallet) Address() account.Address {
+func (w *Wallet) Address() types.Address {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
 	return w.wkey.Address
 }
 
-func (w *Wallet) GetAccount() *account.Account {
+func (w *Wallet) GetAccount() *types2.Account {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
@@ -131,7 +133,7 @@ func (w *Wallet) Lock() {
 	w.wkey.Lock()
 }
 
-func (w *Wallet) GetPubKey() types.HexBytes {
+func (w *Wallet) GetPubKey() bytes.HexBytes {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
@@ -145,7 +147,7 @@ func (w *Wallet) Unlock(s []byte) error {
 	return w.wkey.Unlock(s)
 }
 
-func (w *Wallet) SignTrx(tx *trxs.Trx) (types.HexBytes, types.HexBytes, error) {
+func (w *Wallet) SignTrx(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error) {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
@@ -159,11 +161,12 @@ func (w *Wallet) SignTrx(tx *trxs.Trx) (types.HexBytes, types.HexBytes, error) {
 	}
 }
 
-func (w *Wallet) TransferSync(to account.Address, amt, gas *big.Int) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) TransferSync(to types.Address, gas, amt *big.Int) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
+		w.acct.GetNonce()+1,
 		gas, amt,
-		w.acct.GetNonce()+1)
+	)
 	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err
 	} else {
@@ -171,11 +174,12 @@ func (w *Wallet) TransferSync(to account.Address, amt, gas *big.Int) (*coretypes
 	}
 }
 
-func (w *Wallet) StakingSync(to account.Address, amt, gas *big.Int) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) StakingSync(to types.Address, gas, amt *big.Int) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxStaking(
 		w.Address(), to,
+		w.acct.GetNonce()+1,
 		gas, amt,
-		w.acct.GetNonce()+1)
+	)
 	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err
 	} else {

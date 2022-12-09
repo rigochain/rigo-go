@@ -2,12 +2,14 @@ package stake_test
 
 import (
 	"bytes"
-	"fmt"
+	cfg "github.com/kysee/arcanus/cmd/config"
 	"github.com/kysee/arcanus/ctrlers/stake"
+	"github.com/kysee/arcanus/ctrlers/types"
 	"github.com/kysee/arcanus/libs/client"
-	"github.com/kysee/arcanus/types/trxs"
 	"github.com/stretchr/testify/require"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
+	types2 "github.com/tendermint/tendermint/proto/tendermint/types"
 	"math/big"
 	"math/rand"
 	"os"
@@ -16,16 +18,17 @@ import (
 )
 
 var (
-	DBDIR                = filepath.Join(os.TempDir(), "stake-ctrler-unstaking-test")
-	acctHandlerHelper    = &accountHandler{}
-	govRuleHandlerHelper = &govRuleHandler{}
-	stakeCtrler, _       = stake.NewStakeCtrler(DBDIR, tmlog.NewNopLogger())
+	config      = cfg.DefaultConfig()
+	DBDIR       = filepath.Join(os.TempDir(), "stake-ctrler-unstaking-test")
+	acctHelper  = &accountHandler{}
+	govHelper   = &govHelperMock{}
+	stakeCtrler *stake.StakeCtrler
 
 	Wallets              []*client.Wallet
 	DelegateeWallets     []*client.Wallet
-	stakingToSelfTrxCtxs []*trxs.TrxContext
-	stakingTrxCtxs       []*trxs.TrxContext
-	unstakingTrxCtxs     []*trxs.TrxContext
+	stakingToSelfTrxCtxs []*types.TrxContext
+	stakingTrxCtxs       []*types.TrxContext
+	unstakingTrxCtxs     []*types.TrxContext
 
 	dummyGas   = big.NewInt(0)
 	dummyNonce = uint64(0)
@@ -34,7 +37,10 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	Wallets = makeTestWallets(rand.Intn(100) + int(govRuleHandlerHelper.GetMaxValidatorCount()))
+	config.DBPath = DBDIR
+	stakeCtrler, _ = stake.NewStakeCtrler(config, govHelper, tmlog.NewNopLogger())
+
+	Wallets = makeTestWallets(rand.Intn(100) + int(govHelper.MaxValidatorCnt()))
 
 	for i := 0; i < 5; i++ {
 		if txctx, err := randMakeStakingToSelfTrxContext(); err != nil {
@@ -66,7 +72,7 @@ func TestMain(m *testing.M) {
 		} else {
 			already := false
 			for _, _ctx := range unstakingTrxCtxs {
-				if bytes.Compare(_ctx.Tx.Payload.(*trxs.TrxPayloadUnstaking).TxHash, txctx.Tx.Payload.(*trxs.TrxPayloadUnstaking).TxHash) == 0 {
+				if bytes.Compare(_ctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash, txctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash) == 0 {
 					already = true
 				}
 			}
@@ -92,12 +98,15 @@ func TestStakingToSelfByTx(t *testing.T) {
 	sumPower := int64(0)
 
 	for _, txctx := range stakingToSelfTrxCtxs {
-		err := stakeCtrler.Execute(txctx)
+		err := stakeCtrler.ExecuteTrx(txctx)
 		require.NoError(t, err)
 
 		sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += txctx.GovRuleHandler.AmountToPower(txctx.Tx.Amount)
+		sumPower += txctx.GovHelper.AmountToPower(txctx.Tx.Amount)
 	}
+
+	_, _, err := stakeCtrler.Commit()
+	require.NoError(t, err)
 
 	require.Equal(t, sumAmt.String(), stakeCtrler.GetTotalAmount().String())
 	require.Equal(t, sumPower, stakeCtrler.GetTotalPower())
@@ -108,12 +117,15 @@ func TestStakingByTx(t *testing.T) {
 	sumPower := stakeCtrler.GetTotalPower()
 
 	for _, txctx := range stakingTrxCtxs {
-		err := stakeCtrler.Execute(txctx)
+		err := stakeCtrler.ExecuteTrx(txctx)
 		require.NoError(t, err)
 
 		sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += txctx.GovRuleHandler.AmountToPower(txctx.Tx.Amount)
+		sumPower += txctx.GovHelper.AmountToPower(txctx.Tx.Amount)
 	}
+
+	_, _, err := stakeCtrler.Commit()
+	require.NoError(t, err)
 
 	require.Equal(t, sumAmt.String(), stakeCtrler.GetTotalAmount().String())
 	require.Equal(t, sumPower, stakeCtrler.GetTotalPower())
@@ -126,21 +138,22 @@ func TestUnstakingByTx(t *testing.T) {
 	sumUnstakingPower := int64(0)
 
 	for _, txctx := range unstakingTrxCtxs {
-		stakingTxHash := txctx.Tx.Payload.(*trxs.TrxPayloadUnstaking).TxHash
+		stakingTxHash := txctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash
 
-		err := stakeCtrler.Execute(txctx)
+		err := stakeCtrler.ExecuteTrx(txctx)
 		require.NoError(t, err)
 
 		stakingTxCtx := findStakingTxCtx(stakingTxHash)
 
 		sumUnstakingAmt.Add(sumUnstakingAmt, stakingTxCtx.Tx.Amount)
-		sumUnstakingPower += txctx.GovRuleHandler.AmountToPower(stakingTxCtx.Tx.Amount)
+		sumUnstakingPower += txctx.GovHelper.AmountToPower(stakingTxCtx.Tx.Amount)
 	}
+
+	_, _, err := stakeCtrler.Commit()
+	require.NoError(t, err)
 
 	require.Equal(t, new(big.Int).Sub(sumAmt0, sumUnstakingAmt).String(), stakeCtrler.GetTotalAmount().String())
 	require.Equal(t, sumPower0-sumUnstakingPower, stakeCtrler.GetTotalPower())
-
-	stakeCtrler.Commit()
 
 	// test freezing reward
 	frozenStakes := stakeCtrler.GetFrozenStakes()
@@ -154,80 +167,30 @@ func TestUnstakingByTx(t *testing.T) {
 	}
 	require.Equal(t, sumFrozenAmount.String(), sumUnstakingAmt.String())
 	require.Equal(t, sumFrozenPower, sumUnstakingPower)
+}
 
-	// test lazy rewarding
-	lastHeight += govRuleHandlerHelper.GetLazyRewardBlocks()
-	err := stakeCtrler.ProcessFrozenStakesAt(lastHeight, acctHandlerHelper)
+func TestUnfreezing(t *testing.T) {
+	lastHeight += govHelper.LazyRewardBlocks()
+
+	// execute block at lastHeight
+	err := stakeCtrler.ExecuteBlock(&types.BlockContext{
+		BlockInfo: abcitypes.RequestBeginBlock{
+			Header: types2.Header{
+				Height: lastHeight,
+			},
+		},
+		Fee:        big.NewInt(10),
+		TxsCnt:     0,
+		GovHelper:  govHelper,
+		AcctHelper: acctHelper,
+	})
 	require.NoError(t, err)
 
-	stakeCtrler.Commit()
-	frozenStakes = stakeCtrler.GetFrozenStakes()
+	_, _, err = stakeCtrler.Commit()
+	require.NoError(t, err)
+
+	frozenStakes := stakeCtrler.GetFrozenStakes()
 	require.Equal(t, 0, len(frozenStakes))
 
-}
-
-func TestUpdateValidators(t *testing.T) {
-
-	valUpdates0 := stakeCtrler.UpdateValidators(int(govRuleHandlerHelper.GetMaxValidatorCount())) // sort
-	require.True(t, len(valUpdates0) > 0)
-	require.True(t, stakeCtrler.GetLastValidatorCnt() > 0)
-
-	valUpdates1 := stakeCtrler.UpdateValidators(int(govRuleHandlerHelper.GetMaxValidatorCount())) // sort
-	require.True(t, len(valUpdates1) == 0)
-	require.True(t, stakeCtrler.GetLastValidatorCnt() > 0)
-
-	//
-	// check validatorUpdates
-	// todo: check that validators is correct or not
-	//
-	for i := 0; i < len(valUpdates0); i++ {
-		found := false
-		for j := 0; j < stakeCtrler.GetLastValidatorCnt(); j++ {
-			val := stakeCtrler.GetDelegatee(j)
-			require.NotNil(t, val)
-			if valUpdates0[i].Power == val.GetTotalPower() &&
-				bytes.Compare(valUpdates0[i].PubKey.GetSecp256K1(), val.PubKey) == 0 {
-				found = true
-			}
-		}
-
-		if valUpdates0[i].Power == 0 {
-			// because valUpdates0[i] is excluded, it MUST not exist in validator list.
-			require.False(t, found)
-		} else {
-			// because valUpdates0[i] is added or changed, it MUST exist in validator list.
-			require.True(t, found)
-		}
-	}
-
-	var preDelegatee *stake.Delegatee
-	for i := 0; i < stakeCtrler.DelegateeLen(); i++ {
-		delegatee := stakeCtrler.GetDelegatee(i)
-
-		////
-		//// check power of staker
-		//_stakesMapByOwner, ok := testStakingResultMapByStaker[types.ToAcctKey(delegatee.Addr)]
-		//require.True(t, ok)
-		//
-		//for owner, stakingRet := range _stakesMapByOwner {
-		//	require.Equal(t, types.Address(owner[:]), stakingRet.Owner)
-		//	require.Equal(t, stakingRet.Power, staker.SumPowerOf(owner[:]))
-		//	require.Equal(t, stakingRet.Amt, staker.SumAmountOf(owner[:]))
-		//}
-
-		//
-		// order of stakes
-		if preDelegatee != nil {
-			if preDelegatee.TotalPower <= delegatee.TotalPower {
-				fmt.Println("break")
-			}
-			require.Truef(t, preDelegatee.TotalPower > delegatee.TotalPower,
-				fmt.Sprintf("invalid power(stake) order: pre: %v, curr: %v", preDelegatee.TotalPower, delegatee.TotalPower))
-		}
-		preDelegatee = delegatee
-	}
-}
-
-func TestFrozenReward(t *testing.T) {
-
+	// todo: check received reward and fee
 }

@@ -1,9 +1,9 @@
 package rpc
 
 import (
-	"encoding/hex"
-	"github.com/kysee/arcanus/types/account"
+	abytes "github.com/kysee/arcanus/types/bytes"
 	"github.com/kysee/arcanus/types/xerrors"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	tmrpccoretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
@@ -13,42 +13,44 @@ import (
 
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
-func QueryAccount(ctx *tmrpctypes.Context, addr string) (*QueryResponse, error) {
-	bzAddr, err := account.AddressFromHex(addr)
-	if err != nil {
-		return nil, xerrors.NewFrom(err)
-	}
-
-	if resp, err := tmrpccore.ABCIQuery(ctx, "account", bzAddr, 0, false); err != nil {
+func QueryAccount(ctx *tmrpctypes.Context, addr abytes.HexBytes) (*QueryResult, error) {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "account", tmbytes.HexBytes(addr), 0, false); err != nil {
 		return nil, err
 	} else {
-		return ToQueryResponse(&resp.Response), nil
+		return &QueryResult{resp.Response}, nil
 	}
 }
 
-func QueryStakes(ctx *tmrpctypes.Context, addr string) (*QueryResponse, error) {
-	bzAddr, err := account.AddressFromHex(addr)
-	if err != nil {
-		return nil, xerrors.NewFrom(err)
-	}
-
-	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes", bzAddr, 0, false); err != nil {
+func QueryDelegatee(ctx *tmrpctypes.Context, addr abytes.HexBytes) (*QueryResult, error) {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "delegatee", tmbytes.HexBytes(addr), 0, false); err != nil {
 		return nil, err
 	} else {
-		return ToQueryResponse(&resp.Response), nil
+		return &QueryResult{resp.Response}, nil
 	}
 }
 
-func QueryProposals(ctx *tmrpctypes.Context, txhash string) (*QueryResponse, error) {
-	bzTxHash, err := hex.DecodeString(txhash)
-	if err != nil {
-		return nil, xerrors.NewFrom(err)
-	}
-
-	if resp, err := tmrpccore.ABCIQuery(ctx, "proposals", bzTxHash, 0, false); err != nil {
+func QueryStakes(ctx *tmrpctypes.Context, addr abytes.HexBytes) (*QueryResult, error) {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes", tmbytes.HexBytes(addr), 0, false); err != nil {
 		return nil, err
 	} else {
-		return ToQueryResponse(&resp.Response), nil
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
+func QueryProposals(ctx *tmrpctypes.Context, txhash abytes.HexBytes) (*QueryResult, error) {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "proposals", tmbytes.HexBytes(txhash), 0, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
+func QueryRule(ctx *tmrpctypes.Context) (*QueryResult, error) {
+
+	if resp, err := tmrpccore.ABCIQuery(ctx, "rule", nil, 0, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
 	}
 }
 

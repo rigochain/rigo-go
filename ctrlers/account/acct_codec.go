@@ -1,25 +1,25 @@
 package account
 
 import (
-	"github.com/golang/protobuf/proto"
-	"github.com/kysee/arcanus/types/account"
+	types2 "github.com/kysee/arcanus/ctrlers/types"
+	"google.golang.org/protobuf/proto"
 	"math/big"
 )
 
-func EncodeAccount(acct *account.Account) ([]byte, error) {
+func EncodeAccount(acct *types2.Account) ([]byte, error) {
 	return proto.Marshal(ToProto(acct))
 }
 
-func DecodeAccount(bz []byte) (*account.Account, error) {
-	pm := &account.AcctProto{}
+func DecodeAccount(bz []byte) (*types2.Account, error) {
+	pm := &types2.AcctProto{}
 	if err := proto.Unmarshal(bz, pm); err != nil {
 		return nil, err
 	}
 	return FromProto(pm), nil
 }
 
-func ToProto(acct *account.Account) *account.AcctProto {
-	return &account.AcctProto{
+func ToProto(acct *types2.Account) *types2.AcctProto {
+	return &types2.AcctProto{
 		Address:  acct.GetAddress(),
 		Name:     acct.GetName(),
 		Nonce:    acct.GetNonce(),
@@ -28,8 +28,8 @@ func ToProto(acct *account.Account) *account.AcctProto {
 	}
 }
 
-func FromProto(pm *account.AcctProto) *account.Account {
-	return &account.Account{
+func FromProto(pm *types2.AcctProto) *types2.Account {
+	return &types2.Account{
 		Address: pm.Address,
 		Name:    pm.Name,
 		Nonce:   pm.Nonce,

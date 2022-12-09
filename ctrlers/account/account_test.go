@@ -2,8 +2,8 @@ package account_test
 
 import (
 	"github.com/kysee/arcanus/ctrlers/account"
-	"github.com/kysee/arcanus/libs/crypto"
-	account2 "github.com/kysee/arcanus/types/account"
+	account2 "github.com/kysee/arcanus/ctrlers/types"
+	"github.com/kysee/arcanus/types/crypto"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

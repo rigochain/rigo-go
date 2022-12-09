@@ -129,7 +129,10 @@ var jsonBlobDevnetGenesis = []byte(`{
       "amountPerPower": "1000000000000000000",
       "rewardPerPower": "1000000000",
       "lazyRewardBlocks": "10",
-      "lazyApplyingBlocks": "10"
+      "lazyApplyingBlocks": "10",
+      "minTrxFee": "1000000000000000000",
+      "minVotingPeriodBlocks": "259200",
+	  "maxVotingPeriodBlocks": "2592000"
 	}
   }
 }

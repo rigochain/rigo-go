@@ -1,704 +1,445 @@
 package stake
 
 import (
-	"bytes"
-	"github.com/cosmos/iavl"
-	"github.com/kysee/arcanus/libs"
+	"fmt"
+	cfg "github.com/kysee/arcanus/cmd/config"
+	ctrlertypes "github.com/kysee/arcanus/ctrlers/types"
+	"github.com/kysee/arcanus/ledger"
 	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/account"
-	"github.com/kysee/arcanus/types/trxs"
+	"github.com/kysee/arcanus/types/bytes"
+	"github.com/kysee/arcanus/types/crypto"
 	"github.com/kysee/arcanus/types/xerrors"
-	tmtypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/json"
-	"github.com/tendermint/tendermint/libs/log"
-	db "github.com/tendermint/tm-db"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/big"
 	"sort"
 	"sync"
 )
 
 type StakeCtrler struct {
-	stakesDB      db.DB
-	stakesTree    *iavl.MutableTree
-	updatedStakes []*Stake // updated + newer
+	lastValidators  DelegateeArray
+	delegateeLedger ledger.IFinalityLedger[*Delegatee]
+	frozenLedger    ledger.IFinalityLedger[*Stake]
 
-	delegateesDB      db.DB
-	allDelegatees     DelegateeArray
-	allDelegateesMap  map[account.AcctKey]*Delegatee // the key is delegatee's account key
-	lastValidators    DelegateeArray
-	updatedDelegatees DelegateeArray
-
-	frozenStakesDB  db.DB
-	allFrozenStakes []*Stake
-	newFrozenStakes []*Stake
-	delFrozenStakes []*Stake
-
-	logger log.Logger
-	mtx    sync.RWMutex
+	govHelper ctrlertypes.IGovHelper
+	logger    tmlog.Logger
+	mtx       sync.RWMutex
 }
 
-func NewStakeCtrler(dbDir string, logger log.Logger) (*StakeCtrler, error) {
+func NewStakeCtrler(config *cfg.Config, govHelper ctrlertypes.IGovHelper, logger tmlog.Logger) (*StakeCtrler, error) {
+	//totalPowerOfDelegatees, totalPowerOfStakes := int64(0), int64(0)
+	newDelegateeProvider := func() *Delegatee { return &Delegatee{} }
+	newStakeProvider := func() *Stake { return &Stake{} }
 
-	// for all stakers
-	stakeDB, err := db.NewDB("stakes", "goleveldb", dbDir)
-	if err != nil {
-		return nil, err
-	}
-	stakesTree, err := iavl.NewMutableTree(stakeDB, 1024)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := stakesTree.Load(); err != nil {
-		return nil, err
+	// for all delegatees
+	delegateeLedger, xerr := ledger.NewFinalityLedger[*Delegatee]("delegatees", config.DBDir(), 128, newDelegateeProvider)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	// load pubKey and fee reward
-	delegateesDB, err := db.NewDB("delegatees", "goleveldb", dbDir)
-	if err != nil {
-		return nil, err
+	frozenLedger, xerr := ledger.NewFinalityLedger[*Stake]("frozen", config.DBDir(), 128, newStakeProvider)
+	if xerr != nil {
+		return nil, xerr
 	}
-	iterDelegateeDB, err := delegateesDB.Iterator(nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer iterDelegateeDB.Close()
-
-	var allDelegatees DelegateeArray
-	allDelegateesMap := make(map[account.AcctKey]*Delegatee)
-
-	for ; iterDelegateeDB.Valid(); iterDelegateeDB.Next() {
-		k := iterDelegateeDB.Key()
-		v := iterDelegateeDB.Value()
-		f0 := NewFeeReward(nil)
-		if err := f0.Decode(v); err != nil {
-			return nil, err
-		}
-
-		acctKey := account.ToAcctKey(k)
-		_, ok := allDelegateesMap[acctKey]
-		if ok {
-			logger.Error("the delegatee already exists")
-			return nil, xerrors.New("delegatee is duplicated")
-		}
-
-		delegatee := NewDelegatee(k, f0.pubKey)
-		// restore delegatee's public key and fee reward (#19)
-		if err := delegatee.ReceivedReward.AddFeeReward(f0.receivedFee); err != nil {
-			return nil, err
-		}
-		allDelegatees = append(allDelegatees, delegatee)
-		allDelegateesMap[acctKey] = delegatee
-
-	}
-	if err := iterDelegateeDB.Error(); err != nil {
-		return nil, err
-	}
-
-	// load stakes
-	stopped, err := stakesTree.Iterate(func(key []byte, value []byte) bool {
-		s0 := &Stake{}
-		if err := json.Unmarshal(value, s0); err != nil {
-			logger.Error("Unable to load stake", "txhash", types.HexBytes(key), "error", err)
-			return true
-		}
-
-		if bytes.Compare(s0.TxHash, key) != 0 {
-			logger.Error("Wrong TxHash", "key", types.HexBytes(key), "stake's txhash", s0.TxHash)
-			return true
-		}
-
-		addrKey := account.ToAcctKey(s0.To)
-		delegatee, ok := allDelegateesMap[addrKey]
-		if !ok {
-			logger.Error("not found delegatee")
-			return true
-
-			//delegatee = NewDelegatee(s0.To, nil)
-			//allDelegatees = append(allDelegatees, delegatee)
-			//allDelegateesMap[addrKey] = delegatee
-		}
-
-		// in AppendStake(), block reward is restored
-		if err := delegatee.AppendStake(s0); err != nil {
-			logger.Error("error in appending stake")
-			return true
-		}
-
-		return false
-	})
-	if err != nil {
-		return nil, xerrors.NewFrom(err)
-	} else if stopped {
-		return nil, xerrors.New("Stop to load stakers tree")
-	}
-
-	frozenDB, err := db.NewDB("frozen", "goleveldb", dbDir)
-	if err != nil {
-		return nil, err
-	}
-
-	iterFrozenDB, err := frozenDB.Iterator(nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer iterFrozenDB.Close()
-
-	var allFrozenStakes []*Stake
-	for ; iterFrozenDB.Valid(); iterFrozenDB.Next() {
-		v := iterFrozenDB.Value()
-		s0 := &Stake{}
-		if err := json.Unmarshal(v, s0); err != nil {
-			return nil, err
-		}
-		allFrozenStakes = append(allFrozenStakes, s0)
-	}
-	if err := iterFrozenDB.Error(); err != nil {
-		return nil, err
-	}
-	sort.Sort(refundHeightOrder(allFrozenStakes))
 
 	ret := &StakeCtrler{
-		stakesDB:         stakeDB,
-		stakesTree:       stakesTree,
-		delegateesDB:     delegateesDB,
-		allDelegatees:    allDelegatees,
-		allDelegateesMap: allDelegateesMap,
-		frozenStakesDB:   frozenDB,
-		allFrozenStakes:  allFrozenStakes,
-		logger:           logger,
+		delegateeLedger: delegateeLedger,
+		//stakeLedger:     stakeLedger,
+		frozenLedger: frozenLedger,
+		govHelper:    govHelper,
+		logger:       logger,
 	}
 	return ret, nil
 }
 
-func (ctrler *StakeCtrler) AddDelegatee(delegatee *Delegatee) *Delegatee {
+func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
+	// init validators
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.addDelegatee(delegatee)
-}
-
-func (ctrler *StakeCtrler) AddDelegateeWith(addr account.Address, pubKeyBytes types.HexBytes) *Delegatee {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	delegatee := NewDelegatee(addr, pubKeyBytes)
-	return ctrler.addDelegatee(delegatee)
-}
-
-func (ctrler *StakeCtrler) addDelegatee(dlgtee *Delegatee) *Delegatee {
-	addrKey := account.ToAcctKey(dlgtee.Addr)
-	if _, ok := ctrler.allDelegateesMap[addrKey]; !ok {
-		ctrler.allDelegateesMap[addrKey] = dlgtee
-		ctrler.allDelegatees = append(ctrler.allDelegatees, dlgtee)
-		return dlgtee
+	validators, ok := req.([]abcitypes.ValidatorUpdate)
+	if !ok {
+		return xerrors.New("wrong parameter: StakeCtrler::InitLedger() requires []ValidatorUpdates")
 	}
-	return nil
-}
 
-func (ctrler *StakeCtrler) removeDelegatee(addr account.Address) *Delegatee {
-	addrKey := account.ToAcctKey(addr)
-	if _, ok := ctrler.allDelegateesMap[addrKey]; ok {
-		for i, dlgtee := range ctrler.allDelegatees {
-			if bytes.Compare(dlgtee.Addr, addr) == 0 {
-				delete(ctrler.allDelegateesMap, addrKey)
-				ctrler.allDelegatees = append(ctrler.allDelegatees[:i], ctrler.allDelegatees[i+1:]...)
-				return dlgtee
-			}
+	for _, val := range validators {
+		pubBytes := val.PubKey.GetSecp256K1()
+		addr, xerr := crypto.PubBytes2Addr(pubBytes)
+		if xerr != nil {
+			return xerr
+		}
+		s0 := NewStakeWithPower(
+			addr, addr, // self staking
+			val.Power,
+			0,
+			bytes.ZeroBytes(32), // 0x00... txhash
+			ctrler.govHelper)
+
+		d := NewDelegatee(addr, pubBytes)
+		if xerr := d.AddStake(s0); xerr != nil {
+			return xerr
+		} else if xerr := ctrler.delegateeLedger.SetFinality(d); xerr != nil {
+			return xerr
 		}
 
-		ctrler.logger.Error("not same allDelegatees and allDelegateesMap)", "address", addr)
+		// To give the first block reward to genesis validators,
+		// run the following code
+		// ctrler.lastValidators = append(ctrler.lastValidators, d)
+	}
+
+	return nil
+}
+
+func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	// validating staking and un-staking txs
+	return nil
+}
+
+func (ctrler *StakeCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	// executing staking and un-staking txs
+
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	switch ctx.Tx.GetType() {
+	case ctrlertypes.TRX_STAKING:
+		return ctrler.execStaking(ctx)
+	case ctrlertypes.TRX_UNSTAKING:
+		return ctrler.execUnstaking(ctx)
+	default:
+		return xerrors.ErrUnknownTrxType
+	}
+
+	return nil
+}
+
+func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	getDelegatee := ctrler.delegateeLedger.Get
+	setUpdateDelegatee := ctrler.delegateeLedger.Set
+	if ctx.Exec {
+		getDelegatee = ctrler.delegateeLedger.GetFinality
+		setUpdateDelegatee = ctrler.delegateeLedger.SetFinality
+	}
+
+	delegatee, xerr := getDelegatee(ledger.ToLedgerKey(ctx.Tx.To))
+	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
+		return xerr
+	}
+
+	if delegatee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
+		// self staking
+		// add new delegatee
+		delegatee = NewDelegatee(ctx.Tx.From, ctx.SenderPubKey)
+	} else if delegatee == nil {
+		// there is no delegatee whose address is ctx.Tx.To
+		return xerrors.ErrNotFoundDelegatee
+	}
+
+	// create stake and delegate it to delegatee
+	s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovHelper)
+	if xerr := delegatee.addStake(s0); xerr != nil {
+		return xerr
+	} else if xerr := setUpdateDelegatee(delegatee); xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+func (ctrler *StakeCtrler) execUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	getDelegatee := ctrler.delegateeLedger.Get
+	setUpdateDelegatee := ctrler.delegateeLedger.Set
+	delDelegatee := ctrler.delegateeLedger.Del
+	setUpdateFrozen := ctrler.frozenLedger.Set
+	if ctx.Exec {
+		getDelegatee = ctrler.delegateeLedger.GetFinality
+		setUpdateDelegatee = ctrler.delegateeLedger.SetFinality
+		delDelegatee = ctrler.delegateeLedger.DelFinality
+		setUpdateFrozen = ctrler.frozenLedger.SetFinality
+	}
+
+	// find delegatee
+	delegatee, xerr := getDelegatee(ledger.ToLedgerKey(ctx.Tx.To))
+	if xerr != nil {
+		return xerr
+	}
+
+	// delete the stake from a delegatee
+	txhash := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
+	if txhash == nil && len(txhash) != 32 {
+		return xerrors.ErrInvalidTrxPayloadParams
+	}
+	s0 := delegatee.DelStake(txhash)
+	if s0 == nil {
+		return xerrors.ErrNotFoundStake
+	}
+
+	s0.RefundHeight = ctx.Height + ctx.GovHelper.LazyRewardBlocks()
+	_ = setUpdateFrozen(s0) // add s0 to frozen ledger
+
+	if delegatee.SelfPower == 0 {
+		stakes := delegatee.DelAllStakes()
+		for _, s0 := range stakes {
+			s0.RefundHeight = ctx.Height + ctx.GovHelper.LazyRewardBlocks()
+			_ = setUpdateFrozen(s0) // add s0 to frozen ledger
+		}
+	}
+
+	if delegatee.TotalPower == 0 {
+		// this changed delegate will be committed at Commit()
+		if _, xerr := delDelegatee(delegatee.Key()); xerr != nil {
+			return xerr
+		}
+	} else {
+		// this changed delegate will be committed at Commit()
+		if xerr := setUpdateDelegatee(delegatee); xerr != nil {
+			return xerr
+		}
+	}
+
+	return nil
+}
+
+func (ctrler *StakeCtrler) ValidateBlock(ctx *ctrlertypes.BlockContext) xerrors.XError {
+	// do nothing
+	return nil
+}
+
+func (ctrler *StakeCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	ctrler.logger.Debug("StakeCtrler-ExecuteBlock", "height", ctx.BlockInfo.Header.Height)
+
+	if ctx.Fee.Sign() > 0 {
+		if xerr := ctrler.doReward(); xerr != nil {
+			return xerr
+		}
+	}
+	if xerr := ctrler.unfreezingStakes(ctx.BlockInfo.Header.Height, ctx.AcctHelper); xerr != nil {
+		return xerr
+	}
+	ctx.ValUpdates = ctrler.updateValidators(int(ctx.GovHelper.MaxValidatorCnt()))
+
+	return nil
+}
+
+// the following functions are called in ExecuteBlock()
+//
+
+func (ctrler *StakeCtrler) doReward() xerrors.XError {
+
+	// todo: implement completely
+	// GetFinality() returns delegatee which is updated in execStaking / execUnstaking.
+	// So, the stakes, that is staked or un-staked at this block, is rewarded. is it right?
+	for _, val := range ctrler.lastValidators {
+		if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(val.Addr)); xerr != nil {
+			return xerr
+		} else if delegatee == nil {
+			return xerrors.ErrNotFoundDelegatee
+		} else {
+			_ = delegatee.DoReward()
+			_ = ctrler.delegateeLedger.SetFinality(delegatee)
+		}
 	}
 	return nil
 }
 
-func (ctrler *StakeCtrler) GetDelegatee(idx int) *Delegatee {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
+func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHelper ctrlertypes.IAccountHelper) xerrors.XError {
+	return ctrler.frozenLedger.IterateAllFinalityItems(func(s0 *Stake) xerrors.XError {
+		if s0.RefundHeight <= height {
+			// un-freezing s0
+			if xerr := acctHelper.Reward(s0.From, s0.ReceivedReward, true); xerr != nil {
+				return xerr
+			}
 
-	if idx >= len(ctrler.allDelegatees) {
+			_, _ = ctrler.frozenLedger.DelFinality(ledger.ToLedgerKey(s0.TxHash))
+		}
+		return nil
+	})
+}
+
+// UpdateValidators is called after executing staking/unstaking txs, before committing the result of the txs executing
+// This means that the updated values of ledger is not committed yet.
+// So ledger.IterateAllItems/IterateAllFinalityItems returns not updated values.
+func (ctrler *StakeCtrler) updateValidators(maxVals int) []abcitypes.ValidatorUpdate {
+	var allDelegatees DelegateeArray
+	// NOTE:
+	// IterateAllFinalityItems() returns delegatees, which are committed at previous block.
+	// So, if staking tx is executed at block N,
+	//     stake is saved(committed) at block N,
+	//     the account becomes validator at block N+1, and it is notified to consensus engine
+	//     the account can sign a block from block N+2 in consensus engine
+	if xerr := ctrler.delegateeLedger.IterateAllFinalityItems(func(d *Delegatee) xerrors.XError {
+		allDelegatees = append(allDelegatees, d)
+		return nil
+	}); xerr != nil {
 		return nil
 	}
 
-	return ctrler.allDelegatees[idx]
-}
+	sort.Sort(PowerOrderDelegatees(allDelegatees)) // sort by power
+	newValidators := selectValidators(allDelegatees, maxVals)
 
-func (ctrler *StakeCtrler) DelegateeLen() int {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
+	sort.Sort(AddressOrderDelegatees(newValidators)) // sort by address
+	upVals := validatorUpdates(ctrler.lastValidators, newValidators)
 
-	return len(ctrler.allDelegateesMap)
-}
-
-func (ctrler *StakeCtrler) FindDelegatee(addr account.Address) *Delegatee {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	return ctrler.findDelegatee(addr)
-}
-
-func (ctrler *StakeCtrler) findDelegatee(addr account.Address) *Delegatee {
-	addrKey := account.ToAcctKey(addr)
-	if delegatee, ok := ctrler.allDelegateesMap[addrKey]; ok {
-		return delegatee
-	}
-	return nil
-}
-
-func (ctrler *StakeCtrler) validateStaking(ctx *trxs.TrxContext) error {
-	if ctx.Tx.GetType() != trxs.TRX_STAKING {
-		return xerrors.ErrInvalidTrxType
-	}
-	return nil
-}
-
-func (ctrler *StakeCtrler) validateUnstaking(ctx *trxs.TrxContext) error {
-	if ctx.Tx.GetType() != trxs.TRX_UNSTAKING {
-		return xerrors.ErrInvalidTrxType
-	}
-	return nil
-}
-
-func (ctrler *StakeCtrler) Validate(ctx *trxs.TrxContext) error {
-	if ctx.Tx.GetType() != trxs.TRX_STAKING && ctx.Tx.GetType() != trxs.TRX_STAKING {
-		return xerrors.ErrInvalidTrxType
-	} else {
-		return nil //return ctrler.validateUnstaking(ctx)
-	}
-}
-
-func (ctrler *StakeCtrler) DelegateStake(to *Delegatee, s0 *Stake) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	ctrler.delegateStake(to, s0)
-}
-
-func (ctrler *StakeCtrler) delegateStake(to *Delegatee, s0 *Stake) {
-	if xerr := to.AppendStake(s0); xerr != nil {
-		// Not reachable. AppendStake() does not return error
-		ctrler.logger.Error("Not reachable", "error", xerr)
-		panic(xerr)
-	}
-	ctrler.updatedStakes = append(ctrler.updatedStakes, s0)
-}
-
-func (ctrler *StakeCtrler) GetFrozenStakes() []*Stake {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	return ctrler.allFrozenStakes
-}
-
-func (ctrler *StakeCtrler) ProcessFrozenStakesAt(height int64, acctFinder account.IAccountFinder) error {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	// ctrler.allFrozenStakes is ordered by RefundHeight
-	for _, s0 := range ctrler.allFrozenStakes {
-		if height >= s0.RefundHeight {
-			if acct := acctFinder.FindAccount(s0.From, true); acct == nil {
-				return xerrors.ErrNotFoundAccount
-			} else if xerr := acct.AddBalance(new(big.Int).Add(s0.Amount, s0.ReceivedReward)); xerr != nil {
-				return xerr
-			}
-			ctrler.delFrozenStakes = append(ctrler.delFrozenStakes, s0)
-		} else {
-			break
-		}
-	}
-	return nil
-}
-
-func (ctrler *StakeCtrler) GetTotalAmount() *big.Int {
-	// todo: improve performance
-	amt := big.NewInt(0)
-	for _, s0 := range ctrler.allDelegatees {
-		amt = new(big.Int).Add(amt, s0.GetTotalAmount())
-	}
-	return amt
-}
-
-func (ctrler *StakeCtrler) GetTotalPower() int64 {
-	// todo: improve performance
-	power := int64(0)
-	for _, s0 := range ctrler.allDelegatees {
-		power += s0.GetTotalPower()
-	}
-	return power
-}
-
-func (ctrler *StakeCtrler) GetTotalPowerOf(addr account.Address) int64 {
-	power := int64(0)
-	if delegatee, ok := ctrler.allDelegateesMap[account.ToAcctKey(addr)]; ok {
-		power += delegatee.GetTotalPower()
-	}
-	return power
-}
-
-func selectValidators(delegatees DelegateeArray, maxVals int) DelegateeArray {
-	sort.Sort(powerOrderedDelegatees(delegatees)) // sort by power
-
-	n := libs.MIN(len(delegatees), maxVals)
-	validators := make(DelegateeArray, n)
-	copy(validators, delegatees[:n])
-
-	return validators
-}
-
-func (ctrler *StakeCtrler) UpdateValidators(maxVals int) []tmtypes.ValidatorUpdate {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	newValidators := selectValidators(ctrler.allDelegatees, maxVals)
-	sort.Sort(addressOrderedDelegatees(newValidators)) // sort by address
-
+	// update lastValidators
 	ctrler.lastValidators = newValidators
-	return validatorUpdates(ctrler.lastValidators, newValidators)
+	return upVals
 }
 
-func (ctrler *StakeCtrler) GetLastValidatorCnt() int {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	return len(ctrler.lastValidators)
-}
-
-func (ctrler *StakeCtrler) IsValidator(addr account.Address) bool {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	for _, val := range ctrler.lastValidators {
-		if bytes.Compare(val.Addr, addr) == 0 {
-			return true
-		}
-	}
-	return false
-}
-
-func validatorUpdates(existing, newers DelegateeArray) []tmtypes.ValidatorUpdate {
-	valUpdates := make(tmtypes.ValidatorUpdates, 0, len(existing)+len(newers))
+func validatorUpdates(existing, newers DelegateeArray) []abcitypes.ValidatorUpdate {
+	valUpdates := make(abcitypes.ValidatorUpdates, 0, len(existing)+len(newers))
 
 	i, j := 0, 0
 	for i < len(existing) && j < len(newers) {
 		ret := bytes.Compare(existing[i].Addr, newers[j].Addr)
 		if ret < 0 {
-			// lastValidators[i] is removed
-			valUpdates = append(valUpdates, tmtypes.UpdateValidator(existing[i].PubKey, 0, "secp256k1"))
+			// this 'existing' validator will be removed because the power is 0
+			valUpdates = append(valUpdates, abcitypes.UpdateValidator(existing[i].PubKey, 0, "secp256k1"))
 			i++
 		} else if ret == 0 {
 			if existing[i].TotalPower != newers[j].TotalPower {
-				// lastValidator[i] is updated to newValidators[j]
-				valUpdates = append(valUpdates, tmtypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+				// if power is changed, add newser
+				valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+			} else {
+				// if the power is not changed, exclude the validator in updated validators
 			}
 			i++
 			j++
 		} else { // ret > 0
-			// newValidators[j] is added
-			valUpdates = append(valUpdates, tmtypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+			valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
 			j++
 		}
 	}
 
 	for ; i < len(existing); i++ {
 		// removed
-		valUpdates = append(valUpdates, tmtypes.UpdateValidator(existing[i].PubKey, 0, "secp256k1"))
+		valUpdates = append(valUpdates, abcitypes.UpdateValidator(existing[i].PubKey, 0, "secp256k1"))
 	}
 	for ; j < len(newers); j++ {
 		// added newer
-		valUpdates = append(valUpdates, tmtypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+		valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
 	}
 
 	return valUpdates
 }
 
-func (ctrler *StakeCtrler) execStaking(ctx *trxs.TrxContext) error {
-	if err := ctx.Sender.SubBalance(ctx.Tx.Amount); err != nil {
-		return err
+func selectValidators(delegatees DelegateeArray, maxVals int) DelegateeArray {
+	var validators DelegateeArray
+	for i, val := range delegatees {
+		if val.TotalPower <= 0 {
+			break
+		} else if i >= maxVals {
+			break
+		}
+		validators = append(validators, val)
 	}
 
-	if ctx.Exec {
-		delegatee := ctrler.findDelegatee(ctx.Tx.To)
-		if delegatee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
-			// new delegatee (staking to my self)
-			delegatee = ctrler.addDelegatee(NewDelegatee(ctx.Tx.From, ctx.SenderPubKey))
-		} else if delegatee == nil {
-			// there is no delegatee whose address is ctx.Tx.To
-			return xerrors.ErrNotFoundStaker
-		}
-
-		s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovRuleHandler)
-		expectedPower := ctrler.GetTotalPower() + s0.Power
-		if expectedPower < 0 || expectedPower > ctx.GovRuleHandler.MaxTotalPower() {
-			return xerrors.ErrTooManyPower
-		}
-
-		ctrler.delegateStake(delegatee, s0)
-		ctrler.updatedDelegatees = append(ctrler.updatedDelegatees, delegatee)
-	}
-
-	return nil
+	return validators
 }
 
-func (ctrler *StakeCtrler) execUnstaking(ctx *trxs.TrxContext) error {
-	if ctx.Exec {
-		delegatee := ctrler.findDelegatee(ctx.Tx.To)
-		if delegatee == nil {
-			return xerrors.ErrNotFoundStaker
+func (ctrler *StakeCtrler) Commit() ([]byte, int64, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	ctrler.logger.Debug("StakeCtrler-Commit")
+
+	if h0, v0, xerr := ctrler.delegateeLedger.Commit(); xerr != nil {
+		return nil, -1, xerr
+	} else if h1, v1, xerr := ctrler.frozenLedger.Commit(); xerr != nil {
+		return nil, -1, xerr
+	} else if v0 != v1 {
+		return nil, -1, xerrors.New(fmt.Sprintf("error: StakeCtrler.Commit() has wrong version number - v0:%v, v1:%v", v0, v1))
+	} else {
+		return crypto.DefaultHash(h0, h1), v0, nil
+	}
+}
+
+func (ctrler *StakeCtrler) Close() xerrors.XError {
+	if ctrler.delegateeLedger != nil {
+		if xerr := ctrler.delegateeLedger.Close(); xerr != nil {
+			ctrler.logger.Error("StakeCtrler", "delegateeLedger.Close() returns error", xerr.Error())
 		}
-
-		txhash := ctx.Tx.Payload.(*trxs.TrxPayloadUnstaking).TxHash
-		if txhash == nil && len(txhash) != 32 {
-			return xerrors.ErrInvalidTrxPayloadParams
+		ctrler.delegateeLedger = nil
+	}
+	if ctrler.frozenLedger != nil {
+		if xerr := ctrler.frozenLedger.Close(); xerr != nil {
+			ctrler.logger.Error("StakeCtrler", "frozenLedger.Close() returns error", xerr.Error())
 		}
-		s0 := delegatee.DelStake(txhash)
-		if s0 == nil {
-			return xerrors.ErrNotFoundStake
-		}
-
-		s0.RefundHeight = ctx.Height + ctx.GovRuleHandler.GetLazyRewardBlocks()
-		// ctrler.frozenStakes is ordered by RefundHeight
-		ctrler.newFrozenStakes = append(ctrler.newFrozenStakes, s0)
-
-		if delegatee.SelfPower == 0 {
-			// issue #12
-			stakes := delegatee.DelAllStakes()
-			ctrler.newFrozenStakes = append(ctrler.newFrozenStakes, stakes...)
-		}
-
-		if delegatee.TotalPower == 0 {
-			// issue #11 : add and freeze a stake for FEE
-
-			feeAmt := delegatee.ReceivedReward.FeeReward()
-			feeStake := &Stake{
-				From:           delegatee.Addr,
-				To:             delegatee.Addr,
-				ReceivedReward: feeAmt,
-				RefundHeight:   ctx.Height + ctx.GovRuleHandler.GetLazyRewardBlocks(),
-			}
-			ctrler.newFrozenStakes = append(ctrler.newFrozenStakes, feeStake)
-
-			// issue #19
-			// it will be updated(saved) in Commit()
-			if err := delegatee.ReceivedReward.SubFeeReward(feeAmt); err != nil {
-				return err
-			}
-
-			_ = ctrler.removeDelegatee(delegatee.Addr)
-		}
-		ctrler.updatedDelegatees = append(ctrler.updatedDelegatees, delegatee)
+		ctrler.frozenLedger = nil
 	}
 	return nil
 }
 
-func (ctrler *StakeCtrler) ApplyReward(feeOwner account.Address, fee *big.Int) *big.Int {
+// IStakeHelper's methods
+func (ctrler *StakeCtrler) Validators() ([]*abcitypes.Validator, int64) {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
 
-	// NOTE!!!
-	// Because ApplyReward() is called after executing un-staking-tx,
-	// the account who submit un-staking-tx at this block CAN NOT be rewarded for the previous block.
-	// Likewise, because ApplyReward() is called after executing staking-tx,
-	// the account who submit staking-tx (delegates to current validator) at this block is rewarded for previous block.
+	totalPower := int64(0)
+	var ret []*abcitypes.Validator
+	for _, v := range ctrler.lastValidators {
+		totalPower += v.TotalPower
+		ret = append(ret, &abcitypes.Validator{
+			Address: v.Addr,
+			Power:   v.TotalPower,
+		})
+	}
 
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
+	return ret, totalPower
+}
 
-	blockReward := big.NewInt(0)
-	for _, val := range ctrler.lastValidators {
-		// block reward : fee is not included
-		blockReward = blockReward.Add(blockReward, val.ApplyBlockReward())
-		ctrler.updatedStakes = append(ctrler.updatedStakes, val.GetAllStakes()...)
-
-		// fee reward
-		if bytes.Compare(val.Addr, feeOwner) == 0 {
-			val.ApplyFeeReward(fee)
-
-			// update delegatee's fee reward (#19)
-			ctrler.updatedDelegatees = append(ctrler.updatedDelegatees, val)
+func (ctrler *StakeCtrler) IsValidator(addr types.Address) bool {
+	for _, v := range ctrler.lastValidators {
+		if bytes.Compare(v.Addr, addr) == 0 {
+			return true
 		}
-	}
-	return blockReward
-}
-
-func (ctrler *StakeCtrler) Execute(ctx *trxs.TrxContext) error {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	switch ctx.Tx.GetType() {
-	case trxs.TRX_STAKING:
-		return ctrler.execStaking(ctx)
-	case trxs.TRX_UNSTAKING:
-		return ctrler.execUnstaking(ctx)
-	default:
-		return xerrors.New("unknown transaction type")
-	}
-}
-
-func (ctrler *StakeCtrler) Commit() ([]byte, int64, error) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	// todo: Commit() should be atomic operation
-
-	frozenBatch := ctrler.frozenStakesDB.NewBatch()
-	defer frozenBatch.Close()
-
-	for _, s := range ctrler.delFrozenStakes {
-		if err := frozenBatch.Delete(s.TxHash); err != nil {
-			return nil, -1, err
-		}
-	}
-	ctrler.allFrozenStakes = ctrler.allFrozenStakes[len(ctrler.delFrozenStakes):]
-	ctrler.delFrozenStakes = nil
-	for _, s := range ctrler.newFrozenStakes {
-		if bz, err := json.Marshal(s); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
-		} else if err := frozenBatch.Set(s.TxHash, bz); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
-		} else if _, _, err := ctrler.stakesTree.Remove(s.TxHash); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
-		}
-	}
-	ctrler.allFrozenStakes = append(ctrler.allFrozenStakes, ctrler.newFrozenStakes...)
-	ctrler.newFrozenStakes = nil
-	sort.Sort(refundHeightOrder(ctrler.allFrozenStakes))
-
-	for _, s0 := range ctrler.updatedStakes {
-		if bz, err := json.Marshal(s0); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
-		} else if _, err := ctrler.stakesTree.Set(s0.TxHash, bz); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
-		}
-	}
-	ctrler.updatedStakes = nil
-
-	// updatedDelegatees has delegatees who are newly added/removed or rewarded
-	for _, d0 := range ctrler.updatedDelegatees {
-		if d0.TotalPower == 0 {
-			// remove delegatee
-			if err := ctrler.delegateesDB.Delete(d0.Addr); err != nil {
-				return nil, -1, xerrors.NewFrom(err)
-			}
-		} else {
-			if bz, err := d0.ReceivedReward.fee.Encode(); err != nil {
-				return nil, -1, xerrors.NewFrom(err)
-			} else if err := ctrler.delegateesDB.Set(d0.Addr, bz); err != nil {
-				return nil, -1, xerrors.NewFrom(err)
-			}
-		}
-	}
-	ctrler.updatedDelegatees = nil
-
-	if err := frozenBatch.Write(); err != nil {
-		return nil, -1, err
-	}
-
-	return ctrler.stakesTree.SaveVersion()
-}
-
-func (ctrler *StakeCtrler) Close() error {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	if ctrler.stakesDB != nil {
-		if err := ctrler.stakesDB.Close(); err != nil {
-			return nil
-		}
-	}
-	if ctrler.frozenStakesDB != nil {
-		if err := ctrler.frozenStakesDB.Close(); err != nil {
-			return err
-		}
-	}
-
-	ctrler.stakesDB = nil
-	ctrler.stakesTree = nil
-	ctrler.frozenStakesDB = nil
-	return nil
-}
-
-var _ trxs.ITrxHandler = (*StakeCtrler)(nil)
-var _ types.ILedgerHandler = (*StakeCtrler)(nil)
-var _ types.IStakeHandler = (*StakeCtrler)(nil)
-
-type DelegateeArray []*Delegatee
-
-func (vs DelegateeArray) SumTotalAmount() *big.Int {
-	var amt *big.Int
-	for _, val := range vs {
-		amt = new(big.Int).Add(amt, val.TotalAmount)
-	}
-	return amt
-}
-
-func (vs DelegateeArray) SumTotalPower() int64 {
-	power := int64(0)
-	for _, val := range vs {
-		power += val.TotalPower
-	}
-	return power
-}
-
-func (vs DelegateeArray) SumTotalReward() *big.Int {
-	var reward *big.Int
-	for _, val := range vs {
-		reward = new(big.Int).Add(reward, val.GetTotalReward())
-	}
-	return reward
-}
-
-func (vs DelegateeArray) SumBlockReward() *big.Int {
-	var reward *big.Int
-	for _, val := range vs {
-		reward = new(big.Int).Add(reward, val.ReceivedReward.BlockReward())
-	}
-	return reward
-}
-
-func (vs DelegateeArray) SumTotalFeeReward() *big.Int {
-	var fee *big.Int
-	for _, val := range vs {
-		fee = new(big.Int).Add(fee, val.ReceivedReward.FeeReward())
-	}
-	return fee
-}
-
-type powerOrderedDelegatees []*Delegatee
-
-func (vs powerOrderedDelegatees) Len() int {
-	return len(vs)
-}
-
-// descending order by TotalPower
-func (vs powerOrderedDelegatees) Less(i, j int) bool {
-	if vs[i].TotalPower != vs[j].TotalPower {
-		return vs[i].TotalPower > vs[j].TotalPower
-	} else if len(vs[i].Stakes) != len(vs[j].Stakes) {
-		return len(vs[i].Stakes) > len(vs[j].Stakes)
-	} else if bytes.Compare(vs[i].Addr, vs[j].Addr) > 0 {
-		return true
 	}
 	return false
 }
 
-func (vs powerOrderedDelegatees) Swap(i, j int) {
-	vs[i], vs[j] = vs[j], vs[i]
+func (ctrler *StakeCtrler) PowerOf(addr types.Address) int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(addr)); xerr != nil {
+		return 0
+	} else if delegatee == nil {
+		return 0
+	} else {
+		return delegatee.TotalPower
+	}
 }
 
-var _ sort.Interface = (powerOrderedDelegatees)(nil)
-
-type addressOrderedDelegatees []*Delegatee
-
-func (vs addressOrderedDelegatees) Len() int {
-	return len(vs)
+func (ctrler *StakeCtrler) GetTotalAmount() *big.Int {
+	ret := big.NewInt(0)
+	_ = ctrler.delegateeLedger.IterateAllFinalityItems(func(delegatee *Delegatee) xerrors.XError {
+		_ = ret.Add(ret, delegatee.TotalAmount)
+		return nil
+	})
+	return ret
 }
 
-// ascending order by address
-func (vs addressOrderedDelegatees) Less(i, j int) bool {
-
-	return bytes.Compare(vs[i].Addr, vs[j].Addr) < 0
+func (ctrler *StakeCtrler) GetTotalPower() int64 {
+	ret := int64(0)
+	_ = ctrler.delegateeLedger.IterateAllFinalityItems(func(delegatee *Delegatee) xerrors.XError {
+		ret += delegatee.GetTotalPower()
+		return nil
+	})
+	return ret
 }
 
-func (vs addressOrderedDelegatees) Swap(i, j int) {
-	vs[i], vs[j] = vs[j], vs[i]
+func (ctrler *StakeCtrler) GetFrozenStakes() []*Stake {
+	var ret []*Stake
+	_ = ctrler.frozenLedger.IterateAllFinalityItems(func(s0 *Stake) xerrors.XError {
+		ret = append(ret, s0)
+		return nil
+	})
+	return ret
 }
 
-var _ sort.Interface = (addressOrderedDelegatees)(nil)
+var _ ctrlertypes.ILedgerHandler = (*StakeCtrler)(nil)
+var _ ctrlertypes.ITrxHandler = (*StakeCtrler)(nil)
+var _ ctrlertypes.IBlockHandler = (*StakeCtrler)(nil)
+var _ ctrlertypes.IStakeHelper = (*StakeCtrler)(nil)

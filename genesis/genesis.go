@@ -1,9 +1,9 @@
 package genesis
 
 import (
-	"github.com/kysee/arcanus/ctrlers/gov"
-	"github.com/kysee/arcanus/libs/crypto"
-	"github.com/kysee/arcanus/types/account"
+	types2 "github.com/kysee/arcanus/ctrlers/types"
+	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/crypto"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -11,8 +11,8 @@ import (
 )
 
 type GenesisAssetHolder struct {
-	Address account.Address `json:"address"`
-	Balance string          `json:"balance"`
+	Address types.Address `json:"address"`
+	Balance string        `json:"balance"`
 }
 
 func (gh *GenesisAssetHolder) Hash() []byte {
@@ -24,7 +24,7 @@ func (gh *GenesisAssetHolder) Hash() []byte {
 
 type GenesisAppState struct {
 	AssetHolders []*GenesisAssetHolder `json:"assetHolders"`
-	GovRule      *gov.GovRule          `json:"govRule"`
+	GovRule      *types2.GovRule       `json:"govRule"`
 }
 
 func (ga *GenesisAppState) Hash() ([]byte, error) {
@@ -43,7 +43,7 @@ func (ga *GenesisAppState) Hash() ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govRule *gov.GovRule) (*tmtypes.GenesisDoc, error) {
+func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govRule *types2.GovRule) (*tmtypes.GenesisDoc, error) {
 	appState := GenesisAppState{
 		AssetHolders: assetHolders,
 		GovRule:      govRule,

@@ -3,17 +3,17 @@ package commands
 import (
 	"bytes"
 	"fmt"
+	cfg "github.com/kysee/arcanus/cmd/config"
 	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/libs/crypto"
-	xnode "github.com/kysee/arcanus/node"
+	"github.com/kysee/arcanus/node"
+	"github.com/kysee/arcanus/types/crypto"
+	"github.com/spf13/cobra"
+	"github.com/tendermint/tendermint/libs/log"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
-
-	"github.com/spf13/cobra"
-
-	cfg "github.com/tendermint/tendermint/config"
-	tmos "github.com/tendermint/tendermint/libs/os"
+	"syscall"
 )
 
 var (
@@ -21,10 +21,10 @@ var (
 )
 
 // AddNodeFlags exposes some common configuration options on the command-line
-// These are exposed for convenience of commands embedding a arcanus
+// These are exposed for convenience of commands embedding a node
 func AddNodeFlags(cmd *cobra.Command) {
 	// bind flags
-	cmd.Flags().String("moniker", config.Moniker, "node name")
+	cmd.Flags().String("moniker", config.Moniker, "arcanus name")
 
 	// priv val flags
 	cmd.Flags().String(
@@ -40,7 +40,7 @@ func AddNodeFlags(cmd *cobra.Command) {
 		[]byte{},
 		"optional SHA-256 hash of the genesis file")
 	cmd.Flags().Int64("consensus.double_sign_check_height", config.Consensus.DoubleSignCheckHeight,
-		"how many blocks to look back to check existence of the node's "+
+		"how many blocks to look back to check existence of the arcanus's "+
 			"consensus votes before joining consensus")
 
 	// abci flags
@@ -67,7 +67,7 @@ func AddNodeFlags(cmd *cobra.Command) {
 	cmd.Flags().String(
 		"p2p.laddr",
 		config.P2P.ListenAddress,
-		"node listen address. (0.0.0.0:0 means any interface, any port)")
+		"arcanus listen address. (0.0.0.0:0 means any interface, any port)")
 	cmd.Flags().String("p2p.seeds", config.P2P.Seeds, "comma-delimited ID@host:port seed nodes")
 	cmd.Flags().String("p2p.persistent_peers", config.P2P.PersistentPeers, "comma-delimited ID@host:port persistent peers")
 	cmd.Flags().String("p2p.unconditional_peer_ids",
@@ -106,10 +106,10 @@ func AddNodeFlags(cmd *cobra.Command) {
 
 // NewRunNodeCmd returns the command that allows the CLI to start a node.
 // It can be used with a custom PrivValidator and in-process ABCI application.
-func NewRunNodeCmd(nodeProvider xnode.Provider) *cobra.Command {
+func NewRunNodeCmd(nodeProvider node.Provider) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start",
-		Aliases: []string{"node", "run"},
+		Aliases: []string{"arcanus", "run"},
 		Short:   "Run the arcanus",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkGenesisHash(config); err != nil {
@@ -129,20 +129,23 @@ func NewRunNodeCmd(nodeProvider xnode.Provider) *cobra.Command {
 			libs.ClearCredential(s)
 
 			if err != nil {
-				return fmt.Errorf("failed to create node: %w", err)
+				return fmt.Errorf("failed to create arcanus: %w", err)
 			}
 
 			if err := n.Start(); err != nil {
-				return fmt.Errorf("failed to start node: %w", err)
+				return fmt.Errorf("failed to start arcanus: %w", err)
 			}
 
-			logger.Info("Started node", "nodeInfo", n.Switch().NodeInfo())
+			logger.Info("Started arcanus", "nodeInfo", n.Switch().NodeInfo())
 
 			// Stop upon receiving SIGTERM or CTRL-C.
-			tmos.TrapSignal(logger, func() {
+			trapSignal(logger, func() {
 				if n.IsRunning() {
+					if err := n.ProxyApp().Stop(); err != nil {
+						logger.Error("unable to stop the arcanus client", "error", err)
+					}
 					if err := n.Stop(); err != nil {
-						logger.Error("unable to stop the node", "error", err)
+						logger.Error("unable to stop the arcanus node", "error", err)
 					}
 				}
 			})
@@ -181,4 +184,29 @@ func checkGenesisHash(config *cfg.Config) error {
 	}
 
 	return nil
+}
+
+// trapSignal() comes from tmos.TrapSignal
+func trapSignal(logger log.Logger, cb func()) {
+	var signals = []os.Signal{
+		os.Interrupt,
+		//syscall.SIGINT,
+		//syscall.SIGQUIT,
+		//syscall.SIGABRT,
+		//syscall.SIGKILL,
+		syscall.SIGTERM,
+		//syscall.SIGSTOP,
+	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, signals...)
+	go func() {
+		for sig := range c {
+			logger.Info("signal trapped", "msg", log.NewLazySprintf("captured %v, exiting...", sig))
+			if cb != nil {
+				cb()
+			}
+			os.Exit(0)
+		}
+	}()
 }

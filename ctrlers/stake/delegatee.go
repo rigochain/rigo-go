@@ -4,57 +4,80 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/kysee/arcanus/ledger"
 	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/account"
+	bytes2 "github.com/kysee/arcanus/types/bytes"
+	"github.com/kysee/arcanus/types/xerrors"
 	"math/big"
 	"sort"
 	"sync"
 )
 
 type Delegatee struct {
-	Addr   account.Address `json:"address"`
-	PubKey types.HexBytes  `json:"pubKey"`
-	Stakes []*Stake        `json:"stakes"`
+	Addr   types.Address   `json:"address"`
+	PubKey bytes2.HexBytes `json:"pubKey"`
 
 	SelfAmount  *big.Int `json:"selfAmount"`
 	SelfPower   int64    `json:"selfPower"`
 	TotalAmount *big.Int `json:"totalAmount"`
 	TotalPower  int64    `json:"totalPower"`
 
-	ReceivedReward *Reward `json:"receivedReward"`
+	RewardAmount *big.Int `json:"rewardAmount"`
+	Stakes       []*Stake `json:"stakes"`
 
 	mtx sync.RWMutex
 }
 
-func NewDelegatee(addr account.Address, pubKey types.HexBytes) *Delegatee {
-	return &Delegatee{
-		Addr:           addr,
-		PubKey:         pubKey,
-		SelfAmount:     big.NewInt(0),
-		SelfPower:      0,
-		TotalPower:     0,
-		TotalAmount:    big.NewInt(0),
-		ReceivedReward: NewReward(pubKey),
+func (delegatee *Delegatee) Key() ledger.LedgerKey {
+	delegatee.mtx.RLock()
+	defer delegatee.mtx.RUnlock()
+
+	return ledger.ToLedgerKey(delegatee.Addr)
+}
+
+func (delegatee *Delegatee) Encode() ([]byte, xerrors.XError) {
+	delegatee.mtx.RLock()
+	defer delegatee.mtx.RUnlock()
+
+	if bz, err := json.Marshal(delegatee); err != nil {
+		return nil, xerrors.NewFrom(err)
+	} else {
+		return bz, nil
 	}
 }
 
-func (delegatee *Delegatee) String() string {
-	bz, err := json.MarshalIndent(delegatee, "", "  ")
-	if err != nil {
-		return fmt.Sprintf("{error: %v}", err)
-	}
-	return string(bz)
-}
-
-func (delegatee *Delegatee) AppendStake(stakes ...*Stake) error {
+func (delegatee *Delegatee) Decode(d []byte) xerrors.XError {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
-	return delegatee.appendStake(stakes...)
+	if err := json.Unmarshal(d, delegatee); err != nil {
+		return xerrors.NewFrom(err)
+	}
+	return nil
 }
 
-func (delegatee *Delegatee) appendStake(stakes ...*Stake) error {
-	//stakes[n].To is equal to delegatee.Addr
+var _ ledger.ILedgerItem = (*Delegatee)(nil)
+
+func NewDelegatee(addr types.Address, pubKey bytes2.HexBytes) *Delegatee {
+	return &Delegatee{
+		Addr:         addr,
+		PubKey:       pubKey,
+		SelfAmount:   big.NewInt(0),
+		SelfPower:    0,
+		TotalPower:   0,
+		TotalAmount:  big.NewInt(0),
+		RewardAmount: big.NewInt(0),
+	}
+}
+
+func (delegatee *Delegatee) AddStake(stakes ...*Stake) xerrors.XError {
+	delegatee.mtx.Lock()
+	defer delegatee.mtx.Unlock()
+
+	return delegatee.addStake(stakes...)
+}
+
+func (delegatee *Delegatee) addStake(stakes ...*Stake) xerrors.XError {
 
 	delegatee.Stakes = append(delegatee.Stakes, stakes...)
 
@@ -65,12 +88,12 @@ func (delegatee *Delegatee) appendStake(stakes ...*Stake) error {
 		}
 		delegatee.TotalPower += s.Power
 		delegatee.TotalAmount = new(big.Int).Add(delegatee.TotalAmount, s.Amount)
-		delegatee.ReceivedReward.AddBlockReward(s.ReceivedReward)
+		delegatee.RewardAmount = new(big.Int).Add(delegatee.RewardAmount, s.ReceivedReward)
 	}
 	return nil
 }
 
-func (delegatee *Delegatee) DelStake(txhash types.HexBytes) *Stake {
+func (delegatee *Delegatee) DelStake(txhash bytes2.HexBytes) *Stake {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
@@ -86,28 +109,7 @@ func (delegatee *Delegatee) DelStake(txhash types.HexBytes) *Stake {
 		}
 		delegatee.TotalPower -= s.Power
 		delegatee.TotalAmount = new(big.Int).Sub(delegatee.TotalAmount, s.Amount)
-
-		//delegatee.TotalReward = new(big.Int).Sub(delegatee.TotalReward, s.ReceivedReward)
-		delegatee.ReceivedReward.SubBlockReward(s.ReceivedReward)
-		return s
-	}
-	return nil
-}
-
-func (delegatee *Delegatee) DelStakeByIdx(idx int) *Stake {
-	delegatee.mtx.Lock()
-	defer delegatee.mtx.Unlock()
-
-	if s := delegatee.delStakeByIdx(idx); s != nil {
-		if s.IsSelfStake() {
-			delegatee.SelfPower -= s.Power
-			delegatee.SelfAmount = new(big.Int).Sub(delegatee.SelfAmount, s.Amount)
-		}
-		delegatee.TotalPower -= s.Power
-		delegatee.TotalAmount = new(big.Int).Sub(delegatee.TotalAmount, s.Amount)
-
-		//delegatee.TotalReward = new(big.Int).Sub(delegatee.TotalReward, s.ReceivedReward)
-		delegatee.ReceivedReward.SubBlockReward(s.ReceivedReward)
+		delegatee.RewardAmount = new(big.Int).Sub(delegatee.RewardAmount, s.ReceivedReward)
 		return s
 	}
 	return nil
@@ -133,9 +135,7 @@ func (delegatee *Delegatee) DelAllStakes() []*Stake {
 	for _, s := range stakes {
 		delegatee.TotalPower -= s.Power
 		delegatee.TotalAmount = new(big.Int).Sub(delegatee.TotalAmount, s.Amount)
-
-		//delegatee.TotalReward = new(big.Int).Sub(delegatee.TotalReward, s.ReceivedReward)
-		delegatee.ReceivedReward.SubBlockReward(s.ReceivedReward)
+		delegatee.RewardAmount = new(big.Int).Sub(delegatee.RewardAmount, s.ReceivedReward)
 	}
 
 	return stakes
@@ -164,29 +164,29 @@ func (delegatee *Delegatee) getStake(idx int) *Stake {
 	return delegatee.Stakes[idx]
 }
 
-func (delegatee *Delegatee) NextStake() *Stake {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
+//	func (delegatee *Delegatee) NextStake() *Stake {
+//		delegatee.mtx.RLock()
+//		defer delegatee.mtx.RUnlock()
+//
+//		return delegatee.getStake(0)
+//	}
+//
+//	func (delegatee *Delegatee) LastStake() *Stake {
+//		delegatee.mtx.RLock()
+//		defer delegatee.mtx.RUnlock()
+//
+//		idx := len(delegatee.Stakes) - 1
+//		return delegatee.getStake(idx)
+//	}
 
-	return delegatee.getStake(0)
-}
-
-func (delegatee *Delegatee) LastStake() *Stake {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	idx := len(delegatee.Stakes) - 1
-	return delegatee.getStake(idx)
-}
-
-func (delegatee *Delegatee) FindStake(txhash types.HexBytes) (int, *Stake) {
+func (delegatee *Delegatee) FindStake(txhash bytes2.HexBytes) (int, *Stake) {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
 	return delegatee.findStake(txhash)
 }
 
-func (delegatee *Delegatee) findStake(txhash types.HexBytes) (int, *Stake) {
+func (delegatee *Delegatee) findStake(txhash bytes2.HexBytes) (int, *Stake) {
 	for i, s := range delegatee.Stakes {
 		if bytes.Compare(txhash, s.TxHash) == 0 {
 			return i, s
@@ -195,7 +195,7 @@ func (delegatee *Delegatee) findStake(txhash types.HexBytes) (int, *Stake) {
 	return -1, nil
 }
 
-func (delegatee *Delegatee) StakesOf(addr account.Address) []*Stake {
+func (delegatee *Delegatee) StakesOf(addr types.Address) []*Stake {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
@@ -229,30 +229,26 @@ func (delegatee *Delegatee) GetTotalAmount() *big.Int {
 	return delegatee.TotalAmount
 }
 
-func (delegatee *Delegatee) SumAmountOf(addr account.Address) *big.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	ret := big.NewInt(0)
-	for _, s0 := range delegatee.Stakes {
-		if bytes.Compare(s0.From, addr) == 0 {
-			ret = ret.Add(ret, s0.Amount)
-		}
-	}
-	return ret
-}
-
 func (delegatee *Delegatee) SumAmount() *big.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return delegatee.sumAmount()
+	return delegatee.sumAmountOf(nil)
 }
 
-func (delegatee *Delegatee) sumAmount() *big.Int {
+func (delegatee *Delegatee) SumAmountOf(addr types.Address) *big.Int {
+	delegatee.mtx.RLock()
+	defer delegatee.mtx.RUnlock()
+
+	return delegatee.sumAmountOf(addr)
+}
+
+func (delegatee *Delegatee) sumAmountOf(addr types.Address) *big.Int {
 	amt := big.NewInt(0)
-	for _, s := range delegatee.Stakes {
-		_ = amt.Add(amt, s.Amount)
+	for _, s0 := range delegatee.Stakes {
+		if addr == nil || bytes.Compare(s0.From, addr) == 0 {
+			_ = amt.Add(amt, s0.Amount)
+		}
 	}
 	return amt
 }
@@ -271,7 +267,14 @@ func (delegatee *Delegatee) GetTotalPower() int64 {
 	return delegatee.TotalPower
 }
 
-func (delegatee *Delegatee) SumPowerOf(addr account.Address) int64 {
+func (delegatee *Delegatee) SumPower() int64 {
+	delegatee.mtx.RLock()
+	defer delegatee.mtx.RUnlock()
+
+	return delegatee.sumPowerOf(nil)
+}
+
+func (delegatee *Delegatee) SumPowerOf(addr types.Address) int64 {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
@@ -284,110 +287,147 @@ func (delegatee *Delegatee) SumPowerOf(addr account.Address) int64 {
 	return ret
 }
 
-func (delegatee *Delegatee) SumPower() int64 {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.sumPower()
-}
-
-func (delegatee *Delegatee) sumPower() int64 {
+func (delegatee *Delegatee) sumPowerOf(addr types.Address) int64 {
 	power := int64(0)
 	for _, s := range delegatee.Stakes {
-		power += s.Power
+		if addr == nil || bytes.Compare(addr, s.From) == 0 {
+			power += s.Power
+		}
 	}
 	return power
 }
 
-func (delegatee *Delegatee) GetTotalReward() *big.Int {
+func (delegatee *Delegatee) GetRewardAmount() *big.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return delegatee.ReceivedReward.TotalReward()
+	return new(big.Int).Set(delegatee.RewardAmount)
 }
 
 func (delegatee *Delegatee) SumBlockReward() *big.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return delegatee.sumBlockReward()
+	return delegatee.sumBlockRewardOf(nil)
 }
 
-func (delegatee *Delegatee) SumBlockRewardOf(addr account.Address) *big.Int {
+func (delegatee *Delegatee) SumBlockRewardOf(addr types.Address) *big.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	ret := big.NewInt(0)
-	for _, s0 := range delegatee.Stakes {
-		if bytes.Compare(s0.From, addr) == 0 {
-			ret = ret.Add(ret, s0.ReceivedReward)
-		}
-	}
-	return ret
+	return delegatee.sumBlockRewardOf(addr)
 }
 
-func (delegatee *Delegatee) sumBlockReward() *big.Int {
+func (delegatee *Delegatee) sumBlockRewardOf(addr types.Address) *big.Int {
 	reward := big.NewInt(0)
 	for _, s := range delegatee.Stakes {
-		_ = reward.Add(reward, s.ReceivedReward)
+		if addr == nil || bytes.Compare(addr, s.From) == 0 {
+			_ = reward.Add(reward, s.ReceivedReward)
+		}
 	}
 	return reward
 }
 
-func (delegatee *Delegatee) ApplyBlockReward() *big.Int {
+func (delegatee *Delegatee) DoReward() *big.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return delegatee.applyBlockReward()
+	return delegatee.doBlockReward()
 }
 
-func (delegatee *Delegatee) applyBlockReward() *big.Int {
+func (delegatee *Delegatee) doBlockReward() *big.Int {
 	reward := big.NewInt(0)
 	for _, s := range delegatee.Stakes {
 		reward = new(big.Int).Add(reward, s.applyReward())
 	}
-
-	delegatee.ReceivedReward.AddBlockReward(reward)
+	delegatee.RewardAmount.Add(delegatee.RewardAmount, reward)
 	return reward
 }
 
-func (delegatee *Delegatee) ApplyFeeReward(fee *big.Int) {
-	delegatee.mtx.Lock()
-	defer delegatee.mtx.Unlock()
-
-	delegatee.ReceivedReward.AddFeeReward(fee)
+func (delegatee *Delegatee) String() string {
+	bz, err := json.MarshalIndent(delegatee, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("{error: %v}", err)
+	}
+	return string(bz)
 }
 
-type startHeightOrder []*Stake
+//
+// DelegateeArray
 
-func (slst startHeightOrder) Len() int {
-	return len(slst)
+type DelegateeArray []*Delegatee
+
+func (vs DelegateeArray) SumTotalAmount() *big.Int {
+	var amt *big.Int
+	for _, val := range vs {
+		amt = new(big.Int).Add(amt, val.TotalAmount)
+	}
+	return amt
 }
 
-// ascending order
-func (slst startHeightOrder) Less(i, j int) bool {
-	return slst[i].StartHeight < slst[j].StartHeight
+func (vs DelegateeArray) SumTotalPower() int64 {
+	power := int64(0)
+	for _, val := range vs {
+		power += val.TotalPower
+	}
+	return power
 }
 
-func (slst startHeightOrder) Swap(i, j int) {
-	slst[i], slst[j] = slst[j], slst[i]
+func (vs DelegateeArray) SumTotalReward() *big.Int {
+	var reward *big.Int
+	for _, val := range vs {
+		reward = new(big.Int).Add(reward, val.GetRewardAmount())
+	}
+	return reward
 }
 
-var _ sort.Interface = (startHeightOrder)(nil)
-
-type refundHeightOrder []*Stake
-
-func (slst refundHeightOrder) Len() int {
-	return len(slst)
+func (vs DelegateeArray) SumBlockReward() *big.Int {
+	var reward *big.Int
+	for _, val := range vs {
+		reward = new(big.Int).Add(reward, val.RewardAmount)
+	}
+	return reward
 }
 
-// ascending order
-func (slst refundHeightOrder) Less(i, j int) bool {
-	return slst[i].RefundHeight < slst[j].RefundHeight
+type PowerOrderDelegatees []*Delegatee
+
+func (vs PowerOrderDelegatees) Len() int {
+	return len(vs)
 }
 
-func (slst refundHeightOrder) Swap(i, j int) {
-	slst[i], slst[j] = slst[j], slst[i]
+// descending order by TotalPower
+func (vs PowerOrderDelegatees) Less(i, j int) bool {
+	if vs[i].TotalPower != vs[j].TotalPower {
+		return vs[i].TotalPower > vs[j].TotalPower
+	}
+	if len(vs[i].Stakes) != len(vs[j].Stakes) {
+		return len(vs[i].Stakes) > len(vs[j].Stakes)
+	}
+	if bytes.Compare(vs[i].Addr, vs[j].Addr) > 0 {
+		return true
+	}
+	return false
 }
 
-var _ sort.Interface = (refundHeightOrder)(nil)
+func (vs PowerOrderDelegatees) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+
+var _ sort.Interface = (PowerOrderDelegatees)(nil)
+
+type AddressOrderDelegatees []*Delegatee
+
+func (vs AddressOrderDelegatees) Len() int {
+	return len(vs)
+}
+
+// ascending order by address
+func (vs AddressOrderDelegatees) Less(i, j int) bool {
+	return bytes.Compare(vs[i].Addr, vs[j].Addr) < 0
+}
+
+func (vs AddressOrderDelegatees) Swap(i, j int) {
+	vs[i], vs[j] = vs[j], vs[i]
+}
+
+var _ sort.Interface = (AddressOrderDelegatees)(nil)

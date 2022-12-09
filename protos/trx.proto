@@ -1,6 +1,6 @@
 syntax = "proto3";
 package types;
-option go_package = "github.com/kysee/arcanus/types/trxs";
+option go_package = "github.com/kysee/arcanus/ctrlers/types";
 
 message TrxProto {
   uint32 version = 1;
@@ -27,9 +27,10 @@ message TrxPayloadExecContractProto {
 
 message TrxPayloadProposalProto {
   string message = 1;
-  int64 votingBlocks = 2;
-  int32 proposalType = 3;
-  repeated bytes options = 4;
+  int64 start_voting_height = 2;
+  int64 voting_blocks = 3;
+  int32 opt_type = 4;
+  repeated bytes options = 5;
 }
 
 message TrxPayloadVotingProto {

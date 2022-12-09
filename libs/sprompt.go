@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	bytes2 "github.com/kysee/arcanus/types/bytes"
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"os/signal"
@@ -11,7 +12,7 @@ import (
 )
 
 func ClearCredential(c []byte) {
-	ClearBytes(c)
+	bytes2.ClearBytes(c)
 }
 
 func ReadCredential(prompt string) []byte {

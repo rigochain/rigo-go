@@ -2,13 +2,12 @@ package commands
 
 import (
 	"fmt"
-	"github.com/kysee/arcanus/ctrlers/gov"
+	cfg "github.com/kysee/arcanus/cmd/config"
+	"github.com/kysee/arcanus/ctrlers/types"
 	"github.com/kysee/arcanus/genesis"
 	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/libs/crypto"
-	xnode "github.com/kysee/arcanus/node"
+	acrypto "github.com/kysee/arcanus/types/crypto"
 	"github.com/spf13/cobra"
-	cfg "github.com/tendermint/tendermint/config"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -18,7 +17,7 @@ import (
 //// InitFilesCmd initialises a fresh Tendermint Core instance.
 //var InitFilesCmd = &cobra.Command{
 //	Use:   "init",
-//	Short: "Initialize a arcanus",
+//	Short: "Initialize a node",
 //	RunE:  initFiles,
 //}
 
@@ -30,7 +29,7 @@ var (
 
 // NewRunNodeCmd returns the command that allows the CLI to start a node.
 // It can be used with a custom PrivValidator and in-process ABCI application.
-func NewInitFilesCmd(nodeProvider xnode.Provider) *cobra.Command {
+func NewInitFilesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize a arcanus",
@@ -81,14 +80,14 @@ func initFilesWithConfig(config *cfg.Config) error {
 	// private validator
 	privValKeyFile := config.PrivValidatorKeyFile()
 	privValStateFile := config.PrivValidatorStateFile()
-	var pv *crypto.SFilePV
+	var pv *acrypto.SFilePV
 	if tmos.FileExists(privValKeyFile) {
-		pv = crypto.LoadSFilePV(privValKeyFile, privValStateFile, s)
+		pv = acrypto.LoadSFilePV(privValKeyFile, privValStateFile, s)
 		logger.Info("Found private validator", "keyFile", privValKeyFile,
 			"stateFile", privValStateFile)
 		//pv.SaveWith(s) // encrypt with new driven key.
 	} else {
-		pv = crypto.GenSFilePV(privValKeyFile, privValStateFile)
+		pv = acrypto.GenSFilePV(privValKeyFile, privValStateFile)
 		pv.SaveWith(s)
 		logger.Info("Generated private validator", "keyFile", privValKeyFile,
 			"stateFile", privValStateFile)
@@ -96,12 +95,12 @@ func initFilesWithConfig(config *cfg.Config) error {
 
 	nodeKeyFile := config.NodeKeyFile()
 	if tmos.FileExists(nodeKeyFile) {
-		logger.Info("Found node key", "path", nodeKeyFile)
+		logger.Info("Found arcanus key", "path", nodeKeyFile)
 	} else {
 		if _, err := p2p.LoadOrGenNodeKey(nodeKeyFile); err != nil {
 			return err
 		}
-		logger.Info("Generated node key", "path", nodeKeyFile)
+		logger.Info("Generated arcanus key", "path", nodeKeyFile)
 	}
 
 	// genesis file
@@ -124,18 +123,18 @@ func initFilesWithConfig(config *cfg.Config) error {
 				return err
 			}
 		} else { // anything (e.g. loclanet)
-			defaultWalkeyDirPath := filepath.Join(config.RootDir, crypto.DefaultWalletKeyDir)
-			err := tmos.EnsureDir(defaultWalkeyDirPath, crypto.DefaultWalletKeyDirPerm)
+			defaultWalkeyDirPath := filepath.Join(config.RootDir, acrypto.DefaultWalletKeyDir)
+			err := tmos.EnsureDir(defaultWalkeyDirPath, acrypto.DefaultWalletKeyDirPerm)
 			if err != nil {
 				return err
 			}
 
-			walkeys, err := crypto.CreateWalletKeyFiles(s, walkeyCnt, defaultWalkeyDirPath)
+			walkeys, err := acrypto.CreateWalletKeyFiles(s, walkeyCnt, defaultWalkeyDirPath)
 			if err != nil {
 				return err
 			}
 
-			pvWalKey, err := crypto.OpenWalletKey(libs.NewFileReader(privValKeyFile))
+			pvWalKey, err := acrypto.OpenWalletKey(libs.NewFileReader(privValKeyFile))
 			if err != nil {
 				return err
 			}
@@ -173,7 +172,7 @@ func initFilesWithConfig(config *cfg.Config) error {
 				}
 			}()
 
-			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, gov.DefaultGovRule())
+			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovRule())
 			if err != nil {
 				return err
 			}

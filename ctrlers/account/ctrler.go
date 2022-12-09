@@ -1,133 +1,262 @@
 package account
 
 import (
-	"github.com/cosmos/iavl"
+	"bytes"
+	"fmt"
+	cfg "github.com/kysee/arcanus/cmd/config"
+	atypes "github.com/kysee/arcanus/ctrlers/types"
+	"github.com/kysee/arcanus/genesis"
+	"github.com/kysee/arcanus/ledger"
 	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/account"
-	"github.com/kysee/arcanus/types/trxs"
+	abytes "github.com/kysee/arcanus/types/bytes"
+	"github.com/kysee/arcanus/types/crypto"
 	"github.com/kysee/arcanus/types/xerrors"
-	"github.com/tendermint/tendermint/libs/log"
-	db "github.com/tendermint/tm-db"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/big"
-	"sort"
 	"sync"
 )
 
-type AccountCtrler struct {
-	acctDB   db.DB
-	acctTree *iavl.MutableTree
+type AcctCtrler struct {
+	acctLedger ledger.IFinalityLedger[*atypes.Account]
 
-	simuAccounts map[account.AcctKey]*account.Account
-	execAccounts map[account.AcctKey]*account.Account
-
-	logger log.Logger
+	logger tmlog.Logger
 	mtx    sync.RWMutex
 }
 
-func NewAccountCtrler(dbDir string, logger log.Logger) (*AccountCtrler, error) {
-	acctDB, err := db.NewDB("account", "goleveldb", dbDir)
-	if err != nil {
+func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error) {
+	if execLedger, err := ledger.NewFinalityLedger[*atypes.Account]("accounts", config.DBDir(), 128, func() *atypes.Account { return &atypes.Account{} }); err != nil {
 		return nil, err
+	} else {
+		return &AcctCtrler{
+			acctLedger: execLedger,
+			logger:     logger,
+		}, nil
 	}
-	acctTree, err := iavl.NewMutableTree(acctDB, 128)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := acctTree.Load(); err != nil {
-		return nil, err
-	}
-
-	ret := &AccountCtrler{
-		acctDB:       acctDB,
-		acctTree:     acctTree,
-		simuAccounts: make(map[account.AcctKey]*account.Account),
-		execAccounts: make(map[account.AcctKey]*account.Account),
-		logger:       logger,
-	}
-	return ret, nil
 }
 
-func (ctrler *AccountCtrler) PutAccount(acct *account.Account, exec bool) {
+func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.putAccount(acct, exec)
-}
-
-func (ctrler *AccountCtrler) putAccount(acct *account.Account, exec bool) {
-	acctSet := ctrler.simuAccounts
-	if exec {
-		acctSet = ctrler.execAccounts
+	genAppState, ok := req.(*genesis.GenesisAppState)
+	if !ok {
+		return xerrors.New("wrong parameter: AcctCtrler::InitLedger requires *genesis.GenesisAppState")
 	}
-	acctSet[acct.Key()] = acct
+
+	for _, holder := range genAppState.AssetHolders {
+		addr := append(holder.Address, nil...)
+		if bal, ok := new(big.Int).SetString(holder.Balance, 10); !ok {
+			return xerrors.New("wrong balance in genesis")
+		} else {
+			acct := &atypes.Account{
+				Address: addr,
+				Balance: bal,
+			}
+			if xerr := ctrler.setAccountCommittable(acct, true); xerr != nil {
+				return xerr
+			}
+		}
+	}
+	return nil
 }
 
-func (ctrler *AccountCtrler) FindAccount(addr account.Address, exec bool) *account.Account {
+func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	// check signature
+	var fromAddr types.Address
+	var pubBytes abytes.HexBytes
+
+	if ctx.Exec {
+		tx := ctx.Tx
+		sig := tx.Sig
+		tx.Sig = nil
+		if _txbz, xerr := tx.Encode(); xerr != nil {
+			return xerr
+		} else if fromAddr, pubBytes, xerr = crypto.Sig2Addr(_txbz, sig); xerr != nil {
+			return xerr
+		} else if bytes.Compare(fromAddr, tx.From) != 0 {
+			return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
+		}
+	} else {
+		fromAddr = ctx.Tx.From
+	}
+
+	if acct := ctrler.findAccount(fromAddr, ctx.Exec); acct == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := acct.CheckBalance(ctx.NeedAmt); xerr != nil {
+		return xerr
+	} else if xerr := acct.CheckNonce(ctx.Tx.Nonce); xerr != nil {
+		return xerr
+	} else {
+		ctx.Sender = acct
+		ctx.SenderPubKey = pubBytes
+	}
+	return nil
+}
+
+func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	// amount + fee
+	if xerr := ctx.Sender.SubBalance(ctx.NeedAmt); xerr != nil {
+		return xerr
+	}
+
+	var receiver *atypes.Account
+	if ctx.Tx.Type == atypes.TRX_TRANSFER {
+		receiver = ctrler.findOrNewAccount(ctx.Tx.To, ctx.Exec)
+		if xerr := receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
+			return xerr
+		}
+	}
+
+	// increase sender's nonce
+	ctx.Sender.AddNonce()
+
+	_ = ctrler.setAccountCommittable(ctx.Sender, ctx.Exec)
+	if receiver != nil {
+		_ = ctrler.setAccountCommittable(receiver, ctx.Exec)
+	}
+
+	return nil
+}
+
+func (ctrler *AcctCtrler) ValidateBlock(ctx *atypes.BlockContext) xerrors.XError {
+	// do nothing
+	return nil
+}
+
+func (ctrler *AcctCtrler) ExecuteBlock(ctx *atypes.BlockContext) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	ctrler.logger.Debug("AcctCtrler-ExecuteBlock", "height", ctx.BlockInfo.Header.Height)
+
+	if ctx.BlockInfo.Header.ProposerAddress != nil && ctx.Fee.Sign() > 0 {
+		// give fee to block proposer
+		if acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(ctx.BlockInfo.Header.ProposerAddress)); xerr != nil {
+			return xerr
+		} else if xerr := acct.AddBalance(ctx.Fee); xerr != nil {
+			return xerr
+		} else {
+			return ctrler.setAccountCommittable(acct, true)
+		}
+	}
+	return nil
+}
+
+func (ctrler *AcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	ctrler.logger.Debug("AcctCtrler-Commit")
+
+	return ctrler.acctLedger.Commit()
+}
+
+func (ctrler *AcctCtrler) Close() xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	if ctrler.acctLedger != nil {
+		if xerr := ctrler.acctLedger.Close(); xerr != nil {
+			ctrler.logger.Error("AcctCtrler", "acctLedger.Close() returns error", xerr.Error())
+		}
+		ctrler.acctLedger = nil
+	}
+	return nil
+}
+
+func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *atypes.Account {
+	k := ledger.ToLedgerKey(addr)
+
+	fn := ctrler.acctLedger.Get
+	if exec {
+		fn = ctrler.acctLedger.GetFinality
+	}
+
+	if acct, xerr := fn(k); xerr != nil {
+		// todo: xerr is not returned
+		return nil
+	} else {
+		return acct
+	}
+}
+
+func (ctrler *AcctCtrler) findOrNewAccount(addr types.Address, exec bool) *atypes.Account {
+	if acct := ctrler.findAccount(addr, exec); acct != nil {
+		return acct
+	}
+	return atypes.NewAccountWithName(addr, "")
+}
+
+func (ctrler *AcctCtrler) FindAccount_ExecLedger(addr types.Address) *atypes.Account {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.findAccount(addr, true)
+}
+
+func (ctrler *AcctCtrler) FindAccount_SimuLedger(addr types.Address) *atypes.Account {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.findAccount(addr, false)
+}
+
+func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atypes.Account {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.findOrNewAccount(addr, exec)
+}
+
+func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *atypes.Account {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
 	return ctrler.findAccount(addr, exec)
 }
 
-func (ctrler *AccountCtrler) FindOrNewAccount(addr account.Address, exec bool) *account.Account {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	return ctrler.findOrNewAccount(addr, exec)
-}
-
-func (ctrler *AccountCtrler) findAccount(addr account.Address, exec bool) *account.Account {
-	acctSet := ctrler.simuAccounts
-	if exec {
-		acctSet = ctrler.execAccounts
-	}
-
-	k := account.ToAcctKey(addr)
-	if acct, ok := acctSet[k]; ok {
-		return acct
-	}
-
-	if acct := ctrler.readAccount(addr); acct != nil {
-		acctSet[k] = acct
-		return acct
-	}
-
-	return nil
-}
-
-func (ctrler *AccountCtrler) findOrNewAccount(addr account.Address, exec bool) *account.Account {
-	if acct := ctrler.findAccount(addr, exec); acct != nil {
-		return acct
-	}
-
-	acct := account.NewAccountWithName(addr, "")
-	ctrler.putAccount(acct, exec)
-	return acct
-}
-
-func (ctrler *AccountCtrler) ReadAccount(addr account.Address) *account.Account {
+func (ctrler *AcctCtrler) ReadAccount(addr types.Address) *atypes.Account {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
 	return ctrler.readAccount(addr)
 }
 
-func (ctrler *AccountCtrler) readAccount(addr account.Address) *account.Account {
-	if bz, err := ctrler.acctTree.Get(addr); err != nil {
-		panic(err)
-	} else if bz == nil {
-		return nil
-	} else if acct, err := DecodeAccount(bz); err != nil {
-		panic(err)
+func (ctrler *AcctCtrler) readAccount(addr types.Address) *atypes.Account {
+	if acct, xerr := ctrler.acctLedger.Read(addr.Array32()); xerr != nil {
+		// db error or not found
+		return atypes.NewAccount(addr)
 	} else {
 		return acct
 	}
 }
 
-func (ctrler *AccountCtrler) Transfer(from, to *account.Account, amt *big.Int) error {
-	// don't need locking,
-	// because assetAccount does its own locking
+func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *big.Int, exec bool) xerrors.XError {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
 
+	if acct0 := ctrler.findAccount(from, exec); acct0 == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if acct1 := ctrler.findOrNewAccount(to, exec); acct1 == nil {
+		// not reachable
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := ctrler.transfer(acct0, acct1, amt); xerr != nil {
+		return xerr
+	} else if xerr := ctrler.setAccountCommittable(acct0, exec); xerr != nil {
+		return xerr
+	} else if xerr := ctrler.setAccountCommittable(acct1, exec); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (ctrler *AcctCtrler) transfer(from, to *atypes.Account, amt *big.Int) xerrors.XError {
 	if err := from.SubBalance(amt); err != nil {
 		return err
 	}
@@ -138,77 +267,37 @@ func (ctrler *AccountCtrler) Transfer(from, to *account.Account, amt *big.Int) e
 	return nil
 }
 
-func (ctrler *AccountCtrler) Commit() ([]byte, int64, error) {
+func (ctrler *AcctCtrler) Reward(to types.Address, amt *big.Int, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// accounts must be saved in order of their key.
-	// if the order of accounts is not same,
-	// each node has different iavl tree root hash.
-	var acctKeys account.AcctKeyList
-	for ak := range ctrler.execAccounts {
-		acctKeys = append(acctKeys, ak)
-	}
-	sort.Sort(acctKeys)
-
-	for _, k := range acctKeys {
-		acct, ok := ctrler.execAccounts[k]
-		if !ok {
-			return nil, 0, xerrors.New("not found account - execAccounts may have some problem")
-		}
-		if v, err := EncodeAccount(acct); err != nil {
-			// todo: implements recovery ??? or applying batch...
-			return nil, 0, err
-		} else {
-			// DON'T USE the variable 'k' directly.
-			// Next iteration, when the k's value is updated to next value,
-			// the key of ctrler.acctTree will be updated too.
-			var vk account.AcctKey
-			copy(vk[:], k[:])
-			ctrler.acctTree.Set(vk[:], v)
-		}
-	}
-
-	ctrler.simuAccounts = ctrler.execAccounts
-	ctrler.execAccounts = make(map[account.AcctKey]*account.Account)
-
-	return ctrler.acctTree.SaveVersion()
-}
-
-func (ctrler *AccountCtrler) Close() error {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	if ctrler.acctDB != nil {
-		if err := ctrler.acctDB.Close(); err != nil {
-			return nil
-		}
-	}
-
-	ctrler.acctDB = nil
-	ctrler.acctTree = nil
-	ctrler.simuAccounts = nil
-	ctrler.simuAccounts = nil
-	return nil
-}
-
-func (ctrler *AccountCtrler) Validate(ctx *trxs.TrxContext) error {
-	if ctx.Tx.GetType() != trxs.TRX_TRANSFER {
-		return xerrors.ErrInvalidTrxType
+	if acct := ctrler.findAccount(to, exec); acct == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := acct.AddBalance(amt); xerr != nil {
+		return xerr
+	} else if xerr := ctrler.setAccountCommittable(acct, exec); xerr != nil {
+		return xerr
 	}
 	return nil
 }
 
-func (ctrler *AccountCtrler) Execute(ctx *trxs.TrxContext) error {
+func (ctrler *AcctCtrler) SetAccountCommittable(acct *atypes.Account) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	receiverAcct := ctrler.findOrNewAccount(ctx.Tx.To, ctx.Exec)
-	if err := ctrler.Transfer(ctx.Sender, receiverAcct, ctx.Tx.Amount); err != nil {
-		return err
-	}
-	return nil
+	return ctrler.setAccountCommittable(acct, true)
 }
 
-var _ trxs.ITrxHandler = (*AccountCtrler)(nil)
-var _ types.ILedgerHandler = (*AccountCtrler)(nil)
+func (ctrler *AcctCtrler) setAccountCommittable(acct *atypes.Account, exec bool) xerrors.XError {
+	fn := ctrler.acctLedger.Set
+	if exec {
+		fn = ctrler.acctLedger.SetFinality
+	}
+
+	return fn(acct)
+}
+
+var _ atypes.ILedgerHandler = (*AcctCtrler)(nil)
+var _ atypes.ITrxHandler = (*AcctCtrler)(nil)
+var _ atypes.IBlockHandler = (*AcctCtrler)(nil)
+var _ atypes.IAccountHelper = (*AcctCtrler)(nil)

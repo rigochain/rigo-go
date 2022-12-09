@@ -1,53 +1,11 @@
 package test
 
 import (
-	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/libs/client"
-	"github.com/kysee/arcanus/types/account"
 	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"math/big"
-	"os"
-	"path/filepath"
 	"testing"
 )
-
-var (
-	WALKEYDIR  = ".tmp/walkeys"
-	TESTPASS   = []byte("1")
-	wallets    []*client.Wallet
-	walletsMap map[account.AcctKey]*client.Wallet
-	W0         *client.Wallet
-	W1         *client.Wallet
-	amt        = libs.RandBigIntN(big.NewInt(1000))
-	gas        = big.NewInt(10)
-)
-
-func init() {
-
-	files, err := os.ReadDir(WALKEYDIR)
-	if err != nil {
-		panic(err)
-	}
-
-	walletsMap = make(map[account.AcctKey]*client.Wallet)
-
-	for _, file := range files {
-		if !file.IsDir() {
-			if w, err := client.OpenWallet(
-				libs.NewFileReader(filepath.Join(WALKEYDIR, file.Name()))); err != nil {
-				panic(err)
-			} else {
-				wallets = append(wallets, w)
-
-				acctKey := account.ToAcctKey(w.Address())
-				walletsMap[acctKey] = w
-			}
-		}
-	}
-	W0 = wallets[0]
-	W1 = wallets[1]
-}
 
 func TestSyncWallet(t *testing.T) {
 	for _, w := range wallets {
@@ -56,13 +14,15 @@ func TestSyncWallet(t *testing.T) {
 }
 
 func TestTransfer(t *testing.T) {
+	require.NoError(t, W0.SyncAccount())
+	require.NoError(t, W1.SyncAccount())
 
-	ret, err := W0.TransferSync(W1.Address(), amt, gas)
+	ret, err := W0.TransferSync(W1.Address(), gas, amt)
 	require.Error(t, err) // unlock
 
 	require.NoError(t, W0.Unlock(TESTPASS))
 
-	ret, err = W0.TransferSync(W1.Address(), amt, gas)
+	ret, err = W0.TransferSync(W1.Address(), gas, amt)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	txHash := ret.Hash
@@ -88,7 +48,7 @@ func TestTransfer(t *testing.T) {
 func TestTransfer_OverBalance(t *testing.T) {
 	require.NoError(t, W0.Unlock(TESTPASS))
 
-	ret, err := W1.TransferSync(W0.Address(), amt, gas)
+	ret, err := W1.TransferSync(W0.Address(), gas, amt)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrInsufficientFund.Error(), ret.Log)
 

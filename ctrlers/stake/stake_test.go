@@ -2,29 +2,30 @@ package stake_test
 
 import (
 	"github.com/kysee/arcanus/ctrlers/stake"
-	"github.com/kysee/arcanus/libs"
+	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/bytes"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 )
 
 var (
-	addr0 = libs.RandAddress()
-	addr1 = libs.RandAddress()
+	addr0 = types.RandAddress()
+	addr1 = types.RandAddress()
 )
 
 func TestNewStake(t *testing.T) {
-	amt := libs.RandBigIntN(govRuleHandlerHelper.MaxStakeAmount())
+	amt := bytes.RandBigIntN(govHelper.MaxStakeAmount())
 	s0 := stake.NewStakeWithAmount(
 		addr0,
 		addr1,
 		amt, 1, nil,
-		govRuleHandlerHelper)
+		govHelper)
 
 	require.True(t, s0.Power > int64(0))
-	require.Equal(t, govRuleHandlerHelper.AmountToPower(amt), s0.Power)
+	require.Equal(t, govHelper.AmountToPower(amt), s0.Power)
 	require.True(t, s0.BlockRewardUnit.Sign() > 0)
-	require.Equal(t, govRuleHandlerHelper.PowerToReward(s0.Power), s0.BlockRewardUnit)
+	require.Equal(t, govHelper.PowerToReward(s0.Power), s0.BlockRewardUnit)
 	require.Equal(t, big.NewInt(0), s0.ReceivedReward)
 }
 
@@ -32,13 +33,13 @@ func TestApplyRewardByStake(t *testing.T) {
 	stakes := make([]*stake.Stake, 1000)
 
 	for i := 0; i < 1000; i++ {
-		amt := libs.RandBigIntN(new(big.Int).Div(govRuleHandlerHelper.MaxStakeAmount(), big.NewInt(1000)))
-		txhash := libs.RandBytes(32)
+		amt := bytes.RandBigIntN(new(big.Int).Div(govHelper.MaxStakeAmount(), big.NewInt(1000)))
+		txhash := bytes.RandBytes(32)
 		stakes[i] = stake.NewStakeWithAmount(
 			addr0,
 			addr1,
 			amt, 1, txhash,
-			govRuleHandlerHelper)
+			govHelper)
 	}
 
 	for i := 0; i < 1000; i++ {

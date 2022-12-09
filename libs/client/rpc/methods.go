@@ -2,22 +2,23 @@ package rpc
 
 import (
 	"encoding/json"
-	"github.com/kysee/arcanus/ctrlers/account"
-	accttypes "github.com/kysee/arcanus/types/account"
-	"github.com/kysee/arcanus/types/trxs"
+	"github.com/kysee/arcanus/ctrlers/stake"
+	types2 "github.com/kysee/arcanus/ctrlers/types"
+	"github.com/kysee/arcanus/rpc"
+	"github.com/kysee/arcanus/types"
 	"github.com/kysee/arcanus/types/xerrors"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
-	"math/big"
 	"sync"
 )
 
 var (
 	rpcClient = []*JSONRpcClient{
-		NewRpcClient("http://3.37.191.127:26657"),
-		NewRpcClient("http://3.34.201.6:26657"),
-		NewRpcClient("http://15.165.45.176:26657"),
-		NewRpcClient("http://15.165.38.111:26657"),
+		NewRpcClient("http://localhost:26657"),
+		//NewRpcClient("http://3.37.191.127:26657"),
+		//NewRpcClient("http://3.34.201.6:26657"),
+		//NewRpcClient("http://15.165.45.176:26657"),
+		//NewRpcClient("http://15.165.38.111:26657"),
 	}
 
 	idx = 0
@@ -32,47 +33,74 @@ func getRpcClient() *JSONRpcClient {
 	defer mtx.Unlock()
 
 	idx++
-	return rpcClient[idx%4]
+	return rpcClient[idx%len(rpcClient)]
 }
 
-func GetBalance(addr accttypes.Address) *big.Int {
-	if req, err := NewRequest("account", addr.String()); err != nil {
-		panic(err)
-	} else if resp, err := getRpcClient().call(req); err != nil {
-		panic(err)
-	} else if acct, err := account.DecodeAccount(resp.Result); err != nil {
-		return big.NewInt(0)
-	} else {
-		return acct.GetBalance()
-	}
-}
-
-func GetAccount(addr accttypes.Address) (*accttypes.Account, error) {
-	acct := accttypes.NewAccount(nil)
+func GetAccount(addr types.Address) (*types2.Account, error) {
+	queryResp := &rpc.QueryResult{}
+	acct := types2.NewAccount(nil)
 	if req, err := NewRequest("account", addr.String()); err != nil {
 		panic(err)
 	} else if resp, err := getRpcClient().call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
 		return nil, xerrors.New("rpc error: " + string(resp.Error))
-	} else if err := tmjson.Unmarshal(resp.Result, acct); err != nil {
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return nil, err
+	} else if err := tmjson.Unmarshal(queryResp.Value, acct); err != nil {
 		return nil, err
 	} else {
 		return acct, nil
 	}
 }
 
-func SendTransactionAsync(tx *trxs.Trx) (*coretypes.ResultBroadcastTx, error) {
+func GetDelegatee(addr types.Address) (*stake.Delegatee, error) {
+	queryResp := &rpc.QueryResult{}
+	delegatee := stake.NewDelegatee(nil, nil)
+	if req, err := NewRequest("delegatee", addr.String()); err != nil {
+		panic(err)
+	} else if resp, err := getRpcClient().call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, xerrors.New("rpc error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return nil, err
+	} else if err := tmjson.Unmarshal(queryResp.Value, delegatee); err != nil {
+		return nil, err
+	} else {
+		return delegatee, nil
+	}
+}
+
+func GetStakes(addr types.Address) ([]*stake.Stake, error) {
+	queryResp := &rpc.QueryResult{}
+	var stakes []*stake.Stake
+	if req, err := NewRequest("stakes", addr.String()); err != nil {
+		panic(err)
+	} else if resp, err := getRpcClient().call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, xerrors.New("rpc error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return nil, err
+	} else if err := tmjson.Unmarshal(queryResp.Value, &stakes); err != nil {
+		return nil, err
+	} else {
+		return stakes, nil
+	}
+}
+
+func SendTransactionAsync(tx *types2.Trx) (*coretypes.ResultBroadcastTx, error) {
 	return sendTransaction(tx, "broadcast_tx_async")
 }
-func SendTransactionSync(tx *trxs.Trx) (*coretypes.ResultBroadcastTx, error) {
+func SendTransactionSync(tx *types2.Trx) (*coretypes.ResultBroadcastTx, error) {
 	return sendTransaction(tx, "broadcast_tx_sync")
 }
-func SendTransactionCommit(tx *trxs.Trx) (*coretypes.ResultBroadcastTx, error) {
+func SendTransactionCommit(tx *types2.Trx) (*coretypes.ResultBroadcastTx, error) {
 	return sendTransaction(tx, "broadcast_tx_commit")
 }
 
-func sendTransaction(tx *trxs.Trx, method string) (*coretypes.ResultBroadcastTx, error) {
+func sendTransaction(tx *types2.Trx, method string) (*coretypes.ResultBroadcastTx, error) {
 
 	if txbz, err := tx.Encode(); err != nil {
 		return nil, err
@@ -102,13 +130,13 @@ func sendTransaction(tx *trxs.Trx, method string) (*coretypes.ResultBroadcastTx,
 
 type TrxResult struct {
 	*coretypes.ResultTx
-	TxDetail *trxs.Trx `json:"tx_detail"`
+	TxDetail *types2.Trx `json:"tx_detail"`
 }
 
 func GetTransaction(txhash []byte) (*TrxResult, error) {
 	txRet := &TrxResult{
 		ResultTx: &coretypes.ResultTx{},
-		TxDetail: &trxs.Trx{},
+		TxDetail: &types2.Trx{},
 	}
 
 	if req, err := NewRequest("tx", txhash, false); err != nil {

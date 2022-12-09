@@ -1,69 +1,66 @@
 package client
 
 import (
+	types2 "github.com/kysee/arcanus/ctrlers/types"
 	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/account"
-	"github.com/kysee/arcanus/types/trxs"
+	"github.com/kysee/arcanus/types/bytes"
 	"math/big"
 )
 
-func NewTrxTransfer(from, to account.Address, amt, gas *big.Int, nonce uint64) *trxs.Trx {
-	return trxs.NewTrx(
+func NewTrxTransfer(from, to types.Address, nonce uint64, gas, amt *big.Int) *types2.Trx {
+	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
+		gas,
 		amt,
-		gas,
-		&trxs.TrxPayloadAssetTransfer{})
+		&types2.TrxPayloadAssetTransfer{})
 }
 
-func NewTrxStaking(from, to account.Address, gas, amt *big.Int, nonce uint64) *trxs.Trx {
-	return trxs.NewTrx(
+func NewTrxStaking(from, to types.Address, nonce uint64, gas, amt *big.Int) *types2.Trx {
+	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
+		gas,
 		amt,
-		gas,
-		&trxs.TrxPayloadStaking{})
+		&types2.TrxPayloadStaking{})
 }
 
-func NewTrxUnstaking(from, to account.Address, gas *big.Int, nonce uint64, txhash types.HexBytes) *trxs.Trx {
-	return trxs.NewTrx(
+func NewTrxUnstaking(from, to types.Address, nonce uint64, gas *big.Int, txhash bytes.HexBytes) *types2.Trx {
+	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
-		big.NewInt(0),
 		gas,
-		&trxs.TrxPayloadUnstaking{TxHash: txhash})
+		big.NewInt(0),
+		&types2.TrxPayloadUnstaking{TxHash: txhash})
 }
 
-func NewTrxProposal(from, to account.Address, gas *big.Int, nonce uint64, msg string, blocks int64, propType int32, options [][]byte) *trxs.Trx {
-	return trxs.NewTrx(
+func NewTrxProposal(from, to types.Address, nonce uint64, gas *big.Int, msg string, start, period int64, optType int32, options ...[]byte) *types2.Trx {
+	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
-		big.NewInt(0),
 		gas,
-		&trxs.TrxPayloadProposal{
-			Message:      msg,
-			VotingBlocks: blocks,
-			ProposalType: propType,
-			Options:      options,
+		big.NewInt(0),
+		&types2.TrxPayloadProposal{
+			Message:            msg,
+			StartVotingHeight:  start,
+			VotingPeriodBlocks: period,
+			OptType:            optType,
+			Options:            options,
 		})
 }
 
-func NewTrxGovRuleProposal(from, to account.Address, gas *big.Int, nonce uint64, msg string, option []byte) *trxs.Trx {
-	return NewTrxProposal(from, to, gas, nonce, msg, 10, types.PROPOSAL_GOVRULE, [][]byte{option})
-}
-
-func NewTrxVoting(from, to account.Address, gas *big.Int, nonce uint64, txHash types.HexBytes, choice int32) *trxs.Trx {
-	return trxs.NewTrx(
+func NewTrxVoting(from, to types.Address, nonce uint64, gas *big.Int, txHash bytes.HexBytes, choice int32) *types2.Trx {
+	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
-		big.NewInt(0),
 		gas,
-		&trxs.TrxPayloadVoting{
+		big.NewInt(0),
+		&types2.TrxPayloadVoting{
 			TxHash: txHash,
 			Choice: choice,
 		})

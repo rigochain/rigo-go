@@ -2,23 +2,23 @@ package main
 
 import (
 	"github.com/kysee/arcanus/cmd/commands"
-	xlib "github.com/kysee/arcanus/libs"
-	xnode "github.com/kysee/arcanus/node"
+	"github.com/kysee/arcanus/libs"
+	"github.com/kysee/arcanus/node"
 	"github.com/tendermint/tendermint/libs/cli"
 	"path/filepath"
 )
 
 func main() {
 	commands.RootCmd.AddCommand(
-		commands.NewInitFilesCmd(xnode.XChainNewNode),
+		commands.NewInitFilesCmd(),
 		commands.ResetPrivValidatorCmd,
 		commands.ResetAllCmd,
-		commands.NewRunNodeCmd(xnode.XChainNewNode),
+		commands.NewRunNodeCmd(node.NewArcanusNode),
 		commands.ShowNodeIDCmd,
 		commands.VersionCmd,
 	)
 
-	executor := cli.PrepareBaseCmd(commands.RootCmd, "ARCANUS", filepath.Join(xlib.GetHome(), ".arcanus"))
+	executor := cli.PrepareBaseCmd(commands.RootCmd, "ARCANUS", filepath.Join(libs.GetHome(), ".arcanus"))
 	if err := executor.Execute(); err != nil {
 		panic(err)
 	}

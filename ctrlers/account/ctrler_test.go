@@ -1,137 +1,187 @@
-package account_test
+package account
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/kysee/arcanus/ctrlers/account"
-	"github.com/kysee/arcanus/libs"
-	account2 "github.com/kysee/arcanus/types/account"
+	cfg "github.com/kysee/arcanus/cmd/config"
+	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/bytes"
+	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/stretchr/testify/require"
-	"github.com/tendermint/tendermint/libs/log"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/big"
+	"math/rand"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 )
 
 var (
-	addr0 = libs.RandAddress()
-	dbDir = filepath.Join(os.TempDir(), "account-ctrler-test")
+	acctCtrlers []*AcctCtrler
+	addrs       []types.Address
 )
 
-func TestAccountMapMarshal(t *testing.T) {
-	addrs := make([]account2.Address, 10)
-	for i, _ := range addrs {
-		addrs[i] = libs.RandAddress()
+func init() {
+	if err := initialize(); err != nil {
+		panic(err)
 	}
-
-	accts := &struct {
-		Map1 map[account2.AcctKey]*account2.Account `json:"map1"`
-	}{
-		Map1: make(map[account2.AcctKey]*account2.Account),
-	}
-	for _, addr := range addrs {
-		accts.Map1[account2.ToAcctKey(addr)] = &account2.Account{}
-	}
-
-	_, err := json.Marshal(accts)
-	require.NoError(t, err)
-
-	// how to check that the key is ordered ???
 }
 
-func TestAccountCtrler_Find0(t *testing.T) {
-	os.RemoveAll(dbDir)
+func initialize() error {
+	acctCtrlers = nil
+	for i := 0; i < 10; i++ {
+		config := cfg.DefaultConfig()
+		config.DBPath = filepath.Join(os.TempDir(), fmt.Sprintf("testnode-%d", i))
+		_ = os.RemoveAll(config.DBDir())
 
-	ctrler, err := account.NewAccountCtrler(dbDir, log.NewNopLogger())
-	require.NoError(t, err)
-
-	// when exec == false
-	acct := ctrler.FindAccount(addr0, false)
-	require.Nil(t, acct)
-
-	acct = ctrler.FindOrNewAccount(addr0, false)
-	require.NotNil(t, acct)
-	require.Equal(t, addr0, acct.GetAddress())
-	require.Equal(t, uint64(0), acct.GetNonce())
-
-	// when exec == true
-	acct = ctrler.FindAccount(addr0, true)
-	require.Nil(t, acct)
-
-	acct = ctrler.FindOrNewAccount(addr0, true)
-	require.NotNil(t, acct)
-
-	acct.AddNonce()
-	acct.AddBalance(big.NewInt(10))
-
-	// save execAccounts
-	_, _, err = ctrler.Commit()
-	require.NoError(t, err)
-
-	err = ctrler.Close()
-	require.NoError(t, err)
-
-	ctrler2, err := account.NewAccountCtrler(dbDir, log.NewNopLogger())
-	require.NoError(t, err)
-
-	acct2 := ctrler2.FindAccount(addr0, false)
-	require.NotNil(t, acct2)
-
-	require.Equal(t, addr0, acct2.GetAddress())
-	require.Equal(t, uint64(1), acct2.GetNonce())
-	require.Equal(t, big.NewInt(10), acct2.GetBalance())
-
-	require.NoError(t, ctrler2.Close())
-
-	os.RemoveAll(dbDir)
-}
-
-func TestAccountCtrler_AppHash(t *testing.T) {
-	var addrList [100]account2.Address
-	for i := 0; i < len(addrList); i++ {
-		addrList[i] = libs.RandAddress()
+		ctrler, err := NewAcctCtrler(config, tmlog.NewNopLogger())
+		if err != nil {
+			return err
+		}
+		acctCtrlers = append(acctCtrlers, ctrler)
 	}
 
-	wg := sync.WaitGroup{}
-	nodeCnt := 20
-	appHashes := make([][]byte, nodeCnt)
-	blockNums := make([]int64, nodeCnt)
+	addrs = nil
+	for i := 0; i < 100; i++ {
+		addr := bytes.RandBytes(types.AddrSize)
+		for j := 0; j < len(acctCtrlers); j++ {
+			acct := acctCtrlers[j].FindOrNewAccount(addr, true)
+			acct.AddBalance(big.NewInt(10000000))
+			acctCtrlers[j].setAccountCommittable(acct, true)
+		}
+		addrs = append(addrs, addr)
+	}
+	if _, _, err := commit(); err != nil {
+		return err
+	}
 
-	for i := 0; i < nodeCnt; i++ {
-		wg.Add(1)
-		go func(idx int) {
-			_dbDir := filepath.Join(os.TempDir(), fmt.Sprintf("account-apphash-test_%d", idx))
-			os.RemoveAll(_dbDir)
+	return nil
+}
 
-			ctrler, err := account.NewAccountCtrler(_dbDir, log.NewNopLogger())
-			require.NoError(t, err, "dbDir", _dbDir)
+func commit() ([]byte, int64, error) {
+	var preAppHash, appHash []byte
+	var preVer, ver int64
+	var xerr xerrors.XError
+	for j := 0; j < len(acctCtrlers); j++ {
+		appHash, ver, xerr = acctCtrlers[j].Commit()
+		if xerr != nil {
+			return nil, -1, xerr
+		}
+		if preAppHash != nil && bytes.Compare(preAppHash, appHash) != 0 {
+			return nil, -1, errors.New("appHash is not same")
+		}
+		if preVer != 0 && preVer != ver {
+			return nil, -1, errors.New("version is not same")
+		}
+		preAppHash = appHash
+		preVer = ver
+	}
+	return appHash, ver, nil
+}
 
-			for j := 0; j < len(addrList); j++ {
-				acct := ctrler.FindOrNewAccount(addrList[j], true)
-				require.NotNil(t, acct)
-				acct.AddNonce()
-				acct.AddBalance(big.NewInt(int64(j * 1000000)))
+func simuRand(n int) error {
+	for i := 0; i < n; i++ {
+		r0, r1, r2 := rand.Intn(len(addrs)), rand.Intn(len(addrs)), rand.Intn(len(acctCtrlers))
+		addr0, addr1, ctrler := addrs[r0], addrs[r1], acctCtrlers[r2]
+
+		if err := ctrler.Transfer(addr0, addr1, big.NewInt(1), false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func execRand(n int) error {
+	for i := 0; i < n; i++ {
+		r0, r1, r2 := rand.Intn(len(addrs)), rand.Intn(len(addrs)), rand.Intn(len(acctCtrlers))
+		addr0, addr1, ctrler := addrs[r0], addrs[r1], acctCtrlers[r2]
+
+		if err := ctrler.Transfer(addr0, addr1, big.NewInt(1), true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func execSame(n int) error {
+	for i := 0; i < n; i++ {
+		r0, r1 := rand.Intn(len(addrs)), rand.Intn(len(addrs))
+		addr0, addr1 := addrs[r0], addrs[r1]
+
+		for j := 0; j < len(acctCtrlers); j++ {
+
+			if err := acctCtrlers[j].Transfer(addr0, addr1, big.NewInt(1), true); err != nil {
+				return err
 			}
+		}
+	}
+	return nil
+}
 
-			appHash, ver, err := ctrler.Commit()
-			require.NoError(t, err)
+func readRand(n int) error {
+	for i := 0; i < n; i++ {
+		r0, r1 := rand.Intn(len(addrs)), rand.Intn(len(acctCtrlers))
+		addr0, ctrler := addrs[r0], acctCtrlers[r1]
 
-			appHashes[idx] = appHash
-			blockNums[idx] = ver
+		// it makes ledger tree's cash to be dirty
+		if acct := ctrler.ReadAccount(addr0); acct == nil {
+			return xerrors.ErrNotFoundAccount
+		}
+	}
+	return nil
+}
 
-			os.RemoveAll(_dbDir)
-			wg.Done()
-		}(i)
+func TestAcctCtrler_Commit(t *testing.T) {
+	var preHash []byte
+	var preVer int64
+
+	for i := 0; i < 100; i++ {
+		require.NoError(t, simuRand(100))
+		require.NoError(t, readRand(100))
+		h, v, e := commit()
+		require.NoError(t, e)
+
+		if preHash != nil {
+			require.Equal(t, preHash, h)
+		}
+		preHash = h
+
+		if preVer != 0 {
+			require.Equal(t, preVer+1, v)
+		}
+		preVer = v
 	}
 
-	wg.Wait()
+	require.NoError(t, initialize())
+	for i := 0; i < 1000; i++ {
+		require.NoError(t, simuRand(100))
+		require.NoError(t, execRand(100))
+		require.NoError(t, readRand(100))
 
-	for i := 1; i < len(appHashes); i++ {
-		require.Equal(t, appHashes[0], appHashes[i])
-		require.Equal(t, blockNums[0], blockNums[i])
+		_, _, e := commit()
+		require.Error(t, e)
 	}
 
-	os.RemoveAll(dbDir)
+	require.NoError(t, initialize())
+	preHash = nil
+	preVer = 0
+
+	for i := 2; i < 1000; i++ {
+		require.NoError(t, simuRand(100))
+		require.NoError(t, readRand(10))
+		require.NoError(t, execSame(100))
+		require.NoError(t, readRand(10))
+
+		h, v, e := commit()
+		require.NoError(t, e)
+
+		if preHash != nil {
+			require.NotEqual(t, preHash, h)
+		}
+		preHash = h
+
+		if preVer != 0 {
+			require.Equal(t, preVer+1, v)
+		}
+		preVer = v
+	}
 }
