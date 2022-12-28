@@ -1,9 +1,10 @@
 package genesis
 
 import (
-	"crypto/sha256"
-	"encoding/json"
+	types2 "github.com/kysee/arcanus/ctrlers/types"
 	"github.com/kysee/arcanus/types"
+	"github.com/kysee/arcanus/types/crypto"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -15,33 +16,46 @@ type GenesisAssetHolder struct {
 }
 
 func (gh *GenesisAssetHolder) Hash() []byte {
-	hasher := sha256.New()
+	hasher := crypto.DefaultHasher()
 	hasher.Write(gh.Address[:])
 	hasher.Write([]byte(gh.Balance))
 	return hasher.Sum(nil)
 }
 
 type GenesisAppState struct {
-	AssetHolders []GenesisAssetHolder `json:"assetHolders"`
+	AssetHolders []*GenesisAssetHolder `json:"assetHolders"`
+	GovRule      *types2.GovRule       `json:"govRule"`
 }
 
-func (ga *GenesisAppState) Hash() []byte {
-	hasher := sha256.New()
-	for _, h := range ga.AssetHolders {
-		hasher.Write(h.Hash())
+func (ga *GenesisAppState) Hash() ([]byte, error) {
+	hasher := crypto.DefaultHasher()
+	if bz, err := ga.GovRule.Encode(); err != nil {
+		return nil, err
+	} else if _, err := hasher.Write(bz); err != nil {
+		return nil, err
+	} else {
+		for _, h := range ga.AssetHolders {
+			if _, err := hasher.Write(h.Hash()); err != nil {
+				return nil, err
+			}
+		}
 	}
-	return hasher.Sum(nil)
+	return hasher.Sum(nil), nil
 }
 
-func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []GenesisAssetHolder) (*tmtypes.GenesisDoc, error) {
+func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govRule *types2.GovRule) (*tmtypes.GenesisDoc, error) {
 	appState := GenesisAppState{
 		AssetHolders: assetHolders,
+		GovRule:      govRule,
 	}
-	appStateJsonBlob, err := json.Marshal(appState)
+	appStateJsonBlob, err := tmjson.Marshal(appState)
 	if err != nil {
 		return nil, err
 	}
-	appHash := appState.Hash()
+	appHash, err := appState.Hash()
+	if err != nil {
+		return nil, err
+	}
 
 	return &tmtypes.GenesisDoc{
 		ChainID:     chainID,

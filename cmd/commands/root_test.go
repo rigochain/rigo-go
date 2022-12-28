@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	cfg "github.com/kysee/arcanus/cmd/config"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cfg "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/libs/cli"
 	tmos "github.com/tendermint/tendermint/libs/os"
 )
@@ -98,11 +98,11 @@ func TestRootFlagsEnv(t *testing.T) {
 		env      map[string]string
 		logLevel string
 	}{
-		{[]string{"--log", "debug"}, nil, defaultLogLvl},                  // wrong flag
-		{[]string{"--log_level", "debug"}, nil, "debug"},                  // right flag
-		{nil, map[string]string{"TYC_LOW": "debug"}, defaultLogLvl},       // wrong env flag
-		{nil, map[string]string{"YCT_LOG_LEVEL": "debug"}, defaultLogLvl}, // wrong env prefix
-		{nil, map[string]string{"TYC_LOG_LEVEL": "debug"}, "debug"},       // right env
+		{[]string{"--log", "debug"}, nil, defaultLogLvl},                       // wrong flag
+		{[]string{"--log_level", "debug"}, nil, "debug"},                       // right flag
+		{nil, map[string]string{"ARCANUS_LOW": "debug"}, defaultLogLvl},        // wrong env flag
+		{nil, map[string]string{"_ARCANUS_LOG_LEVEL": "debug"}, defaultLogLvl}, // wrong env prefix
+		{nil, map[string]string{"ARCANUS_LOG_LEVEL": "debug"}, "debug"},        // right env
 	}
 
 	for i, tc := range cases {
@@ -129,9 +129,9 @@ func TestRootConfig(t *testing.T) {
 
 		logLvl string
 	}{
-		{nil, nil, nonDefaultLogLvl},                                      // should load config
-		{[]string{"--log_level=abc:info"}, nil, "abc:info"},               // flag over rides
-		{nil, map[string]string{"TYC_LOG_LEVEL": "abc:info"}, "abc:info"}, // env over rides
+		{nil, nil, nonDefaultLogLvl},                                          // should load config
+		{[]string{"--log_level=abc:info"}, nil, "abc:info"},                   // flag over rides
+		{nil, map[string]string{"ARCANUS_LOG_LEVEL": "abc:info"}, "abc:info"}, // env over rides
 	}
 
 	for i, tc := range cases {

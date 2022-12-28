@@ -1,55 +1,196 @@
 package stake_test
 
 import (
-	"fmt"
+	"bytes"
+	cfg "github.com/kysee/arcanus/cmd/config"
 	"github.com/kysee/arcanus/ctrlers/stake"
-	"github.com/kysee/arcanus/libs"
+	"github.com/kysee/arcanus/ctrlers/types"
 	"github.com/kysee/arcanus/libs/client"
-	"github.com/kysee/arcanus/types"
 	"github.com/stretchr/testify/require"
-	"github.com/tendermint/tendermint/libs/log"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
+	tmlog "github.com/tendermint/tendermint/libs/log"
+	types2 "github.com/tendermint/tendermint/proto/tendermint/types"
 	"math/big"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
 var (
-	addr0        = libs.RandAddress()
-	dbDir        = filepath.Join(os.TempDir(), "stake-ctrler-test")
-	maxAmount, _ = new(big.Int).SetString(types.MXCO, 10)
+	config      = cfg.DefaultConfig()
+	DBDIR       = filepath.Join(os.TempDir(), "stake-ctrler-unstaking-test")
+	acctHelper  = &accountHandler{}
+	govHelper   = &govHelperMock{}
+	stakeCtrler *stake.StakeCtrler
+
+	Wallets              []*client.Wallet
+	DelegateeWallets     []*client.Wallet
+	stakingToSelfTrxCtxs []*types.TrxContext
+	stakingTrxCtxs       []*types.TrxContext
+	unstakingTrxCtxs     []*types.TrxContext
+
+	dummyGas   = big.NewInt(0)
+	dummyNonce = uint64(0)
+
+	lastHeight = int64(1)
 )
 
-func TestStakerOrder(t *testing.T) {
-	os.RemoveAll(dbDir)
+func TestMain(m *testing.M) {
+	config.DBPath = DBDIR
+	stakeCtrler, _ = stake.NewStakeCtrler(config, govHelper, tmlog.NewNopLogger())
 
-	ctrler, err := stake.NewStakeCtrler(dbDir, log.NewNopLogger())
-	require.NoError(t, err)
+	Wallets = makeTestWallets(rand.Intn(100) + int(govHelper.MaxValidatorCnt()))
 
-	var vals stake.StakeSetArray
-	for i := 0; i < 50; i++ {
-		w0 := client.NewWallet([]byte("1"))
-		val0 := ctrler.AddStakerWith(w0.Address(), w0.GetPubKey())
-		require.NotNil(t, val0)
-		val0.AppendStake(stake.NewStake(w0.Address(), libs.RandBigIntN(maxAmount), int64(i+1), libs.RandBytes(32)))
-
-		vals = append(vals, val0)
-	}
-	require.Equal(t, 50, ctrler.StakersLen())
-
-	_ = ctrler.UpdateValidators() // sort
-
-	var preVal *stake.StakeSet
-	for i := 0; i < ctrler.StakersLen(); i++ {
-		staker := ctrler.GetStaker(i)
-		if preVal != nil {
-			require.Truef(t, preVal.TotalPower >= staker.TotalPower,
-				fmt.Sprintf("invalid power(stake) order: pre: %v, curr: %v", preVal.TotalPower, staker.TotalPower))
+	for i := 0; i < 5; i++ {
+		if txctx, err := randMakeStakingToSelfTrxContext(); err != nil {
+			panic(err)
+		} else {
+			stakingToSelfTrxCtxs = append(stakingToSelfTrxCtxs, txctx)
 		}
-		preVal = staker
+		if rand.Int()%3 == 0 {
+			lastHeight++
+		}
 	}
+
+	for i := 0; i < 1000; i++ {
+		if txctx, err := randMakeStakingTrxContext(); err != nil {
+			panic(err)
+		} else {
+			stakingTrxCtxs = append(stakingTrxCtxs, txctx)
+		}
+		if rand.Int()%3 == 0 {
+			lastHeight++
+		}
+	}
+
+	lastHeight += 10
+
+	for i := 0; i < 100; i++ {
+		if txctx, err := randMakeUnstakingTrxContext(); err != nil {
+			panic(err)
+		} else {
+			already := false
+			for _, _ctx := range unstakingTrxCtxs {
+				if bytes.Compare(_ctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash, txctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash) == 0 {
+					already = true
+				}
+			}
+			if !already {
+				unstakingTrxCtxs = append(unstakingTrxCtxs, txctx)
+			}
+
+		}
+		if rand.Int()%3 == 0 {
+			lastHeight++
+		}
+	}
+
+	exitCode := m.Run()
+
+	os.RemoveAll(DBDIR)
+
+	os.Exit(exitCode)
 }
 
-func TestStakerReward(t *testing.T) {
-	// todo: check if reward is wrong or not
+func TestStakingToSelfByTx(t *testing.T) {
+	sumAmt := big.NewInt(0)
+	sumPower := int64(0)
+
+	for _, txctx := range stakingToSelfTrxCtxs {
+		err := stakeCtrler.ExecuteTrx(txctx)
+		require.NoError(t, err)
+
+		sumAmt.Add(sumAmt, txctx.Tx.Amount)
+		sumPower += txctx.GovHelper.AmountToPower(txctx.Tx.Amount)
+	}
+
+	_, _, err := stakeCtrler.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, sumAmt.String(), stakeCtrler.GetTotalAmount().String())
+	require.Equal(t, sumPower, stakeCtrler.GetTotalPower())
+}
+
+func TestStakingByTx(t *testing.T) {
+	sumAmt := stakeCtrler.GetTotalAmount()
+	sumPower := stakeCtrler.GetTotalPower()
+
+	for _, txctx := range stakingTrxCtxs {
+		err := stakeCtrler.ExecuteTrx(txctx)
+		require.NoError(t, err)
+
+		sumAmt.Add(sumAmt, txctx.Tx.Amount)
+		sumPower += txctx.GovHelper.AmountToPower(txctx.Tx.Amount)
+	}
+
+	_, _, err := stakeCtrler.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, sumAmt.String(), stakeCtrler.GetTotalAmount().String())
+	require.Equal(t, sumPower, stakeCtrler.GetTotalPower())
+}
+
+func TestUnstakingByTx(t *testing.T) {
+	sumAmt0 := stakeCtrler.GetTotalAmount()
+	sumPower0 := stakeCtrler.GetTotalPower()
+	sumUnstakingAmt := big.NewInt(0)
+	sumUnstakingPower := int64(0)
+
+	for _, txctx := range unstakingTrxCtxs {
+		stakingTxHash := txctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash
+
+		err := stakeCtrler.ExecuteTrx(txctx)
+		require.NoError(t, err)
+
+		stakingTxCtx := findStakingTxCtx(stakingTxHash)
+
+		sumUnstakingAmt.Add(sumUnstakingAmt, stakingTxCtx.Tx.Amount)
+		sumUnstakingPower += txctx.GovHelper.AmountToPower(stakingTxCtx.Tx.Amount)
+	}
+
+	_, _, err := stakeCtrler.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, new(big.Int).Sub(sumAmt0, sumUnstakingAmt).String(), stakeCtrler.GetTotalAmount().String())
+	require.Equal(t, sumPower0-sumUnstakingPower, stakeCtrler.GetTotalPower())
+
+	// test freezing reward
+	frozenStakes := stakeCtrler.GetFrozenStakes()
+	require.Equal(t, len(unstakingTrxCtxs), len(frozenStakes))
+
+	sumFrozenAmount := big.NewInt(0)
+	sumFrozenPower := int64(0)
+	for _, s := range frozenStakes {
+		sumFrozenAmount.Add(sumFrozenAmount, s.Amount)
+		sumFrozenPower += s.Power
+	}
+	require.Equal(t, sumFrozenAmount.String(), sumUnstakingAmt.String())
+	require.Equal(t, sumFrozenPower, sumUnstakingPower)
+}
+
+func TestUnfreezing(t *testing.T) {
+	lastHeight += govHelper.LazyRewardBlocks()
+
+	// execute block at lastHeight
+	err := stakeCtrler.ExecuteBlock(&types.BlockContext{
+		BlockInfo: abcitypes.RequestBeginBlock{
+			Header: types2.Header{
+				Height: lastHeight,
+			},
+		},
+		Fee:        big.NewInt(10),
+		TxsCnt:     0,
+		GovHelper:  govHelper,
+		AcctHelper: acctHelper,
+	})
+	require.NoError(t, err)
+
+	_, _, err = stakeCtrler.Commit()
+	require.NoError(t, err)
+
+	frozenStakes := stakeCtrler.GetFrozenStakes()
+	require.Equal(t, 0, len(frozenStakes))
+
+	// todo: check received reward and fee
 }

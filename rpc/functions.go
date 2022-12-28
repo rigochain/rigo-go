@@ -1,13 +1,9 @@
 package rpc
 
 import (
-	"encoding/hex"
-	"github.com/kysee/arcanus/ctrlers/account"
-	"github.com/kysee/arcanus/ctrlers/stake"
-	"github.com/kysee/arcanus/types"
+	abytes "github.com/kysee/arcanus/types/bytes"
 	"github.com/kysee/arcanus/types/xerrors"
-	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/libs/json"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	tmrpccoretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
@@ -17,113 +13,45 @@ import (
 
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
-func queryAccount(ctx *tmrpctypes.Context, addr string) (types.IAccount, error) {
-	if strings.HasPrefix(addr, "0x") {
-		addr = addr[2:]
-	}
-
-	bzAddr, err := hex.DecodeString(addr)
-	if err != nil {
+func QueryAccount(ctx *tmrpctypes.Context, addr abytes.HexBytes) (*QueryResult, error) {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "account", tmbytes.HexBytes(addr), 0, false); err != nil {
 		return nil, err
-	}
-	if len(bzAddr) != crypto.AddressSize {
-		return nil, xerrors.New("error of address length: address length should be 20 bytes")
-	}
-
-	qd := &types.QueryData{
-		Command: types.QUERY_ACCOUNT,
-		Params:  bzAddr,
-	}
-	resp, err := tmrpccore.ABCIQuery(ctx, ctx.HTTPReq.RequestURI, qd.Encode(), 0, false)
-	if err != nil {
-		// not reachable
-		// ABCIQuery never returns error
-		return nil, err
-	}
-
-	if resp.Response.Code == xerrors.ErrCodeSuccess {
-		acct, err := account.DecodeAccount(resp.Response.Value)
-		if err != nil {
-			return nil, err
-		}
-		return acct, nil
 	} else {
-		return nil, xerrors.WithCode(resp.Response.Code, resp.Response.Log)
+		return &QueryResult{resp.Response}, nil
 	}
 }
 
-func QueryAccount(ctx *tmrpctypes.Context, addr string) (*account.Account, error) {
-	acct, err := queryAccount(ctx, addr)
-	if err != nil {
-		if xerr, ok := err.(xerrors.XError); ok && xerr.Code() == xerrors.ErrNotFoundAccount.Code() {
-			addrbz, _ := hex.DecodeString(addr)
-			acct = account.NewAccountWithName(addrbz, "")
-		} else {
-			return nil, err
-		}
-	}
-
-	switch acct.Type() {
-	case types.ACCT_COMMON_TYPE:
-		return acct.(*account.Account), nil
-	default:
-		return nil, xerrors.New("error account type: unknown account type")
-	}
-}
-
-func QueryAcctNonce(ctx *tmrpctypes.Context, addr string) (*ResponseAcctNonce, error) {
-	acct, err := queryAccount(ctx, addr)
-	if err != nil {
+func QueryDelegatee(ctx *tmrpctypes.Context, addr abytes.HexBytes) (*QueryResult, error) {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "delegatee", tmbytes.HexBytes(addr), 0, false); err != nil {
 		return nil, err
-	}
-	return &ResponseAcctNonce{
-		Nonce: acct.GetNonce(),
-	}, nil
-}
-
-func queryStakes(ctx *tmrpctypes.Context, addr string) (*stake.StakeSet, error) {
-	if strings.HasPrefix(addr, "0x") {
-		addr = addr[2:]
-	}
-
-	bzAddr, err := hex.DecodeString(addr)
-	if err != nil {
-		return nil, err
-	}
-	if len(bzAddr) != crypto.AddressSize {
-		return nil, xerrors.New("error of address length: address length should be 20 bytes")
-	}
-
-	qd := &types.QueryData{
-		Command: types.QUERY_STAKES,
-		Params:  bzAddr,
-	}
-
-	resp, err := tmrpccore.ABCIQuery(ctx, ctx.HTTPReq.RequestURI, qd.Encode(), 0, false)
-	if err != nil {
-		// not reachable
-		// ABCIQuery never returns error
-		return nil, err
-	}
-
-	if resp.Response.Code == xerrors.ErrCodeSuccess {
-		sset := &stake.StakeSet{}
-		err := json.Unmarshal(resp.Response.Value, sset)
-		if err != nil {
-			return nil, err
-		}
-		return sset, nil
 	} else {
-		return nil, xerrors.WithCode(resp.Response.Code, resp.Response.Log)
+		return &QueryResult{resp.Response}, nil
 	}
 }
 
-func QueryStakes(ctx *tmrpctypes.Context, addr string) (*stake.StakeSet, error) {
-	staker, err := queryStakes(ctx, addr)
-	if err != nil {
+func QueryStakes(ctx *tmrpctypes.Context, addr abytes.HexBytes) (*QueryResult, error) {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes", tmbytes.HexBytes(addr), 0, false); err != nil {
 		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
 	}
-	return staker, nil
+}
+
+func QueryProposals(ctx *tmrpctypes.Context, txhash abytes.HexBytes) (*QueryResult, error) {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "proposals", tmbytes.HexBytes(txhash), 0, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
+func QueryRule(ctx *tmrpctypes.Context) (*QueryResult, error) {
+
+	if resp, err := tmrpccore.ABCIQuery(ctx, "rule", nil, 0, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
 }
 
 func Subscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultSubscribe, error) {

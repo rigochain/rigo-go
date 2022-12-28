@@ -17,41 +17,58 @@ const (
 	ErrCodeInvalidAccountType
 	ErrCodeInvalidTrx
 	ErrCodeNotFoundTx
-	ErrCodeNotFoundStaker
+	ErrCodeNotFoundDelegatee
+	ErrCodeNotFoundStake
+	ErrCodeNotFoundProposal
 )
 
 type xerr2 error
 
 const (
 	ErrCodeQuery uint32 = 1000 + iota
-	ErrCodeInvalidQueryCmd
+	ErrCodeInvalidQueryPath
 	ErrCodeInvalidQueryParams
+	ErrCodeNotFoundResult
 	ErrLast
 )
 
 var (
-	ErrCheckTx    = WithCode(ErrCodeCheckTx, "CheckTx failed")
-	ErrBeginBlock = WithCode(ErrCodeBeginBlock, "BeginBlock failed")
-	ErrDeliverTx  = WithCode(ErrCodeDeliverTx, "DeliverTx failed")
-	ErrEndBlock   = WithCode(ErrCodeEndBlock, "EndBlock failed")
-	ErrCommit     = WithCode(ErrCodeCommit, "Commit failed")
-	ErrQuery      = WithCode(ErrCodeQuery, "query failed")
+	ErrCheckTx    = NewWith(ErrCodeCheckTx, "CheckTx failed")
+	ErrBeginBlock = NewWith(ErrCodeBeginBlock, "BeginBlock failed")
+	ErrDeliverTx  = NewWith(ErrCodeDeliverTx, "DeliverTx failed")
+	ErrEndBlock   = NewWith(ErrCodeEndBlock, "EndBlock failed")
+	ErrCommit     = NewWith(ErrCodeCommit, "Commit failed")
+	ErrQuery      = NewWith(ErrCodeQuery, "query failed")
 
-	ErrNotFoundAccount       = WithCode(ErrCodeNotFoundAccount, "not found account")
-	ErrInvalidAccountType    = WithCode(ErrCodeInvalidAccountType, "invalid account type")
-	ErrInvalidTrx            = WithCode(ErrCodeInvalidTrx, "invalid transaction")
-	ErrNegGas                = ErrInvalidTrx.Wrap(errors.New("negative gas"))
-	ErrInvalidNonce          = ErrInvalidTrx.Wrap(errors.New("invalid nonce"))
-	ErrNegAmount             = ErrInvalidTrx.Wrap(errors.New("negative amount"))
-	ErrInsufficientFund      = ErrInvalidTrx.Wrap(errors.New("insufficient fund"))
-	ErrInvalidTrxType        = ErrInvalidTrx.Wrap(errors.New("wrong transaction type"))
-	ErrInvalidTrxPayloadType = ErrInvalidTrx.Wrap(errors.New("wrong transaction payload type"))
-	ErrInvalidTrxSig         = ErrInvalidTrx.With(errors.New("invalid signature"))
-	ErrNotFoundTx            = WithCode(ErrCodeNotFoundTx, "not found tx")
-	ErrNotFoundStaker        = WithCode(ErrCodeNotFoundStaker, "not found staker")
+	ErrNotFoundAccount         = NewWith(ErrCodeNotFoundAccount, "not found account")
+	ErrInvalidAccountType      = NewWith(ErrCodeInvalidAccountType, "invalid account type")
+	ErrInvalidTrx              = NewWith(ErrCodeInvalidTrx, "invalid transaction")
+	ErrNegFee                  = ErrInvalidTrx.Wrap(errors.New("negative fee"))
+	ErrInsufficientFee         = ErrInvalidTrx.Wrap(errors.New("not enough fee"))
+	ErrInvalidNonce            = ErrInvalidTrx.Wrap(errors.New("invalid nonce"))
+	ErrNegAmount               = ErrInvalidTrx.Wrap(errors.New("negative amount"))
+	ErrInsufficientFund        = ErrInvalidTrx.Wrap(errors.New("insufficient fund"))
+	ErrInvalidTrxType          = ErrInvalidTrx.Wrap(errors.New("wrong transaction type"))
+	ErrInvalidTrxPayloadType   = ErrInvalidTrx.Wrap(errors.New("wrong transaction payload type"))
+	ErrInvalidTrxPayloadParams = ErrInvalidTrx.With(errors.New("invalid params of transaction payload"))
+	ErrInvalidTrxSig           = ErrInvalidTrx.With(errors.New("invalid signature"))
+	ErrTooManyPower            = ErrInvalidTrx.With(errors.New("too many power"))
+	ErrNotFoundTx              = NewWith(ErrCodeNotFoundTx, "not found tx")
+	ErrNotFoundDelegatee       = NewWith(ErrCodeNotFoundDelegatee, "not found delegatee")
+	ErrNotFoundStake           = NewWith(ErrCodeNotFoundStake, "not found stake")
+	ErrNotFoundProposal        = NewWith(ErrCodeNotFoundProposal, "not found proposal")
 
-	ErrInvalidQueryCmd    = WithCode(ErrCodeInvalidQueryCmd, "invalid query command")
-	ErrInvalidQueryParams = WithCode(ErrCodeInvalidQueryParams, "invalid query parameters")
+	ErrInvalidQueryPath   = NewWith(ErrCodeInvalidQueryPath, "invalid query path")
+	ErrInvalidQueryParams = NewWith(ErrCodeInvalidQueryParams, "invalid query parameters")
+
+	ErrNotFoundResult = NewWith(ErrCodeNotFoundResult, "not found result")
+
+	// new style errors
+	ErrUnknownTrxType        = New("unknown transaction type")
+	ErrUnknownTrxPayloadType = New("unknown transaction payload type")
+	ErrNoRight               = New("no right")
+	ErrNotVotingPeriod       = New("not voting period")
+	ErrDuplicatedKey         = New("already existed key")
 )
 
 type XError interface {
@@ -63,62 +80,65 @@ type XError interface {
 	Unwrap() error
 }
 
-type xerr struct {
+type xerror struct {
 	code  uint32
 	msg   string
 	cause error
 }
 
 func New(m string) XError {
-	return &xerr{
+	return &xerror{
 		code: ErrCodeGeneric,
 		msg:  m,
 	}
 }
 
-func WithCode(code uint32, msg string) XError {
-	return &xerr{
+func NewWith(code uint32, msg string) XError {
+	return &xerror{
 		code: code,
 		msg:  msg,
 	}
 }
 
-func Wrap(err error) XError {
-	return &xerr{
-		code: ErrCodeGeneric,
-		msg:  err.Error(),
+func NewFrom(err error) XError {
+	if err != nil {
+		return &xerror{
+			code: ErrCodeGeneric,
+			msg:  err.Error(),
+		}
 	}
+	return nil
 }
 
-func (e *xerr) Code() uint32 {
+func (e *xerror) Code() uint32 {
 	return e.code
 }
 
-func (e *xerr) Error() string {
+func (e *xerror) Error() string {
 	if e.cause != nil {
 		return e.msg + "<<" + e.cause.Error()
 	}
 	return e.msg
 }
 
-func (e *xerr) Cause() error {
+func (e *xerror) Cause() error {
 	return e.cause
 }
 
-func (e *xerr) Unwrap() error {
+func (e *xerror) Unwrap() error {
 	return e.Cause()
 }
 
-func (e *xerr) With(err error) XError {
-	return &xerr{
+func (e *xerror) With(err error) XError {
+	return &xerror{
 		code:  e.code,
 		msg:   e.msg,
 		cause: err,
 	}
 }
 
-func (e *xerr) Wrap(err error) XError {
-	return &xerr{
+func (e *xerror) Wrap(err error) XError {
+	return &xerror{
 		code:  e.code,
 		msg:   e.msg,
 		cause: err,

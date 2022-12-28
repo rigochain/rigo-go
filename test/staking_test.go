@@ -1,31 +1,28 @@
 package test
 
 import (
-	"encoding/hex"
-	"github.com/kysee/arcanus/types"
+	"bytes"
+	"github.com/kysee/arcanus/libs/client/rpc"
+	abytes "github.com/kysee/arcanus/types/bytes"
 	"github.com/kysee/arcanus/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 )
 
-func TestStaking(t *testing.T) {
-	addr, err := hex.DecodeString("4754BD89C3E067A5405F0FCF1158EB1A252362D8")
-	require.NoError(t, err)
+func TestStakingToValidator(t *testing.T) {
 
-	acctKey := types.ToAcctKey(addr)
-	w, ok := walletsMap[acctKey]
-	require.True(t, ok)
+	w := randCommonWallet()
 	require.NoError(t, w.SyncAccount())
 
 	bal := w.GetBalance()
 	require.True(t, bal.Cmp(big.NewInt(0)) > 0)
 
-	stakeAmt, ok := new(big.Int).SetString("15000000000000000000", 10)
-	require.True(t, ok)
+	stakeAmt := abytes.RandBigIntN(bal)
 
 	require.NoError(t, w.Unlock(TESTPASS))
-	ret, err := w.StakingSync(w.Address(), stakeAmt, gas)
+	// self staking
+	ret, err := w.StakingSync(validatorWallet.Address(), gas, stakeAmt)
 	require.NoError(t, err)
 
 	require.NoError(t, err)
@@ -36,7 +33,59 @@ func TestStaking(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 	require.Equal(t, txHash, txRet.Hash)
-	//require.Equal(t, trxs.TRX_TRANSFER, txRet.TxDetail.Payload.Type())
 	require.Equal(t, gas, txRet.TxDetail.Gas)
 	require.Equal(t, stakeAmt, txRet.TxDetail.Amount)
+
+	// check stakes
+	found := false
+	stakes, err := rpc.GetStakes(w.Address())
+	require.True(t, len(stakes) > 0)
+	for _, s0 := range stakes {
+		if bytes.Compare(s0.TxHash, txHash) == 0 {
+			require.Equal(t, stakeAmt, s0.Amount)
+			found = true
+		}
+	}
+	require.True(t, found)
+	require.NoError(t, err)
+}
+
+func TestStakingToSelf(t *testing.T) {
+
+	w := randCommonWallet()
+	require.NoError(t, w.SyncAccount())
+
+	bal := w.GetBalance()
+	require.True(t, bal.Cmp(big.NewInt(0)) > 0)
+
+	stakeAmt := abytes.RandBigIntN(bal)
+
+	require.NoError(t, w.Unlock(TESTPASS))
+	// self staking
+	ret, err := w.StakingSync(w.Address(), gas, stakeAmt)
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+	txHash := ret.Hash
+
+	txRet, err := waitTrxResult(txHash, 10)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
+	require.Equal(t, txHash, txRet.Hash)
+	require.Equal(t, gas, txRet.TxDetail.Gas)
+	require.Equal(t, stakeAmt, txRet.TxDetail.Amount)
+
+	// check stakes
+	found := false
+	stakes, err := rpc.GetStakes(w.Address())
+	require.True(t, len(stakes) > 0)
+	for _, s0 := range stakes {
+		if bytes.Compare(s0.TxHash, txHash) == 0 {
+			require.Equal(t, stakeAmt, s0.Amount)
+			found = true
+		}
+	}
+	require.True(t, found)
+	require.NoError(t, err)
 }

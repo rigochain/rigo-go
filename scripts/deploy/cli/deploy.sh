@@ -10,15 +10,15 @@ IDX=0
 for N in "${NODES[@]}"; do
   T="ubuntu@${N}"
   echo Stop ${T}...
-  ssh -i ~/.ssh/arcanus-dev.pem ${T} "chmod +x ~/bin/*.sh; ~/bin/stop.sh"
+  ssh -i ~/.ssh/anode-dev.pem ${T} "chmod +x ~/bin/*.sh; ~/bin/stop.sh"
 done
 
 
 # init locally
-rm -rf ~/.arcanus
-build/linux/arcanus init --chain_id demonet --priv_validator_secret 1
-cp -f scripts/config/config.toml ~/.arcanus/config/config.toml
-WKEY=($(ls ~/.arcanus/walkeys/wk*))
+rm -rf ~/.anode
+build/linux/anode init --chain_id demonet --priv_validator_secret 1
+cp -f scripts/config/config.toml ~/.anode/config/config.toml
+WKEY=($(ls ~/.anode/walkeys/wk*))
 
 PRE=""
 for N in "${NODES[@]}"; do
@@ -29,8 +29,8 @@ for N in "${NODES[@]}"; do
   echo " "
     echo "*********** Deploy to ${T}"
   # upload and ...
-  scp -i ~/.ssh/arcanus-dev.pem .deploy/deploy.gz.tar ${T}:~/
-  ssh -i ~/.ssh/arcanus-dev.pem ${T} "mkdir -p ~/bin; tar -xzvf ~/deploy.gz.tar -C ~/bin; chmod +x ~/bin/*.sh"
+  scp -i ~/.ssh/anode-dev.pem .deploy/deploy.gz.tar ${T}:~/
+  ssh -i ~/.ssh/anode-dev.pem ${T} "mkdir -p ~/bin; tar -xzvf ~/deploy.gz.tar -C ~/bin; chmod +x ~/bin/*.sh"
 
   if [[ "0" == "$IDX" ]]; then
 #    echo " "
@@ -39,21 +39,21 @@ for N in "${NODES[@]}"; do
     echo "First node is current node"
   else
   # init & configuration
-    ssh -i ~/.ssh/arcanus-dev.pem ${T} "rm -rf ~/.arcanus"
-    ssh -i ~/.ssh/arcanus-dev.pem ${T} "~/bin/init.sh"
-    scp -i ~/.ssh/arcanus-dev.pem ~/.arcanus/config/config.toml ${T}:~/.arcanus/config/config.toml
-    scp -i ~/.ssh/arcanus-dev.pem ~/.arcanus/config/genesis.json ${T}:~/.arcanus/config/genesis.json
+    ssh -i ~/.ssh/anode-dev.pem ${T} "rm -rf ~/.arcanus"
+    ssh -i ~/.ssh/anode-dev.pem ${T} "~/bin/init.sh"
+    scp -i ~/.ssh/anode-dev.pem ~/.anode/config/config.toml ${T}:~/.anode/config/config.toml
+    scp -i ~/.ssh/anode-dev.pem ~/.anode/config/genesis.json ${T}:~/.anode/config/genesis.json
 
     echo " "
     echo "************* Copy ${WKEY[$IDX]}"
-    scp -i ~/.ssh/arcanus-dev.pem ${WKEY[$IDX]} ${T}:~/.arcanus/config/priv_validator_key.json
+    scp -i ~/.ssh/anode-dev.pem ${WKEY[$IDX]} ${T}:~/.anode/config/priv_validator_key.json
   fi
-  ssh -i ~/.ssh/arcanus-dev.pem ${T} "~/bin/reset.sh"
-  nodeid=`ssh  -i ~/.ssh/arcanus-dev.pem ${T} "~/bin/arcanus show-node-id"`
+  ssh -i ~/.ssh/anode-dev.pem ${T} "~/bin/reset.sh"
+  nodeid=`ssh  -i ~/.ssh/anode-dev.pem ${T} "~/bin/arcanus show-node-id"`
   echo " "
   echo "Start ...."
 
-  ssh -i ~/.ssh/arcanus-dev.pem ${T} "~/bin/start.sh ${PREN}"
+  ssh -i ~/.ssh/anode-dev.pem ${T} "~/bin/start.sh ${PREN}"
 
   echo "***************************************************"
   echo " "

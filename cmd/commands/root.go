@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	cfg "github.com/kysee/arcanus/cmd/config"
 	"os"
 	"strings"
 
@@ -15,7 +16,7 @@ import (
 )
 
 var (
-	config = tmcfg.DefaultConfig()
+	config = cfg.DefaultConfig()
 	logger = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 )
 
@@ -29,7 +30,7 @@ func registerFlagsRootCmd(cmd *cobra.Command) {
 
 // ParseConfig retrieves the default environment configuration,
 // sets up the Tendermint root and ensures that the root exists
-func ParseConfig() (*tmcfg.Config, error) {
+func ParseConfig() (*cfg.Config, error) {
 	conf := tmcfg.DefaultConfig()
 	err := viper.Unmarshal(conf)
 	if err != nil {
@@ -40,7 +41,7 @@ func ParseConfig() (*tmcfg.Config, error) {
 	if err := conf.ValidateBasic(); err != nil {
 		return nil, fmt.Errorf("error in config file: %v", err)
 	}
-	return conf, nil
+	return &cfg.Config{conf}, nil
 }
 
 // RootCmd is the root command for Tendermint core.
