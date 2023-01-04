@@ -3,6 +3,7 @@ package crypto
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/sha256"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/kysee/arcanus/types"
 	abytes "github.com/kysee/arcanus/types/bytes"
@@ -91,11 +92,13 @@ func DefaultHash(datas ...[]byte) []byte {
 }
 
 func DefaultHasher() hash.Hash {
-	return ethcrypto.NewKeccakState()
+	//return ethcrypto.NewKeccakState()
+	return sha256.New()
 }
 
 func DefaultHasherName() string {
-	return "keccak256"
+	//return "keccak256"
+	return "sha256"
 }
 
 //
