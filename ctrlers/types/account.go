@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/kysee/arcanus/ledger"
@@ -16,11 +17,11 @@ import (
 )
 
 type Account struct {
-	Address types.Address `json:"address"`
-	Name    string        `json:"name,omitempty"`
-	Nonce   uint64        `json:"nonce"`
-	Balance *big.Int      `json:"balance,string"`
-	Code    []byte        `json:"code,omitempty"`
+	Address types.Address
+	Name    string
+	Nonce   uint64
+	Balance *big.Int
+	Code    []byte
 
 	mtx sync.RWMutex
 }
@@ -178,6 +179,65 @@ func (acct *Account) Decode(d []byte) xerrors.XError {
 	acct.Nonce = pm.Nonce
 	acct.Balance = new(big.Int).SetBytes(pm.XBalance)
 	acct.Code = pm.XCode
+	return nil
+}
+
+//type Account struct {
+//	Address types.Address `json:"address"`
+//	Name    string        `json:"name,omitempty"`
+//	Nonce   uint64        `json:"nonce"`
+//	Balance *big.Int      `json:"balance"`
+//	Code    []byte        `json:"code,omitempty"`
+//
+//	mtx sync.RWMutex
+//}
+
+func (acct *Account) MarshalJSON() ([]byte, error) {
+	acct.mtx.RLock()
+	defer acct.mtx.RUnlock()
+
+	_acct := &struct {
+		Address types.Address `json:"address"`
+		Name    string        `json:"name,omitempty"`
+		Nonce   uint64        `json:"nonce"`
+		Balance string        `json:"balance"`
+		Code    []byte        `json:"code,omitempty"`
+	}{
+		Address: acct.Address,
+		Name:    acct.Name,
+		Nonce:   acct.Nonce,
+		Balance: acct.Balance.String(),
+		Code:    acct.Code,
+	}
+
+	return json.Marshal(_acct)
+}
+
+func (acct *Account) UnmarshalJSON(d []byte) error {
+	_acct := &struct {
+		Address types.Address `json:"address"`
+		Name    string        `json:"name,omitempty"`
+		Nonce   uint64        `json:"nonce"`
+		Balance string        `json:"balance"`
+		Code    []byte        `json:"code,omitempty"`
+	}{}
+	if err := json.Unmarshal(d, _acct); err != nil {
+		return err
+	}
+
+	acct.mtx.Lock()
+	defer acct.mtx.Unlock()
+
+	bal, ok := new(big.Int).SetString(_acct.Balance, 10)
+	if !ok {
+		return errors.New("error in converting string to big.Int")
+	}
+
+	acct.Address = _acct.Address
+	acct.Name = _acct.Name
+	acct.Nonce = _acct.Nonce
+	acct.Balance = bal
+	acct.Code = _acct.Code
 	return nil
 }
 
