@@ -115,6 +115,8 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 
 	// increase sender's nonce
 	ctx.Sender.AddNonce()
+	// set used gas
+	ctx.GasUsed = ctx.Tx.Gas
 
 	_ = ctrler.setAccountCommittable(ctx.Sender, ctx.Exec)
 	if receiver != nil {
