@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/kysee/arcanus/libs/client"
 	"github.com/kysee/arcanus/types"
@@ -21,6 +22,10 @@ func TestBulkTransfer(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	for i, w := range wallets {
+
+		if bytes.Compare(w.Address(), validatorWallet.Address()) == 0 {
+			continue
+		}
 
 		fmt.Println("index", i, "address", w.Address())
 
