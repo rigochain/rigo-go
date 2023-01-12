@@ -1,6 +1,8 @@
 package gov
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	cfg "github.com/kysee/arcanus/cmd/config"
 	"github.com/kysee/arcanus/ctrlers/gov/proposal"
@@ -96,6 +98,10 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_PROPOSAL:
+		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
+			return xerrors.ErrInvalidTrxPayloadParams.With(errors.New("wrong address: the 'to' field in TRX_PROPOSAL should be zero address"))
+		}
+
 		// check right
 		if ctx.StakeHelper.IsValidator(ctx.Tx.From) == false {
 			return xerrors.ErrNoRight
@@ -124,6 +130,9 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
 	case ctrlertypes.TRX_VOTING:
+		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
+			return xerrors.ErrInvalidTrxPayloadParams.With(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
+		}
 		// check tx type
 		txpayload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadVoting)
 		if !ok {
@@ -135,6 +144,9 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		if xerr != nil {
 			return xerr
 		}
+		if prop.IsVoter(ctx.Tx.From) == false {
+			return xerrors.ErrNoRight
+		}
 
 		// check choice validation
 		if txpayload.Choice < 0 || txpayload.Choice >= int32(len(prop.Options)) {
@@ -145,9 +157,6 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		if ctx.Height > prop.EndVotingHeight ||
 			ctx.Height < prop.StartVotingHeight {
 			return xerrors.ErrNotVotingPeriod
-		}
-		if prop.IsVoter(ctx.Tx.From) == false {
-			return xerrors.ErrNoRight
 		}
 	default:
 		return xerrors.ErrUnknownTrxType
