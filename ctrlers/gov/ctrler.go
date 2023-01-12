@@ -96,10 +96,15 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		return xerrors.ErrInsufficientFee
 	}
 
+	// validation by tx type
 	switch ctx.Tx.GetType() {
+	case ctrlertypes.TRX_STAKING:
+		if ctrler.AmountPerPower().Cmp(ctx.Tx.Amount) > 0 {
+			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be greater than %v", ctrler.AmountPerPower()))
+		}
 	case ctrlertypes.TRX_PROPOSAL:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
-			return xerrors.ErrInvalidTrxPayloadParams.With(errors.New("wrong address: the 'to' field in TRX_PROPOSAL should be zero address"))
+			return xerrors.ErrInvalidTrx.With(errors.New("wrong address: the 'to' field in TRX_PROPOSAL should be zero address"))
 		}
 
 		// check right
