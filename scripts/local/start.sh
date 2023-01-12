@@ -3,8 +3,8 @@
 . ./env.sh
 
 # start nodes
-rpcport=35567
-port=26658
+rpcport=26657
+port=36656
 nodeid=""
 peer_opt="" #--p2p.persistent_peers ${nodeid}@${ip}:${port}
 for home in "${NODE_HOMES[@]}"; do

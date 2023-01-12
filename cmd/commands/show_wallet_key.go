@@ -12,12 +12,31 @@ import (
 	"strings"
 )
 
-var ShowWalletKeyCmd = &cobra.Command{
-	Use:     "show-wallet-key",
-	Aliases: []string{"show_wallet_key"},
-	Short:   "Show wallet key file",
-	RunE:    showWalletKey,
-	PreRun:  deprecateSnakeCase,
+var (
+	wkSecret string
+)
+
+func AddShowWalletKeyCmdFlag(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&wkSecret,
+		"secret",
+		"",
+		"passphrase to encrypt and decrypt a private key in a wallet key files",
+	)
+}
+
+func NewShowWalletKeyCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "show-wallet-key",
+		Aliases: []string{"show_wallet_key"},
+		Short:   "Show wallet key file",
+		RunE:    showWalletKey,
+		PreRun:  deprecateSnakeCase,
+	}
+
+	AddShowWalletKeyCmdFlag(cmd)
+
+	return cmd
 }
 
 func showWalletKey(cmd *cobra.Command, args []string) error {
@@ -65,10 +84,17 @@ func showWalletKeyDir(path string) error {
 }
 
 func showWalletKeyFile(path string) error {
+
 	if wk, err := crypto.OpenWalletKey(libs.NewFileReader(path)); err != nil {
 		return err
 	} else {
-		s := libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(path)))
+		var s []byte
+		if wkSecret != "" {
+			s = []byte(wkSecret)
+		} else {
+			s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(path)))
+		}
+
 		if err := wk.Unlock(s); err != nil {
 			return err
 		}

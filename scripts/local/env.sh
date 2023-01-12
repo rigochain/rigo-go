@@ -6,7 +6,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 echo "Your OS is $HOSTOS"
 
-EXE="../../../build/${HOSTOS}/arcanus"
+EXE="$GOPATH/src/github.com/kysee/arcanus/build/${HOSTOS}/arcanus"
 
 echo ${1}
 NODE_HOMES=()

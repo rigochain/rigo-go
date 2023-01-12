@@ -59,7 +59,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, w *client.Wallet, cnt int) {
 
 		expectedBalance := new(big.Int).Sub(w.GetBalance(), new(big.Int).Add(amt, gas))
 		require.NoError(t, w.SyncAccount())
-		require.Equal(t, expectedBalance, w.GetBalance())
+		require.Equal(t, expectedBalance, w.GetBalance(), w.Address())
 
 		time.Sleep(1 * time.Millisecond)
 	}
