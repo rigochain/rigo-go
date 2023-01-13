@@ -1,4 +1,4 @@
-## X.Chain Deamon
+## ARCANUS Deamon
 
 ```plantuml
 @startuml
