@@ -280,25 +280,31 @@ func (ctrler *ArcanusApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcityp
 			_txctx.Callback = func(ctx *types2.TrxContext, xerr xerrors.XError) {
 				// todo: notify that the tx is finisehd
 				// it is called in the executionRoutine goroutine
-				ctrler.mtx.Lock()
-				defer ctrler.mtx.Unlock()
+				if xerr != nil {
+					xerr = xerrors.ErrDeliverTx.Wrap(xerr)
+					response.Code = xerr.Code()
+					response.Log = xerr.Error()
 
-				_ = ctrler.currBlockCtx.Fee.Add(ctrler.currBlockCtx.Fee, ctx.GasUsed)
+				} else {
+					ctrler.mtx.Lock()
+					defer ctrler.mtx.Unlock()
 
-				response.GasWanted = ctx.Tx.Gas.Int64()
-				response.GasUsed = ctx.GasUsed.Int64()
-				response.Events = []abcitypes.Event{
-					{
-						Type: "tx",
-						Attributes: []abcitypes.EventAttribute{
-							{Key: []byte(types2.EVENT_ATTR_TXTYPE), Value: []byte(ctx.Tx.TypeString()), Index: true},
-							{Key: []byte(types2.EVENT_ATTR_TXSENDER), Value: []byte(ctx.Tx.From.String()), Index: true},
-							{Key: []byte(types2.EVENT_ATTR_TXRECVER), Value: []byte(ctx.Tx.To.String()), Index: true},
-							{Key: []byte(types2.EVENT_ATTR_ADDRPAIR), Value: []byte(ctx.Tx.From.String() + ctx.Tx.To.String()), Index: true},
+					_ = ctrler.currBlockCtx.Fee.Add(ctrler.currBlockCtx.Fee, ctx.GasUsed)
+
+					response.GasWanted = ctx.Tx.Gas.Int64()
+					response.GasUsed = ctx.GasUsed.Int64()
+					response.Events = []abcitypes.Event{
+						{
+							Type: "tx",
+							Attributes: []abcitypes.EventAttribute{
+								{Key: []byte(types2.EVENT_ATTR_TXTYPE), Value: []byte(ctx.Tx.TypeString()), Index: true},
+								{Key: []byte(types2.EVENT_ATTR_TXSENDER), Value: []byte(ctx.Tx.From.String()), Index: true},
+								{Key: []byte(types2.EVENT_ATTR_TXRECVER), Value: []byte(ctx.Tx.To.String()), Index: true},
+								{Key: []byte(types2.EVENT_ATTR_ADDRPAIR), Value: []byte(ctx.Tx.From.String() + ctx.Tx.To.String()), Index: true},
+							},
 						},
-					},
+					}
 				}
-
 				ctrler.localClient.(*arcanusLocalClient).OnTrxExecFinished(ctrler.localClient, ctx.TxIdx, &req, &response)
 			}
 			return nil
