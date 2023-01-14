@@ -56,11 +56,12 @@ func TestTrxPayloadUnstaking_Decode(t *testing.T) {
 	decoded1 := &types2.Trx{}
 	require.NoError(t, decoded1.Decode(encoded1))
 
-	bz2, err := decoded1.Encode()
+	encoded2, err := decoded1.Encode()
 	require.NoError(t, err)
+	require.Equal(t, bz0, encoded2)
 
-	require.Equal(t, bz1, bz2)
-
+	decoded2 := &types2.Trx{}
+	require.NoError(t, decoded2.Decode(encoded2))
 }
 
 func BenchmarkTrxEncode(b *testing.B) {
