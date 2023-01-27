@@ -72,11 +72,14 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 		tx := ctx.Tx
 		sig := tx.Sig
 		tx.Sig = nil
-		if _txbz, xerr := tx.Encode(); xerr != nil {
+		_txbz, xerr := tx.Encode()
+		if xerr != nil {
 			return xerr
-		} else if fromAddr, pubBytes, xerr = crypto.Sig2Addr(_txbz, sig); xerr != nil {
+		}
+		if fromAddr, pubBytes, xerr = crypto.Sig2Addr(_txbz, sig); xerr != nil {
 			return xerr
-		} else if bytes.Compare(fromAddr, tx.From) != 0 {
+		}
+		if bytes.Compare(fromAddr, tx.From) != 0 {
 			return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
 		}
 	} else {
@@ -115,6 +118,8 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 
 	// increase sender's nonce
 	ctx.Sender.AddNonce()
+	// set used gas
+	ctx.GasUsed = ctx.Tx.Gas
 
 	_ = ctrler.setAccountCommittable(ctx.Sender, ctx.Exec)
 	if receiver != nil {

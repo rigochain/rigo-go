@@ -117,6 +117,28 @@ func TestOpenSave(t *testing.T) {
 	require.Equal(t, w1.Address, w2.Address)
 }
 
+func TestAddrFromPub(t *testing.T) {
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	err = filepath.Walk(filepath.Join(home, ".arcanus/walkeys"), func(path string, info os.FileInfo, err error) error {
+		require.NoError(t, err)
+		if info.IsDir() == false {
+			wk, err := crypto2.OpenWalletKey(libs.NewFileReader(path))
+			require.NoError(t, err)
+			require.NoError(t, wk.Unlock([]byte("1")))
+			addr, err := crypto2.PubBytes2Addr(wk.PubKey())
+			//t.Logf("prvKey: %x\n", wk.PrvKey())
+			//t.Logf("prvKey: %x\n", wk.PubKey())
+			//t.Logf("prvKey: %x\n", wk.Address)
+			//t.Log("--------------------------")
+			require.NoError(t, err)
+			require.Equal(t, wk.Address, addr)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func TestSig2Addr(t *testing.T) {
 	os.MkdirAll(TESTDIR, 0700)
 	defer os.RemoveAll(TESTDIR)

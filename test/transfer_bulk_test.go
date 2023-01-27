@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/kysee/arcanus/libs/client"
 	"github.com/kysee/arcanus/types"
@@ -21,6 +22,10 @@ func TestBulkTransfer(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	for i, w := range wallets {
+
+		if bytes.Compare(w.Address(), validatorWallet.Address()) == 0 {
+			continue
+		}
 
 		fmt.Println("index", i, "address", w.Address())
 
@@ -54,7 +59,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, w *client.Wallet, cnt int) {
 
 		expectedBalance := new(big.Int).Sub(w.GetBalance(), new(big.Int).Add(amt, gas))
 		require.NoError(t, w.SyncAccount())
-		require.Equal(t, expectedBalance, w.GetBalance())
+		require.Equal(t, expectedBalance, w.GetBalance(), w.Address())
 
 		time.Sleep(1 * time.Millisecond)
 	}

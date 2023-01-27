@@ -15,6 +15,7 @@ func main() {
 		commands.ResetAllCmd,
 		commands.NewRunNodeCmd(node.NewArcanusNode),
 		commands.ShowNodeIDCmd,
+		commands.NewShowWalletKeyCmd(),
 		commands.VersionCmd,
 	)
 

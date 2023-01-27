@@ -78,9 +78,11 @@ func runTrx(ctx *types.TrxContext) xerrors.XError {
 		return xerr
 	}
 	if xerr := ctx.AcctHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+		// todo: rollback changes in GovHandler.ExecuteTrx
 		return xerr
 	}
 	if xerr := ctx.StakeHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+		// todo: rollback changes in GovHandler.ExecuteTrx and AcctHandler.ExecuteTrx
 		return xerr
 	}
 

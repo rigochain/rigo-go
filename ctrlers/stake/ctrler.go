@@ -91,7 +91,18 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	// validating staking and un-staking txs
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	switch ctx.Tx.GetType() {
+	case ctrlertypes.TRX_STAKING:
+
+	case ctrlertypes.TRX_UNSTAKING:
+
+	default:
+		return xerrors.ErrUnknownTrxType
+	}
+
 	return nil
 }
 

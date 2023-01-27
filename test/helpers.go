@@ -17,8 +17,8 @@ import (
 
 var (
 	home, _         = os.UserHomeDir()
-	VALWALLETPATH   = filepath.Join(home, ".arcanus/config/priv_validator_key.json")
-	WALKEYDIR       = filepath.Join(home, ".arcanus/walkeys")
+	VALWALLETPATH   = filepath.Join(home, "arcanus_localnet_0/config/priv_validator_key.json")
+	WALKEYDIR       = filepath.Join(home, "arcanus_localnet_0/walkeys")
 	TESTPASS        = []byte("1")
 	validatorWallet *client.Wallet
 	wallets         []*client.Wallet
