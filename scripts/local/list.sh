@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 
-ps -e | grep arcanus | grep -v 'grep'
+# list only arcanus processes which is launched by start.sh
+ps -e | grep 'arcanus start --home' | grep -v 'grep'
