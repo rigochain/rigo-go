@@ -2,10 +2,10 @@ package proposal
 
 import (
 	"encoding/json"
-	"github.com/kysee/arcanus/ledger"
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/ledger"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"sort"
 	"sync"
 )

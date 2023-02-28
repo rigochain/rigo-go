@@ -17,7 +17,7 @@ var (
 	commitVer uint64 = 0
 
 	// it is changed using ldflags.
-	//  ex) -ldflags "... -X 'github.com/kysee/arcanus/tynode/version.GitCommit=$(LVER)'"
+	//  ex) -ldflags "... -X 'github.com/rigochain/rigo-go/tynode/version.GitCommit=$(LVER)'"
 	GitCommit string
 )
 

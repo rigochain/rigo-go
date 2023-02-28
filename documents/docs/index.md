@@ -1,3 +1,3 @@
 # OVERVIEW
 
-![Overview](./img/arch.png)
+![Overview](img/arch.png)

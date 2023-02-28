@@ -1,8 +1,8 @@
 package proposal
 
 import (
-	"github.com/kysee/arcanus/types"
-	abytes "github.com/kysee/arcanus/types/bytes"
+	"github.com/rigochain/rigo-go/types"
+	abytes "github.com/rigochain/rigo-go/types/bytes"
 )
 
 const (

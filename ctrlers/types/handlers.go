@@ -1,8 +1,8 @@
 package types
 
 import (
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"math/big"
 )

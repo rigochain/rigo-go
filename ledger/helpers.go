@@ -1,6 +1,6 @@
 package ledger
 
-import "github.com/kysee/arcanus/types/xerrors"
+import "github.com/rigochain/rigo-go/types/xerrors"
 
 func iterateItems[T ILedgerItem](m map[LedgerKey]T, cb func(T) xerrors.XError) xerrors.XError {
 	for _, v := range m {

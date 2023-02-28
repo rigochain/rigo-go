@@ -5,9 +5,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/kysee/arcanus/types"
-	abytes "github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types"
+	abytes "github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	"hash"
 )

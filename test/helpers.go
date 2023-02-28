@@ -1,12 +1,12 @@
 package test
 
 import (
-	"github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/libs/client"
-	"github.com/kysee/arcanus/libs/client/rpc"
-	"github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/libs"
+	"github.com/rigochain/rigo-go/libs/client"
+	"github.com/rigochain/rigo-go/libs/client/rpc"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/rand"
 	"math/big"
 	"os"
@@ -17,8 +17,8 @@ import (
 
 var (
 	home, _         = os.UserHomeDir()
-	VALWALLETPATH   = filepath.Join(home, "arcanus_localnet_0/config/priv_validator_key.json")
-	WALKEYDIR       = filepath.Join(home, "arcanus_localnet_0/walkeys")
+	VALWALLETPATH   = filepath.Join(home, "rigo_localnet_0/config/priv_validator_key.json")
+	WALKEYDIR       = filepath.Join(home, "rigo_localnet_0/walkeys")
 	TESTPASS        = []byte("1")
 	validatorWallet *client.Wallet
 	wallets         []*client.Wallet

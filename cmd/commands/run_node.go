@@ -3,10 +3,10 @@ package commands
 import (
 	"bytes"
 	"fmt"
-	cfg "github.com/kysee/arcanus/cmd/config"
-	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/node"
-	"github.com/kysee/arcanus/types/crypto"
+	cfg "github.com/rigochain/rigo-go/cmd/config"
+	"github.com/rigochain/rigo-go/libs"
+	"github.com/rigochain/rigo-go/node"
+	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/libs/log"
 	"io"
@@ -24,7 +24,7 @@ var (
 // These are exposed for convenience of commands embedding a node
 func AddNodeFlags(cmd *cobra.Command) {
 	// bind flags
-	cmd.Flags().String("moniker", config.Moniker, "arcanus name")
+	cmd.Flags().String("moniker", config.Moniker, "rigo name")
 
 	// priv val flags
 	cmd.Flags().String(
@@ -40,7 +40,7 @@ func AddNodeFlags(cmd *cobra.Command) {
 		[]byte{},
 		"optional SHA-256 hash of the genesis file")
 	cmd.Flags().Int64("consensus.double_sign_check_height", config.Consensus.DoubleSignCheckHeight,
-		"how many blocks to look back to check existence of the arcanus's "+
+		"how many blocks to look back to check existence of the rigo's "+
 			"consensus votes before joining consensus")
 
 	// abci flags
@@ -67,7 +67,7 @@ func AddNodeFlags(cmd *cobra.Command) {
 	cmd.Flags().String(
 		"p2p.laddr",
 		config.P2P.ListenAddress,
-		"arcanus listen address. (0.0.0.0:0 means any interface, any port)")
+		"rigo listen address. (0.0.0.0:0 means any interface, any port)")
 	cmd.Flags().String("p2p.seeds", config.P2P.Seeds, "comma-delimited ID@host:port seed nodes")
 	cmd.Flags().String("p2p.persistent_peers", config.P2P.PersistentPeers, "comma-delimited ID@host:port persistent peers")
 	cmd.Flags().String("p2p.unconditional_peer_ids",
@@ -109,8 +109,8 @@ func AddNodeFlags(cmd *cobra.Command) {
 func NewRunNodeCmd(nodeProvider node.Provider) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start",
-		Aliases: []string{"arcanus", "run"},
-		Short:   "Run the arcanus",
+		Aliases: []string{"rigo", "run"},
+		Short:   "Run the rigo",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkGenesisHash(config); err != nil {
 				return err
@@ -129,23 +129,23 @@ func NewRunNodeCmd(nodeProvider node.Provider) *cobra.Command {
 			libs.ClearCredential(s)
 
 			if err != nil {
-				return fmt.Errorf("failed to create arcanus: %w", err)
+				return fmt.Errorf("failed to create rigo: %w", err)
 			}
 
 			if err := n.Start(); err != nil {
-				return fmt.Errorf("failed to start arcanus: %w", err)
+				return fmt.Errorf("failed to start rigo: %w", err)
 			}
 
-			logger.Info("Started arcanus", "nodeInfo", n.Switch().NodeInfo())
+			logger.Info("Started rigo", "nodeInfo", n.Switch().NodeInfo())
 
 			// Stop upon receiving SIGTERM or CTRL-C.
 			trapSignal(logger, func() {
 				if n.IsRunning() {
 					if err := n.ProxyApp().Stop(); err != nil {
-						logger.Error("unable to stop the arcanus client", "error", err)
+						logger.Error("unable to stop the rigo client", "error", err)
 					}
 					if err := n.Stop(); err != nil {
-						logger.Error("unable to stop the arcanus node", "error", err)
+						logger.Error("unable to stop the rigo node", "error", err)
 					}
 				}
 			})

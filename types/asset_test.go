@@ -1,7 +1,7 @@
 package types_test
 
 import (
-	"github.com/kysee/arcanus/types"
+	"github.com/rigochain/rigo-go/types"
 	"github.com/stretchr/testify/require"
 	"math/rand"
 	"strconv"

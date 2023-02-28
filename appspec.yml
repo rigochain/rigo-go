@@ -2,7 +2,7 @@ version: 0.0
 os: linux
 files:
   - source:  /
-    destination: /home/ubuntu/arcanus-deploy
+    destination: /home/ubuntu/rigo-deploy
 
 file_exists_behavior: OVERWRITE
 

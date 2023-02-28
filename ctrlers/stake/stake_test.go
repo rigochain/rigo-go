@@ -1,9 +1,9 @@
 package stake_test
 
 import (
-	"github.com/kysee/arcanus/ctrlers/stake"
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/bytes"
+	"github.com/rigochain/rigo-go/ctrlers/stake"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"

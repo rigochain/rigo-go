@@ -1,6 +1,6 @@
 package ledger
 
-import "github.com/kysee/arcanus/types/xerrors"
+import "github.com/rigochain/rigo-go/types/xerrors"
 
 type memItems[T ILedgerItem] struct {
 	gotItems     map[LedgerKey]T

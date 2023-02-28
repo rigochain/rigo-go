@@ -1,11 +1,11 @@
 package node
 
 import (
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
-func (ctrler *ArcanusApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
+func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
 	response := abcitypes.ResponseQuery{
 		Code: abcitypes.CodeTypeOK,
 		Key:  req.Data,

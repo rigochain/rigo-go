@@ -2,7 +2,7 @@ package ledger
 
 import (
 	"encoding/json"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"

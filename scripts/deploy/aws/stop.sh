@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-PID=`ps -ef | grep 'arcanus' | grep -v grep | awk '{print $2}'`
+PID=`ps -ef | grep 'rigo' | grep -v grep | awk '{print $2}'`
 if [[ -n "$PID" ]]; then
   echo "Stopping kms-go (PID:${PID}) ..."
   kill -15 ${PID}

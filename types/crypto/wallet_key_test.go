@@ -3,9 +3,9 @@ package crypto_test
 import (
 	"bytes"
 	cryptorand "crypto/rand"
-	"github.com/kysee/arcanus/libs"
-	bytes2 "github.com/kysee/arcanus/types/bytes"
-	crypto2 "github.com/kysee/arcanus/types/crypto"
+	"github.com/rigochain/rigo-go/libs"
+	bytes2 "github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"os"
@@ -24,12 +24,12 @@ func TestSFilePV(t *testing.T) {
 
 	pass := []byte("abcdef")
 
-	sfilePV := crypto2.LoadOrGenSFilePV(privKeyFilePath, privStateFilePath, pass)
+	sfilePV := crypto.LoadOrGenSFilePV(privKeyFilePath, privStateFilePath, pass)
 	require.NotNil(t, sfilePV)
 	prvKey := sfilePV.Key.PrivKey
 	require.NotNil(t, prvKey)
 
-	sfilePV2 := crypto2.LoadOrGenSFilePV(privKeyFilePath, privStateFilePath, pass)
+	sfilePV2 := crypto.LoadOrGenSFilePV(privKeyFilePath, privStateFilePath, pass)
 	require.NotNil(t, sfilePV2)
 
 	msg := make([]byte, 1024)
@@ -59,7 +59,7 @@ func TestLock(t *testing.T) {
 
 	pass := []byte("abcdef")
 
-	w := crypto2.CreateWalletKey(pass)
+	w := crypto.CreateWalletKey(pass)
 	require.Nil(t, w.PrvKey())
 	require.NotNil(t, w.PubKey())
 
@@ -100,11 +100,11 @@ func TestOpenSave(t *testing.T) {
 	pass := []byte("abcdef")
 	path := filepath.Join(TESTDIR, "test_key.json")
 
-	w1 := crypto2.CreateWalletKey(pass)
+	w1 := crypto.CreateWalletKey(pass)
 	_, err := w1.Save(libs.NewFileWriter(path))
 	require.NoError(t, err)
 
-	w2, err := crypto2.OpenWalletKey(libs.NewFileReader(path))
+	w2, err := crypto.OpenWalletKey(libs.NewFileReader(path))
 	require.NoError(t, err)
 
 	err = w1.Unlock(pass)
@@ -120,13 +120,13 @@ func TestOpenSave(t *testing.T) {
 func TestAddrFromPub(t *testing.T) {
 	home, err := os.UserHomeDir()
 	require.NoError(t, err)
-	err = filepath.Walk(filepath.Join(home, ".arcanus/walkeys"), func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(filepath.Join(home, ".rigo/walkeys"), func(path string, info os.FileInfo, err error) error {
 		require.NoError(t, err)
 		if info.IsDir() == false {
-			wk, err := crypto2.OpenWalletKey(libs.NewFileReader(path))
+			wk, err := crypto.OpenWalletKey(libs.NewFileReader(path))
 			require.NoError(t, err)
 			require.NoError(t, wk.Unlock([]byte("1")))
-			addr, err := crypto2.PubBytes2Addr(wk.PubKey())
+			addr, err := crypto.PubBytes2Addr(wk.PubKey())
 			//t.Logf("prvKey: %x\n", wk.PrvKey())
 			//t.Logf("prvKey: %x\n", wk.PubKey())
 			//t.Logf("prvKey: %x\n", wk.Address)
@@ -145,7 +145,7 @@ func TestSig2Addr(t *testing.T) {
 
 	pass := []byte("abcdef")
 
-	w := crypto2.CreateWalletKey(pass)
+	w := crypto.CreateWalletKey(pass)
 	err := w.Unlock(pass)
 	require.NoError(t, err)
 	require.NotNil(t, w.PrvKey())
@@ -155,7 +155,7 @@ func TestSig2Addr(t *testing.T) {
 	sig, err := w.Sign(msg)
 	require.NoError(t, err)
 
-	addr, _, err := crypto2.Sig2Addr(msg, sig)
+	addr, _, err := crypto.Sig2Addr(msg, sig)
 	require.NoError(t, err)
 	require.Equal(t, w.Address, addr)
 }

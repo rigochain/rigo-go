@@ -2,7 +2,7 @@ package commands
 
 import (
 	"fmt"
-	cfg "github.com/kysee/arcanus/cmd/config"
+	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"io/ioutil"
 	"os"
 	"path/filepath"

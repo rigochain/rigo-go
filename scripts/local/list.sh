@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
-# list only arcanus processes which is launched by start.sh
-ps -e | grep 'arcanus start --home' | grep -v 'grep'
+# list only rigo processes which is launched by start.sh
+ps -e | grep 'rigo start --home' | grep -v 'grep'

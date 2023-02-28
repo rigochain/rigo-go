@@ -2,7 +2,7 @@
 
 #make build
 #make build-deploy
-#build/darwin/arcanus init --chain_id demonet --priv_validator_secret 1
+#build/darwin/rigo init --chain_id demonet --priv_validator_secret 1
 
 NODES=("3.38.221.227" "3.37.191.127" "3.34.201.6" "15.165.45.176" "15.165.38.111")
 IDX=0
@@ -35,11 +35,11 @@ for N in "${NODES[@]}"; do
   if [[ "0" == "$IDX" ]]; then
 #    echo " "
 #    echo "************* Copy priv_validator_key.json"
-#    scp -i ~/.ssh/arcanus-dev.pem ~/.arcanus/config/priv_validator_key.json ${T}:~/.arcanus/config/priv_validator_key.json
+#    scp -i ~/.ssh/rigo-dev.pem ~/.rigo/config/priv_validator_key.json ${T}:~/.rigo/config/priv_validator_key.json
     echo "First node is current node"
   else
   # init & configuration
-    ssh -i ~/.ssh/anode-dev.pem ${T} "rm -rf ~/.arcanus"
+    ssh -i ~/.ssh/anode-dev.pem ${T} "rm -rf ~/.rigo"
     ssh -i ~/.ssh/anode-dev.pem ${T} "~/bin/init.sh"
     scp -i ~/.ssh/anode-dev.pem ~/.anode/config/config.toml ${T}:~/.anode/config/config.toml
     scp -i ~/.ssh/anode-dev.pem ~/.anode/config/genesis.json ${T}:~/.anode/config/genesis.json
@@ -49,7 +49,7 @@ for N in "${NODES[@]}"; do
     scp -i ~/.ssh/anode-dev.pem ${WKEY[$IDX]} ${T}:~/.anode/config/priv_validator_key.json
   fi
   ssh -i ~/.ssh/anode-dev.pem ${T} "~/bin/reset.sh"
-  nodeid=`ssh  -i ~/.ssh/anode-dev.pem ${T} "~/bin/arcanus show-node-id"`
+  nodeid=`ssh  -i ~/.ssh/anode-dev.pem ${T} "~/bin/rigo show-node-id"`
   echo " "
   echo "Start ...."
 

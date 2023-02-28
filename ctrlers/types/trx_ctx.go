@@ -1,8 +1,8 @@
 package types
 
 import (
-	bytes2 "github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	bytes2 "github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/types"
 	"math/big"
 )

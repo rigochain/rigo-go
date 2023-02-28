@@ -1,8 +1,8 @@
 package types
 
 import (
-	"github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"google.golang.org/protobuf/proto"
 )
 

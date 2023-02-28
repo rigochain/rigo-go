@@ -2,9 +2,9 @@ package types_test
 
 import (
 	"encoding/hex"
-	types2 "github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/bytes"
+	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"math/rand"

@@ -2,7 +2,7 @@ package ledger
 
 import (
 	"bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"sort"
 )
 

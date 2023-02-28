@@ -1,12 +1,12 @@
 package gov
 
 import (
-	cfg "github.com/kysee/arcanus/cmd/config"
-	"github.com/kysee/arcanus/ctrlers/stake"
-	ctrlertypes "github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	cfg "github.com/rigochain/rigo-go/cmd/config"
+	"github.com/rigochain/rigo-go/ctrlers/stake"
+	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/big"

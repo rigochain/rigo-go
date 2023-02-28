@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-~/bin/arcanus unsafe-reset-all --priv_validator_secret 1
+~/bin/rigo unsafe-reset-all --priv_validator_secret 1

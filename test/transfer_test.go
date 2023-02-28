@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"

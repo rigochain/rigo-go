@@ -2,7 +2,7 @@ package node
 
 import (
 	"encoding/binary"
-	"github.com/kysee/arcanus/ctrlers/types"
+	"github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/tendermint/tendermint/libs/json"
 	tmdb "github.com/tendermint/tm-db"
 	"sync"

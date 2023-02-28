@@ -2,8 +2,8 @@ package types
 
 import (
 	"encoding/hex"
-	abytes "github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	abytes "github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/crypto"
 	"strings"
 )

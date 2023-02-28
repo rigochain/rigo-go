@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"encoding/json"
-	"github.com/kysee/arcanus/types/bytes"
+	"github.com/rigochain/rigo-go/types/bytes"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/proto/tendermint/crypto"
 )

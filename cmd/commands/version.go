@@ -2,7 +2,7 @@ package commands
 
 import (
 	"fmt"
-	xver "github.com/kysee/arcanus/cmd/version"
+	xver "github.com/rigochain/rigo-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 
