@@ -19,7 +19,7 @@ func main() {
 		commands.VersionCmd,
 	)
 
-	executor := cli.PrepareBaseCmd(commands.RootCmd, "ARCANUS", filepath.Join(libs.GetHome(), ".rigo"))
+	executor := cli.PrepareBaseCmd(commands.RootCmd, "RIGO", filepath.Join(libs.GetHome(), ".rigo"))
 	if err := executor.Execute(); err != nil {
 		panic(err)
 	}
