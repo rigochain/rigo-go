@@ -20,10 +20,10 @@ const (
 )
 
 const (
-	EVENT_ATTR_TXTYPE   = "tx.type"
-	EVENT_ATTR_TXSENDER = "tx.sender"
-	EVENT_ATTR_TXRECVER = "tx.receiver"
-	EVENT_ATTR_ADDRPAIR = "tx.addrpair"
+	EVENT_ATTR_TXTYPE   = "type"
+	EVENT_ATTR_TXSENDER = "sender"
+	EVENT_ATTR_TXRECVER = "receiver"
+	EVENT_ATTR_ADDRPAIR = "addrpair"
 )
 
 type ITrxPayload interface {
