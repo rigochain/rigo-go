@@ -47,4 +47,4 @@ build/darwin/rigo start
 * Validator private key file is  `$HOME/.rigo/config/priv_validator_key.json`.
 * Initial wallet files are in `$HOME/.rigo/walkeys/`.
 * To show private key, run `build/darwin/rigo show-wallet-key {Wallet Key Files}`.  
-  e.g. run `build/darwin/rigo show-wallet-key ~/.rigo/config/priv_validator_key.json`.
+  (e.g. run `build/darwin/rigo show-wallet-key ~/.rigo/config/priv_validator_key.json`)
