@@ -2,16 +2,16 @@ package node
 
 import (
 	"fmt"
-	cfg "github.com/kysee/arcanus/cmd/config"
-	"github.com/kysee/arcanus/cmd/version"
-	"github.com/kysee/arcanus/ctrlers/account"
-	"github.com/kysee/arcanus/ctrlers/gov"
-	"github.com/kysee/arcanus/ctrlers/stake"
-	types2 "github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/genesis"
-	"github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/crypto"
-	"github.com/kysee/arcanus/types/xerrors"
+	cfg "github.com/rigochain/rigo-go/cmd/config"
+	"github.com/rigochain/rigo-go/cmd/version"
+	"github.com/rigochain/rigo-go/ctrlers/account"
+	"github.com/rigochain/rigo-go/ctrlers/gov"
+	"github.com/rigochain/rigo-go/ctrlers/stake"
+	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/genesis"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/crypto"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/json"
@@ -22,9 +22,9 @@ import (
 	"sync"
 )
 
-var _ abcitypes.Application = (*ArcanusApp)(nil)
+var _ abcitypes.Application = (*RigoApp)(nil)
 
-type ArcanusApp struct {
+type RigoApp struct {
 	abcitypes.BaseApplication
 
 	currBlockCtx *types2.BlockContext
@@ -41,8 +41,8 @@ type ArcanusApp struct {
 	mtx    sync.Mutex
 }
 
-func NewArcanusApp(config *cfg.Config, logger log.Logger) *ArcanusApp {
-	stateDB, err := openStateDB("arcanus_app", config.DBDir())
+func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
+	stateDB, err := openStateDB("rigo_app", config.DBDir())
 	if err != nil {
 		panic(err)
 	}
@@ -64,7 +64,7 @@ func NewArcanusApp(config *cfg.Config, logger log.Logger) *ArcanusApp {
 
 	txExecutor := NewTrxExecutor(runtime.GOMAXPROCS(0), logger)
 
-	return &ArcanusApp{
+	return &RigoApp{
 		stateDB:     stateDB,
 		acctCtrler:  acctCtrler,
 		stakeCtrler: stakeCtrler,
@@ -74,12 +74,12 @@ func NewArcanusApp(config *cfg.Config, logger log.Logger) *ArcanusApp {
 	}
 }
 
-func (ctrler *ArcanusApp) Start() error {
+func (ctrler *RigoApp) Start() error {
 	ctrler.txExecutor.Start()
 	return nil
 }
 
-func (ctrler *ArcanusApp) Stop() error {
+func (ctrler *RigoApp) Stop() error {
 	ctrler.txExecutor.Stop()
 	if err := ctrler.acctCtrler.Close(); err != nil {
 		return err
@@ -96,14 +96,14 @@ func (ctrler *ArcanusApp) Stop() error {
 	return nil
 }
 
-func (ctrler *ArcanusApp) SetLocalClient(client abcicli.Client) {
+func (ctrler *RigoApp) SetLocalClient(client abcicli.Client) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	ctrler.localClient = client
 }
 
-func (ctrler *ArcanusApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
+func (ctrler *RigoApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 	ctrler.logger.Info("Info", "version", tmver.ABCIVersion, "AppVersion", version.String())
 
 	return abcitypes.ResponseInfo{
@@ -116,7 +116,7 @@ func (ctrler *ArcanusApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInf
 }
 
 // InitChain is called only when the ResponseInfo::LastBlockHeight which is returned in Info() is 0.
-func (ctrler *ArcanusApp) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
+func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	appState := genesis.GenesisAppState{}
 	if err := json.Unmarshal(req.AppStateBytes, &appState); err != nil {
 		panic(err)
@@ -145,7 +145,7 @@ func (ctrler *ArcanusApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Re
 	}
 }
 
-func (ctrler *ArcanusApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
+func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	response := abcitypes.ResponseCheckTx{Code: abcitypes.CodeTypeOK}
 
 	ctrler.mtx.Lock()
@@ -184,7 +184,7 @@ func (ctrler *ArcanusApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respon
 	return response
 }
 
-func (ctrler *ArcanusApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	if req.Header.Height != ctrler.stateDB.LastBlockHeight()+1 {
 		panic(fmt.Errorf("error block height: expected(%v), actural(%v)", ctrler.stateDB.LastBlockHeight()+1, req.Header.Height))
 	}
@@ -207,7 +207,7 @@ func (ctrler *ArcanusApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.
 	return abcitypes.ResponseBeginBlock{}
 }
 
-func (ctrler *ArcanusApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	response := abcitypes.ResponseDeliverTx{}
 
 	if txctx, xerr := types2.NewTrxContext(req.Tx,
@@ -256,7 +256,7 @@ func (ctrler *ArcanusApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitype
 	return response
 }
 
-func (ctrler *ArcanusApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	txIdx := ctrler.currBlockCtx.TxsCnt
 	ctrler.currBlockCtx.TxsCnt++
 
@@ -305,7 +305,7 @@ func (ctrler *ArcanusApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcityp
 						},
 					}
 				}
-				ctrler.localClient.(*arcanusLocalClient).OnTrxExecFinished(ctrler.localClient, ctx.TxIdx, &req, &response)
+				ctrler.localClient.(*rigoLocalClient).OnTrxExecFinished(ctrler.localClient, ctx.TxIdx, &req, &response)
 			}
 			return nil
 		}); xerr != nil {
@@ -314,23 +314,23 @@ func (ctrler *ArcanusApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcityp
 		response.Code = xerr.Code()
 		response.Log = xerr.Error()
 
-		ctrler.localClient.(*arcanusLocalClient).OnTrxExecFinished(ctrler.localClient, txIdx, &req, &response)
+		ctrler.localClient.(*rigoLocalClient).OnTrxExecFinished(ctrler.localClient, txIdx, &req, &response)
 	} else if xerr := ctrler.txExecutor.ExecuteAsync(txctx); xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		response.Code = xerr.Code()
 		response.Log = xerr.Error()
 
-		ctrler.localClient.(*arcanusLocalClient).OnTrxExecFinished(ctrler.localClient, txIdx, &req, &response)
+		ctrler.localClient.(*rigoLocalClient).OnTrxExecFinished(ctrler.localClient, txIdx, &req, &response)
 	}
 	return response
 }
 
-func (ctrler *ArcanusApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+func (ctrler *RigoApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	// todo: call ctrler.deliverTxAsync() when is implemented.
 	return ctrler.deliverTxAsync(req)
 }
 
-func (ctrler *ArcanusApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	_ = ctrler.govCtrler.ExecuteBlock(ctrler.currBlockCtx)
 	_ = ctrler.acctCtrler.ExecuteBlock(ctrler.currBlockCtx)
 	_ = ctrler.stakeCtrler.ExecuteBlock(ctrler.currBlockCtx)
@@ -340,7 +340,7 @@ func (ctrler *ArcanusApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Resp
 	}
 }
 
-func (ctrler *ArcanusApp) Commit() abcitypes.ResponseCommit {
+func (ctrler *RigoApp) Commit() abcitypes.ResponseCommit {
 
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -349,26 +349,26 @@ func (ctrler *ArcanusApp) Commit() abcitypes.ResponseCommit {
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("ArcanusApp-Commit", "height", ver0, "appHash0", bytes.HexBytes(appHash0))
+	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "appHash0", bytes.HexBytes(appHash0))
 
 	appHash1, ver1, err := ctrler.acctCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("ArcanusApp-Commit", "height", ver0, "appHash1", bytes.HexBytes(appHash1))
+	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "appHash1", bytes.HexBytes(appHash1))
 
 	appHash2, ver2, err := ctrler.stakeCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("ArcanusApp-Commit", "height", ver0, "appHash2", bytes.HexBytes(appHash2))
+	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "appHash2", bytes.HexBytes(appHash2))
 
 	if ver0 != ver1 || ver1 != ver2 {
 		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v", ver0, ver1, ver2))
 	}
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2)
-	ctrler.logger.Debug("ArcanusApp-Commit", "height", ver0, "final hash", bytes.HexBytes(appHash))
+	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "final hash", bytes.HexBytes(appHash))
 
 	ctrler.stateDB.PutLastBlockHeight(ver0)
 	ctrler.stateDB.PutLastBlockAppHash(appHash[:])

@@ -1,7 +1,7 @@
 package crypto
 
 import (
-	"github.com/kysee/arcanus/types/bytes"
+	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

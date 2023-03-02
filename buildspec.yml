@@ -16,7 +16,7 @@ phases:
     commands:
       - echo Build completed on $(date)
       - chmod +x scripts/deploy/aws/*.sh
-      - build/linux/arcanus --home ./build/.arcanus --chain_id demonet --holders 10 --priv_validator_secret '1'
+      - build/linux/rigo --home ./build/.rigo --chain_id demonet --holders 10 --priv_validator_secret '1'
       - pwd
 
 artifacts:
@@ -28,5 +28,5 @@ artifacts:
   secondary-artifacts:
     artifact1:
       files:
-        - .arcanus/**/*
+        - .rigo/**/*
       base-directory: build

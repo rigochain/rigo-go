@@ -1,7 +1,7 @@
 package account
 
 import (
-	types2 "github.com/kysee/arcanus/ctrlers/types"
+	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"google.golang.org/protobuf/proto"
 	"math/big"
 )

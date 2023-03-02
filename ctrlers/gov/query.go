@@ -1,7 +1,7 @@
 package gov
 
 import (
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 )

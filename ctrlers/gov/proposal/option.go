@@ -2,7 +2,7 @@ package proposal
 
 import (
 	"encoding/json"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types/xerrors"
 )
 
 type voteOption struct {

@@ -2,7 +2,7 @@ package ledger
 
 import (
 	"github.com/cosmos/iavl"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	tmdb "github.com/tendermint/tm-db"
 	"sort"
 	"sync"

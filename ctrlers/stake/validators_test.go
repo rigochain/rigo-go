@@ -2,9 +2,9 @@ package stake
 
 import (
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/crypto"
+	"github.com/rigochain/rigo-go/libs"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/libs/rand"

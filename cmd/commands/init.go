@@ -2,11 +2,11 @@ package commands
 
 import (
 	"fmt"
-	cfg "github.com/kysee/arcanus/cmd/config"
-	"github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/genesis"
-	"github.com/kysee/arcanus/libs"
-	acrypto "github.com/kysee/arcanus/types/crypto"
+	cfg "github.com/rigochain/rigo-go/cmd/config"
+	"github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/genesis"
+	"github.com/rigochain/rigo-go/libs"
+	acrypto "github.com/rigochain/rigo-go/types/crypto"
 	"github.com/spf13/cobra"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
@@ -32,7 +32,7 @@ var (
 func NewInitFilesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Initialize a arcanus",
+		Short: "Initialize a rigo",
 		RunE:  initFiles,
 	}
 	AddInitFlags(cmd)
@@ -95,12 +95,12 @@ func initFilesWithConfig(config *cfg.Config) error {
 
 	nodeKeyFile := config.NodeKeyFile()
 	if tmos.FileExists(nodeKeyFile) {
-		logger.Info("Found arcanus key", "path", nodeKeyFile)
+		logger.Info("Found rigo key", "path", nodeKeyFile)
 	} else {
 		if _, err := p2p.LoadOrGenNodeKey(nodeKeyFile); err != nil {
 			return err
 		}
-		logger.Info("Generated arcanus key", "path", nodeKeyFile)
+		logger.Info("Generated rigo key", "path", nodeKeyFile)
 	}
 
 	// genesis file

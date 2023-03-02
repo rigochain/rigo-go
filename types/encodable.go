@@ -1,6 +1,6 @@
 package types
 
-import "github.com/kysee/arcanus/types/xerrors"
+import "github.com/rigochain/rigo-go/types/xerrors"
 
 type IEncoder interface {
 	Encode() ([]byte, xerrors.XError)

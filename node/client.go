@@ -11,33 +11,33 @@ import (
 //----------------------------------------------------
 // local proxy uses a mutex on an in-proc app
 
-type arcanusLocalClientCreator struct {
+type rigoLocalClientCreator struct {
 	mtx *tmsync.Mutex
 	app abcitypes.Application
 }
 
 // NewLocalClientCreator returns a ClientCreator for the given app,
 // which will be running locally.
-func NewArcanusLocalClientCreator(app abcitypes.Application) tmproxy.ClientCreator {
-	return &arcanusLocalClientCreator{
+func NewRigoLocalClientCreator(app abcitypes.Application) tmproxy.ClientCreator {
+	return &rigoLocalClientCreator{
 		mtx: new(tmsync.Mutex),
 		app: app,
 	}
 }
 
-func (l *arcanusLocalClientCreator) NewABCIClient() (abcicli.Client, error) {
-	client := NewArcanusLocalClient(l.mtx, l.app)
-	l.app.(*ArcanusApp).SetLocalClient(client)
+func (l *rigoLocalClientCreator) NewABCIClient() (abcicli.Client, error) {
+	client := NewRigoLocalClient(l.mtx, l.app)
+	l.app.(*RigoApp).SetLocalClient(client)
 	return client, nil
 }
 
-var _ abcicli.Client = (*arcanusLocalClient)(nil)
+var _ abcicli.Client = (*rigoLocalClient)(nil)
 
 // NOTE: use defer to unlock mutex because Application might panic (e.g., in
 // case of malicious tx or query). It only makes sense for publicly exposed
 // methods like CheckTx (/broadcast_tx_* RPC endpoint) or Query (/abci_query
 // RPC endpoint), but defers are used everywhere for the sake of consistency.
-type arcanusLocalClient struct {
+type rigoLocalClient struct {
 	service.BaseService
 
 	mtx *tmsync.Mutex
@@ -48,50 +48,50 @@ type arcanusLocalClient struct {
 	OnTrxExecFinished func(abcicli.Client, int, *abcitypes.RequestDeliverTx, *abcitypes.ResponseDeliverTx)
 }
 
-var _ abcicli.Client = (*arcanusLocalClient)(nil)
+var _ abcicli.Client = (*rigoLocalClient)(nil)
 
 // NewLocalClient creates a local client, which will be directly calling the
 // methods of the given app.
 //
 // Both Async and Sync methods ignore the given context.Context parameter.
-func NewArcanusLocalClient(mtx *tmsync.Mutex, app abcitypes.Application) abcicli.Client {
+func NewRigoLocalClient(mtx *tmsync.Mutex, app abcitypes.Application) abcicli.Client {
 	if mtx == nil {
 		mtx = new(tmsync.Mutex)
 	}
-	cli := &arcanusLocalClient{
+	cli := &rigoLocalClient{
 		mtx:               mtx,
 		Application:       app,
 		OnTrxExecFinished: defualtOnTrxExecFinished,
 	}
-	cli.BaseService = *service.NewBaseService(nil, "arcanusLocalClient", cli)
+	cli.BaseService = *service.NewBaseService(nil, "rigoLocalClient", cli)
 	return cli
 }
 
-func (client *arcanusLocalClient) OnStart() error {
-	return client.Application.(*ArcanusApp).Start()
+func (client *rigoLocalClient) OnStart() error {
+	return client.Application.(*RigoApp).Start()
 }
 
-func (client *arcanusLocalClient) OnStop() {
-	client.Application.(*ArcanusApp).Stop()
+func (client *rigoLocalClient) OnStop() {
+	client.Application.(*RigoApp).Stop()
 }
 
-func (client *arcanusLocalClient) SetResponseCallback(cb abcicli.Callback) {
+func (client *rigoLocalClient) SetResponseCallback(cb abcicli.Callback) {
 	client.mtx.Lock()
 	client.Callback = cb
 	client.mtx.Unlock()
 }
 
 // TODO: change abcitypes.Application to include Error()?
-func (client *arcanusLocalClient) Error() error {
+func (client *rigoLocalClient) Error() error {
 	return nil
 }
 
-func (client *arcanusLocalClient) FlushAsync() *abcicli.ReqRes {
+func (client *rigoLocalClient) FlushAsync() *abcicli.ReqRes {
 	// Do nothing
 	return newLocalReqRes(abcitypes.ToRequestFlush(), nil)
 }
 
-func (client *arcanusLocalClient) EchoAsync(msg string) *abcicli.ReqRes {
+func (client *rigoLocalClient) EchoAsync(msg string) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -101,7 +101,7 @@ func (client *arcanusLocalClient) EchoAsync(msg string) *abcicli.ReqRes {
 	)
 }
 
-func (client *arcanusLocalClient) InfoAsync(req abcitypes.RequestInfo) *abcicli.ReqRes {
+func (client *rigoLocalClient) InfoAsync(req abcitypes.RequestInfo) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -112,7 +112,7 @@ func (client *arcanusLocalClient) InfoAsync(req abcitypes.RequestInfo) *abcicli.
 	)
 }
 
-func (client *arcanusLocalClient) SetOptionAsync(req abcitypes.RequestSetOption) *abcicli.ReqRes {
+func (client *rigoLocalClient) SetOptionAsync(req abcitypes.RequestSetOption) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -123,7 +123,7 @@ func (client *arcanusLocalClient) SetOptionAsync(req abcitypes.RequestSetOption)
 	)
 }
 
-func (client *arcanusLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverTx) *abcicli.ReqRes {
+func (client *rigoLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverTx) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -141,10 +141,10 @@ func (client *arcanusLocalClient) DeliverTxAsync(params abcitypes.RequestDeliver
 }
 
 func defualtOnTrxExecFinished(client abcicli.Client, txidx int, req *abcitypes.RequestDeliverTx, res *abcitypes.ResponseDeliverTx) {
-	client.(*arcanusLocalClient).onTrxFinished(txidx, req, res)
+	client.(*rigoLocalClient).onTrxFinished(txidx, req, res)
 }
 
-func (client *arcanusLocalClient) onTrxFinished(txidx int, req *abcitypes.RequestDeliverTx, res *abcitypes.ResponseDeliverTx) {
+func (client *rigoLocalClient) onTrxFinished(txidx int, req *abcitypes.RequestDeliverTx, res *abcitypes.ResponseDeliverTx) {
 	if txidx >= len(client.deliverTxReqReses) {
 		panic("client.deliverTxReqReses's length is wrong")
 	}
@@ -153,7 +153,7 @@ func (client *arcanusLocalClient) onTrxFinished(txidx int, req *abcitypes.Reques
 	rr.Done()
 }
 
-func (client *arcanusLocalClient) CheckTxAsync(req abcitypes.RequestCheckTx) *abcicli.ReqRes {
+func (client *rigoLocalClient) CheckTxAsync(req abcitypes.RequestCheckTx) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -164,7 +164,7 @@ func (client *arcanusLocalClient) CheckTxAsync(req abcitypes.RequestCheckTx) *ab
 	)
 }
 
-func (client *arcanusLocalClient) QueryAsync(req abcitypes.RequestQuery) *abcicli.ReqRes {
+func (client *rigoLocalClient) QueryAsync(req abcitypes.RequestQuery) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -175,7 +175,7 @@ func (client *arcanusLocalClient) QueryAsync(req abcitypes.RequestQuery) *abcicl
 	)
 }
 
-func (client *arcanusLocalClient) CommitAsync() *abcicli.ReqRes {
+func (client *rigoLocalClient) CommitAsync() *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -186,7 +186,7 @@ func (client *arcanusLocalClient) CommitAsync() *abcicli.ReqRes {
 	)
 }
 
-func (client *arcanusLocalClient) InitChainAsync(req abcitypes.RequestInitChain) *abcicli.ReqRes {
+func (client *rigoLocalClient) InitChainAsync(req abcitypes.RequestInitChain) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -197,7 +197,7 @@ func (client *arcanusLocalClient) InitChainAsync(req abcitypes.RequestInitChain)
 	)
 }
 
-func (client *arcanusLocalClient) BeginBlockAsync(req abcitypes.RequestBeginBlock) *abcicli.ReqRes {
+func (client *rigoLocalClient) BeginBlockAsync(req abcitypes.RequestBeginBlock) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -208,7 +208,7 @@ func (client *arcanusLocalClient) BeginBlockAsync(req abcitypes.RequestBeginBloc
 	)
 }
 
-func (client *arcanusLocalClient) EndBlockAsync(req abcitypes.RequestEndBlock) *abcicli.ReqRes {
+func (client *rigoLocalClient) EndBlockAsync(req abcitypes.RequestEndBlock) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -219,7 +219,7 @@ func (client *arcanusLocalClient) EndBlockAsync(req abcitypes.RequestEndBlock) *
 	)
 }
 
-func (client *arcanusLocalClient) ListSnapshotsAsync(req abcitypes.RequestListSnapshots) *abcicli.ReqRes {
+func (client *rigoLocalClient) ListSnapshotsAsync(req abcitypes.RequestListSnapshots) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -230,7 +230,7 @@ func (client *arcanusLocalClient) ListSnapshotsAsync(req abcitypes.RequestListSn
 	)
 }
 
-func (client *arcanusLocalClient) OfferSnapshotAsync(req abcitypes.RequestOfferSnapshot) *abcicli.ReqRes {
+func (client *rigoLocalClient) OfferSnapshotAsync(req abcitypes.RequestOfferSnapshot) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -241,7 +241,7 @@ func (client *arcanusLocalClient) OfferSnapshotAsync(req abcitypes.RequestOfferS
 	)
 }
 
-func (client *arcanusLocalClient) LoadSnapshotChunkAsync(req abcitypes.RequestLoadSnapshotChunk) *abcicli.ReqRes {
+func (client *rigoLocalClient) LoadSnapshotChunkAsync(req abcitypes.RequestLoadSnapshotChunk) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -252,7 +252,7 @@ func (client *arcanusLocalClient) LoadSnapshotChunkAsync(req abcitypes.RequestLo
 	)
 }
 
-func (client *arcanusLocalClient) ApplySnapshotChunkAsync(req abcitypes.RequestApplySnapshotChunk) *abcicli.ReqRes {
+func (client *rigoLocalClient) ApplySnapshotChunkAsync(req abcitypes.RequestApplySnapshotChunk) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -265,15 +265,15 @@ func (client *arcanusLocalClient) ApplySnapshotChunkAsync(req abcitypes.RequestA
 
 //-------------------------------------------------------
 
-func (client *arcanusLocalClient) FlushSync() error {
+func (client *rigoLocalClient) FlushSync() error {
 	return nil
 }
 
-func (client *arcanusLocalClient) EchoSync(msg string) (*abcitypes.ResponseEcho, error) {
+func (client *rigoLocalClient) EchoSync(msg string) (*abcitypes.ResponseEcho, error) {
 	return &abcitypes.ResponseEcho{Message: msg}, nil
 }
 
-func (client *arcanusLocalClient) InfoSync(req abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
+func (client *rigoLocalClient) InfoSync(req abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -281,7 +281,7 @@ func (client *arcanusLocalClient) InfoSync(req abcitypes.RequestInfo) (*abcitype
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) SetOptionSync(req abcitypes.RequestSetOption) (*abcitypes.ResponseSetOption, error) {
+func (client *rigoLocalClient) SetOptionSync(req abcitypes.RequestSetOption) (*abcitypes.ResponseSetOption, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -289,7 +289,7 @@ func (client *arcanusLocalClient) SetOptionSync(req abcitypes.RequestSetOption) 
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) DeliverTxSync(req abcitypes.RequestDeliverTx) (*abcitypes.ResponseDeliverTx, error) {
+func (client *rigoLocalClient) DeliverTxSync(req abcitypes.RequestDeliverTx) (*abcitypes.ResponseDeliverTx, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -297,7 +297,7 @@ func (client *arcanusLocalClient) DeliverTxSync(req abcitypes.RequestDeliverTx) 
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) CheckTxSync(req abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
+func (client *rigoLocalClient) CheckTxSync(req abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -305,7 +305,7 @@ func (client *arcanusLocalClient) CheckTxSync(req abcitypes.RequestCheckTx) (*ab
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) QuerySync(req abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
+func (client *rigoLocalClient) QuerySync(req abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -313,7 +313,7 @@ func (client *arcanusLocalClient) QuerySync(req abcitypes.RequestQuery) (*abcity
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) CommitSync() (*abcitypes.ResponseCommit, error) {
+func (client *rigoLocalClient) CommitSync() (*abcitypes.ResponseCommit, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -321,7 +321,7 @@ func (client *arcanusLocalClient) CommitSync() (*abcitypes.ResponseCommit, error
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) InitChainSync(req abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {
+func (client *rigoLocalClient) InitChainSync(req abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -329,7 +329,7 @@ func (client *arcanusLocalClient) InitChainSync(req abcitypes.RequestInitChain) 
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) BeginBlockSync(req abcitypes.RequestBeginBlock) (*abcitypes.ResponseBeginBlock, error) {
+func (client *rigoLocalClient) BeginBlockSync(req abcitypes.RequestBeginBlock) (*abcitypes.ResponseBeginBlock, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -337,7 +337,7 @@ func (client *arcanusLocalClient) BeginBlockSync(req abcitypes.RequestBeginBlock
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*abcitypes.ResponseEndBlock, error) {
+func (client *rigoLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*abcitypes.ResponseEndBlock, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -353,7 +353,7 @@ func (client *arcanusLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) ListSnapshotsSync(req abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
+func (client *rigoLocalClient) ListSnapshotsSync(req abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -361,7 +361,7 @@ func (client *arcanusLocalClient) ListSnapshotsSync(req abcitypes.RequestListSna
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) OfferSnapshotSync(req abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
+func (client *rigoLocalClient) OfferSnapshotSync(req abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
@@ -369,7 +369,7 @@ func (client *arcanusLocalClient) OfferSnapshotSync(req abcitypes.RequestOfferSn
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) LoadSnapshotChunkSync(
+func (client *rigoLocalClient) LoadSnapshotChunkSync(
 	req abcitypes.RequestLoadSnapshotChunk) (*abcitypes.ResponseLoadSnapshotChunk, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
@@ -378,7 +378,7 @@ func (client *arcanusLocalClient) LoadSnapshotChunkSync(
 	return &res, nil
 }
 
-func (client *arcanusLocalClient) ApplySnapshotChunkSync(
+func (client *rigoLocalClient) ApplySnapshotChunkSync(
 	req abcitypes.RequestApplySnapshotChunk) (*abcitypes.ResponseApplySnapshotChunk, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
@@ -389,7 +389,7 @@ func (client *arcanusLocalClient) ApplySnapshotChunkSync(
 
 //-------------------------------------------------------
 
-func (client *arcanusLocalClient) callback(req *abcitypes.Request, res *abcitypes.Response) *abcicli.ReqRes {
+func (client *rigoLocalClient) callback(req *abcitypes.Request, res *abcitypes.Response) *abcicli.ReqRes {
 	client.Callback(req, res)
 	rr := newLocalReqRes(req, res)
 	rr.InvokeCallback() //rr.callbackInvoked = true

@@ -2,7 +2,7 @@ package commands
 
 import (
 	"fmt"
-	cfg "github.com/kysee/arcanus/cmd/config"
+	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"os"
 	"strings"
 
@@ -46,7 +46,7 @@ func ParseConfig() (*cfg.Config, error) {
 
 // RootCmd is the root command for Tendermint core.
 var RootCmd = &cobra.Command{
-	Use:   "arcanus",
+	Use:   "rigo",
 	Short: "BFT state machine replication for applications in any programming languages",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		if cmd.Name() == VersionCmd.Name() {

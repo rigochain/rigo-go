@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-~/bin/arcanus init --chain_id demonet --priv_validator_secret 1
+~/bin/rigo init --chain_id demonet --priv_validator_secret 1

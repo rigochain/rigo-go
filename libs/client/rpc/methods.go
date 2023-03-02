@@ -2,11 +2,11 @@ package rpc
 
 import (
 	"encoding/json"
-	"github.com/kysee/arcanus/ctrlers/stake"
-	types2 "github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/rpc"
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/ctrlers/stake"
+	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/rpc"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"sync"

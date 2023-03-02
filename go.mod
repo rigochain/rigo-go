@@ -1,4 +1,4 @@
-module github.com/kysee/arcanus
+module github.com/rigochain/rigo-go
 
 go 1.19
 

@@ -7,7 +7,7 @@
 idx=0
 for home in "${NODE_HOMES[@]}"; do
   echo ""
-  read -p "initialize arcanus at ${home} ?" a
+  read -p "initialize rigo at ${home} ?" a
   echo ""
 
   rm -rf ${home}

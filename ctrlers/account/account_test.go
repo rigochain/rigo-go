@@ -1,9 +1,9 @@
 package account_test
 
 import (
-	"github.com/kysee/arcanus/ctrlers/account"
-	account2 "github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/types/crypto"
+	"github.com/rigochain/rigo-go/ctrlers/account"
+	account2 "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

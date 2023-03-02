@@ -1,9 +1,9 @@
 package types
 
 import (
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
 	"math/big"
@@ -20,7 +20,7 @@ const (
 )
 
 const (
-	EVENT_ATTR_TXTYPE   = "txtype"
+	EVENT_ATTR_TXTYPE   = "type"
 	EVENT_ATTR_TXSENDER = "sender"
 	EVENT_ATTR_TXRECVER = "receiver"
 	EVENT_ATTR_ADDRPAIR = "addrpair"

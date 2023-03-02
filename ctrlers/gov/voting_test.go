@@ -2,12 +2,12 @@ package gov
 
 import (
 	"encoding/json"
-	"github.com/kysee/arcanus/ctrlers/gov/proposal"
-	ctrlertypes "github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/libs/client"
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/ctrlers/gov/proposal"
+	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/libs/client"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"

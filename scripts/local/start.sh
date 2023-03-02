@@ -9,7 +9,7 @@ nodeid=""
 peer_opt="" #--p2p.persistent_peers ${nodeid}@${ip}:${port}
 for home in "${NODE_HOMES[@]}"; do
   echo ""
-  read -p "start arcanus at ${home} ?" a
+  read -p "start rigo at ${home} ?" a
   echo ""
 
   echo "this peer will be connecto to $peer_opt"

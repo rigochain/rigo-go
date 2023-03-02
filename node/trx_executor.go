@@ -1,8 +1,8 @@
 package node
 
 import (
-	"github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/log"
 )
 

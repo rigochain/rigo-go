@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	bytes2 "github.com/kysee/arcanus/types/bytes"
+	bytes2 "github.com/rigochain/rigo-go/types/bytes"
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"os/signal"

@@ -3,9 +3,9 @@ package test
 import (
 	"bytes"
 	"fmt"
-	"github.com/kysee/arcanus/libs/client"
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/xerrors"
+	"github.com/rigochain/rigo-go/libs/client"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"sync"

@@ -44,11 +44,11 @@ BUILDDIR="./build/$(HOSTOS)"
 all: $(TARGETOS)
 
 $(TARGETOS):
-	@echo Build arcanus for $(@) on $(HOSTOS)
+	@echo Build rigo for $(@) on $(HOSTOS)
 ifeq ($(HOSTOS), windows)
-	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(BUILDDIR)/arcanus.exe ./cmd/
+	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(BUILDDIR)/rigo.exe ./cmd/
 else
-	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(BUILDDIR)/arcanus ./cmd/
+	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(BUILDDIR)/rigo ./cmd/
 endif
 
 pbm:
@@ -63,7 +63,7 @@ build-deploy:
 	@mkdir -p .deploy
 	@mkdir -p .tmp/deploy
 	@cp ./scripts/deploy/cli/files/* .tmp/deploy/
-	@cp $(BUILDDIR)/arcanus .tmp/deploy/
+	@cp $(BUILDDIR)/rigo .tmp/deploy/
 
 	@tar -czvf .deploy/deploy.gz.tar -C .tmp/deploy .
 	@tar -tzvf .deploy/deploy.gz.tar

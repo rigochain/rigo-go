@@ -2,8 +2,8 @@ package commands
 
 import (
 	"fmt"
-	"github.com/kysee/arcanus/libs"
-	"github.com/kysee/arcanus/types/crypto"
+	"github.com/rigochain/rigo-go/libs"
+	"github.com/rigochain/rigo-go/types/crypto"
 	"os"
 	"path/filepath"
 
@@ -18,7 +18,7 @@ import (
 var ResetAllCmd = &cobra.Command{
 	Use:     "unsafe-reset-all",
 	Aliases: []string{"unsafe_reset_all"},
-	Short:   "(unsafe) Remove all the data and WAL, reset this arcanus's validator to genesis state",
+	Short:   "(unsafe) Remove all the data and WAL, reset this rigo's validator to genesis state",
 	Run:     resetAll,
 	PreRun:  deprecateSnakeCase,
 }
@@ -45,7 +45,7 @@ func init() {
 var ResetPrivValidatorCmd = &cobra.Command{
 	Use:     "unsafe-reset-priv-validator",
 	Aliases: []string{"unsafe_reset_priv_validator"},
-	Short:   "(unsafe) Reset this arcanus's validator to genesis state",
+	Short:   "(unsafe) Reset this rigo's validator to genesis state",
 	Run:     resetPrivValidator,
 	PreRun:  deprecateSnakeCase,
 }

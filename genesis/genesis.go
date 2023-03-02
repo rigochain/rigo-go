@@ -1,9 +1,9 @@
 package genesis
 
 import (
-	types2 "github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/crypto"
+	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/crypto"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"

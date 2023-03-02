@@ -1,11 +1,11 @@
 package client
 
 import (
-	types2 "github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/libs/client/rpc"
-	"github.com/kysee/arcanus/types"
-	"github.com/kysee/arcanus/types/bytes"
-	"github.com/kysee/arcanus/types/crypto"
+	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/libs/client/rpc"
+	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/crypto"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"io"

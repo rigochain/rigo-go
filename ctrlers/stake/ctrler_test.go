@@ -2,10 +2,10 @@ package stake_test
 
 import (
 	"bytes"
-	cfg "github.com/kysee/arcanus/cmd/config"
-	"github.com/kysee/arcanus/ctrlers/stake"
-	"github.com/kysee/arcanus/ctrlers/types"
-	"github.com/kysee/arcanus/libs/client"
+	cfg "github.com/rigochain/rigo-go/cmd/config"
+	"github.com/rigochain/rigo-go/ctrlers/stake"
+	"github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/libs/client"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
