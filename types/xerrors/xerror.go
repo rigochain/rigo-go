@@ -1,7 +1,6 @@
 package xerrors
 
 import (
-	"errors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
@@ -43,16 +42,16 @@ var (
 	ErrNotFoundAccount         = NewWith(ErrCodeNotFoundAccount, "not found account")
 	ErrInvalidAccountType      = NewWith(ErrCodeInvalidAccountType, "invalid account type")
 	ErrInvalidTrx              = NewWith(ErrCodeInvalidTrx, "invalid transaction")
-	ErrNegFee                  = ErrInvalidTrx.Wrap(errors.New("negative fee"))
-	ErrInsufficientFee         = ErrInvalidTrx.Wrap(errors.New("not enough fee"))
-	ErrInvalidNonce            = ErrInvalidTrx.Wrap(errors.New("invalid nonce"))
-	ErrNegAmount               = ErrInvalidTrx.Wrap(errors.New("negative amount"))
-	ErrInsufficientFund        = ErrInvalidTrx.Wrap(errors.New("insufficient fund"))
-	ErrInvalidTrxType          = ErrInvalidTrx.Wrap(errors.New("wrong transaction type"))
-	ErrInvalidTrxPayloadType   = ErrInvalidTrx.Wrap(errors.New("wrong transaction payload type"))
-	ErrInvalidTrxPayloadParams = ErrInvalidTrx.With(errors.New("invalid params of transaction payload"))
-	ErrInvalidTrxSig           = ErrInvalidTrx.With(errors.New("invalid signature"))
-	ErrTooManyPower            = ErrInvalidTrx.With(errors.New("too many power"))
+	ErrNegFee                  = ErrInvalidTrx.Wrap(New("negative fee"))
+	ErrInsufficientFee         = ErrInvalidTrx.Wrap(New("not enough fee"))
+	ErrInvalidNonce            = ErrInvalidTrx.Wrap(New("invalid nonce"))
+	ErrNegAmount               = ErrInvalidTrx.Wrap(New("negative amount"))
+	ErrInsufficientFund        = ErrInvalidTrx.Wrap(New("insufficient fund"))
+	ErrInvalidTrxType          = ErrInvalidTrx.Wrap(New("wrong transaction type"))
+	ErrInvalidTrxPayloadType   = ErrInvalidTrx.Wrap(New("wrong transaction payload type"))
+	ErrInvalidTrxPayloadParams = ErrInvalidTrx.With(New("invalid params of transaction payload"))
+	ErrInvalidTrxSig           = ErrInvalidTrx.With(New("invalid signature"))
+	ErrTooManyPower            = ErrInvalidTrx.With(New("too many power"))
 	ErrNotFoundTx              = NewWith(ErrCodeNotFoundTx, "not found tx")
 	ErrNotFoundDelegatee       = NewWith(ErrCodeNotFoundDelegatee, "not found delegatee")
 	ErrNotFoundStake           = NewWith(ErrCodeNotFoundStake, "not found stake")
@@ -115,10 +114,18 @@ func (e *xerror) Code() uint32 {
 }
 
 func (e *xerror) Error() string {
-	if e.cause != nil {
-		return e.msg + "<<" + e.cause.Error()
+	type causer interface {
+		Cause() error
 	}
-	return e.msg
+
+	msg := e.msg
+
+	if e.cause != nil {
+		msg += " << " + e.cause.Error()
+	}
+
+	return msg
+
 }
 
 func (e *xerror) Cause() error {
@@ -138,6 +145,15 @@ func (e *xerror) With(err error) XError {
 }
 
 func (e *xerror) Wrap(err error) XError {
+	type wapper interface {
+		Wrap(error) XError
+	}
+
+	w, ok := e.cause.(wapper)
+	if w != nil && ok {
+		err = w.Wrap(err)
+	}
+
 	return &xerror{
 		code:  e.code,
 		msg:   e.msg,

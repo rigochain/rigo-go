@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/rigochain/rigo-go/ledger"
 	"github.com/rigochain/rigo-go/types"
 	abytes "github.com/rigochain/rigo-go/types/bytes"
@@ -83,7 +82,7 @@ func (acct *Account) CheckNonce(n uint64) xerrors.XError {
 	defer acct.mtx.RUnlock()
 
 	if acct.Nonce+1 != n {
-		return xerrors.ErrInvalidNonce.Wrap(errors.New(fmt.Sprintf("address: %v, expected: %v, actual:%v", acct.Address, acct.Nonce+1, n)))
+		return xerrors.ErrInvalidNonce
 	}
 	return nil
 }
