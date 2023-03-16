@@ -120,12 +120,23 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
+	// remove
+	for _, k := range ledger.finalityItems.removedKeys {
+		var vk LedgerKey
+		copy(vk[:], k[:])
+		if _, _, err := ledger.tree.Remove(vk[:]); err != nil {
+			return nil, -1, xerrors.NewFrom(err)
+		}
+		delete(ledger.finalityItems.gotItems, vk)
+		delete(ledger.finalityItems.updatedItems, vk)
+	}
+
+	// update
 	var keys LedgerKeyList
 	for k, _ := range ledger.finalityItems.updatedItems {
 		keys = append(keys, k)
 	}
 	sort.Sort(keys)
-
 	for _, k := range keys {
 		_val := ledger.finalityItems.updatedItems[k]
 		_key := _val.Key()
@@ -136,19 +147,11 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		}
 	}
 
-	for _, k := range ledger.finalityItems.removedKeys {
-		var vk LedgerKey
-		copy(vk[:], k[:])
-		if _, _, err := ledger.tree.Remove(vk[:]); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
-		}
-	}
-
 	if r1, r2, err := ledger.tree.SaveVersion(); err != nil {
 		return r1, r2, xerrors.NewFrom(err)
 	} else {
-		ledger.SimpleLedger.cachedItems.reset()
-		ledger.finalityItems.reset()
+		ledger.SimpleLedger.cachedItems.refresh()
+		ledger.finalityItems.refresh()
 		return r1, r2, nil
 	}
 }
