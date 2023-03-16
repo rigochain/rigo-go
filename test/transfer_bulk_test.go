@@ -76,19 +76,6 @@ func TestBulkTransfer(t *testing.T) {
 
 	fmt.Printf("Check accounts[%v] state...\n", len(accountStates))
 
-	//for _, acctRet := range accountStates {
-	//	for _, txHash := range acctRet.txHashes {
-	//		txRet, err := waitTrxResult(txHash, 20)
-	//		require.NoError(t, err)
-	//
-	//		// check tx result
-	//		require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log, txRet.TxDetail.Nonce, txHash)
-	//		require.EqualValues(t, txHash, txRet.Hash)
-	//		require.Equal(t, gas, txRet.TxDetail.Gas)
-	//		//require.Equal(t, randAmt, txRet.TxDetail.Amount)
-	//	}
-	//}
-
 	for _, acctRet := range accountStates {
 		fmt.Println("\tCheck account", acctRet.w.Address())
 
@@ -143,7 +130,6 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 		eventDataTx := event.Data.(types.EventDataTx)
 		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code)
 		require.Equal(t, gas, big.NewInt(eventDataTx.TxResult.Result.GasUsed))
-
 	})
 	require.NoError(t, err)
 
@@ -163,16 +149,6 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, w.GetNonce(), ret.Hash)
 
-		////wait tx
-		//txRet, err := waitTrxResult(txHash, 20)
-		//require.NoError(t, err)
-		//
-		//// check tx result
-		//require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
-		//require.Equal(t, txHash, txRet.Hash)
-		//require.Equal(t, gas, txRet.TxDetail.Gas)
-		//require.Equal(t, randAmt, txRet.TxDetail.Amount)
-
 		// record expected state of account
 		acctState.txHashes = append(acctState.txHashes, rbytes.HexBytes(ret.Hash))
 		acctState.spentGas = new(big.Int).Add(acctState.spentGas, gas)
@@ -189,7 +165,4 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 	subWg.Wait()
 
 	wg.Done()
-
-	//fmt.Println("\tgoodbye", w.Address())
-
 }
