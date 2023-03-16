@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"runtime"
 	"sync"
+	"sync/atomic"
 )
 
 var _ abcitypes.Application = (*RigoApp)(nil)
@@ -36,6 +37,8 @@ type RigoApp struct {
 	txExecutor  *TrxExecutor
 
 	localClient abcicli.Client
+
+	started int32
 
 	logger log.Logger
 	mtx    sync.Mutex
@@ -75,7 +78,9 @@ func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
 }
 
 func (ctrler *RigoApp) Start() error {
-	ctrler.txExecutor.Start()
+	if atomic.CompareAndSwapInt32(&ctrler.started, 0, 1) {
+		ctrler.txExecutor.Start()
+	}
 	return nil
 }
 
@@ -100,6 +105,9 @@ func (ctrler *RigoApp) SetLocalClient(client abcicli.Client) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
+	// todo: Find out how to solve the following problem.
+	// Problem: The 'client' MUST BE a client of CONSENSUS.
+	// However, there is no way to know if the 'client' is for CONSENSUS or not.
 	ctrler.localClient = client
 }
 
