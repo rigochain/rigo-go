@@ -17,9 +17,9 @@ import (
 
 var (
 	home, _         = os.UserHomeDir()
-	VALWALLETPATH   = filepath.Join(home, "rigo_localnet_0/config/priv_validator_key.json")
-	WALKEYDIR       = filepath.Join(home, "rigo_localnet_0/walkeys")
-	TESTPASS        = []byte("1")
+	VALWALLETPATH   = filepath.Join(home, ".rigo/config/priv_validator_key.json")
+	WALKEYDIR       = filepath.Join(home, ".rigo/walkeys")
+	TESTPASS        = []byte("1111")
 	validatorWallet *client.Wallet
 	wallets         []*client.Wallet
 	walletsMap      map[types.AcctKey]*client.Wallet
@@ -63,7 +63,7 @@ func init() {
 
 func waitTrxResult(txhash []byte, maxTimes int) (*rpc.TrxResult, error) {
 	for i := 0; i < maxTimes; i++ {
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// todo: check why it takes more than 10 secs to fetch a transaction
 
