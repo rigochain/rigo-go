@@ -6,108 +6,109 @@ import (
 	"fmt"
 	"github.com/rigochain/rigo-go/libs"
 	"github.com/rigochain/rigo-go/libs/client"
+	"github.com/rigochain/rigo-go/types"
 	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
-	"github.com/tendermint/tendermint/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"math/big"
+	"math/rand"
 	"path/filepath"
 	"sync"
 	"testing"
 )
 
-type accountState struct {
+type accountTestObj struct {
 	w *client.Wallet
 
 	originBalance *big.Int
 	originNonce   uint64
 
-	spentGas *big.Int
-	txHashes []rbytes.HexBytes
-
+	txHashes        map[string]types.Address
+	spentGas        *big.Int
 	expectedBalance *big.Int
 	expectedNonce   uint64
 }
 
-func newAccountState(w *client.Wallet) *accountState {
-	return &accountState{
+var senderAccountTestObjMap = make(map[string]*accountTestObj)
+var gmtx = &sync.Mutex{}
+
+func newAccountTestObj(w *client.Wallet) *accountTestObj {
+	return &accountTestObj{
 		w:               w,
 		originBalance:   w.GetBalance(),
 		originNonce:     w.GetNonce(),
+		txHashes:        make(map[string]types.Address),
 		spentGas:        big.NewInt(0),
 		expectedBalance: w.GetBalance(),
 		expectedNonce:   w.GetNonce(),
 	}
 }
 
-var accountStates map[string]*accountState
-var gmtx sync.Mutex
-
-func addAccountState(k string, v *accountState) {
+func addSenderAccountTestObj(k string, v *accountTestObj) {
 	gmtx.Lock()
 	defer gmtx.Unlock()
 
-	accountStates[k] = v
+	senderAccountTestObjMap[k] = v
 }
 
 func TestBulkTransfer(t *testing.T) {
-	accountStates = make(map[string]*accountState, len(wallets))
 
 	wg := sync.WaitGroup{}
 
-	for i, w := range wallets {
-		if i >= 80 {
-			// limit the number of accounts to less than 100.
-			// because the max of subscription connections of rigo is 100
-			break
-		}
-
+	var allAccountTestObjArr []*accountTestObj
+	senderCnt := 0
+	for _, w := range wallets {
 		if bytes.Compare(w.Address(), validatorWallet.Address()) == 0 {
 			continue
 		}
 
 		require.NoError(t, w.SyncAccount())
-		if w.GetBalance().Sign() == 0 {
-			continue
+
+		acctTestObj := newAccountTestObj(w)
+		allAccountTestObjArr = append(allAccountTestObjArr, acctTestObj)
+
+		fmt.Println(w.Address(), w.GetNonce(), w.GetBalance())
+
+		if senderCnt < 90 && w.GetBalance().Cmp(big.NewInt(1000000)) >= 0 {
+			addSenderAccountTestObj(w.Address().String(), acctTestObj)
+			senderCnt++
 		}
+	}
 
-		acctState := newAccountState(w)
-		accountStates[w.Address().String()] = acctState
+	for i := len(allAccountTestObjArr); i < 100; i++ {
+		newAcctTestObj := newAccountTestObj(client.NewWallet(TESTPASS))
+		require.NoError(t, saveRandWallet(newAcctTestObj.w))
+		allAccountTestObjArr = append(allAccountTestObjArr, newAcctTestObj)
+	}
 
+	t.Logf("TestBulkTransfer - senders: %v, all: %v\n", len(senderAccountTestObjMap), len(allAccountTestObjArr))
+
+	for _, v := range senderAccountTestObjMap {
 		wg.Add(1)
-		go bulkTransfer(t, &wg, acctState, 100)
+		go bulkTransfer(t, &wg, v, allAccountTestObjArr, 50) // 50 txs
 	}
 
 	wg.Wait()
 
-	t.Logf("TestBulkTransfer - Check %v accounts ...\n", len(accountStates))
+	t.Logf("TestBulkTransfer - Check %v accounts ...\n", len(allAccountTestObjArr))
 
-	for _, acctRet := range accountStates {
-		//fmt.Println("\tCheck account", acctRet.w.Address())
+	for _, acctObj := range allAccountTestObjArr {
+		//fmt.Println("\tCheck account", acctObj.w.Address())
 
-		require.NoError(t, acctRet.w.SyncAccount())
-		require.Equal(t, acctRet.expectedBalance, acctRet.w.GetBalance(), acctRet.w.Address().String())
-		require.NotEqual(t, acctRet.expectedBalance, acctRet.originBalance, acctRet.w.Address().String())
-		require.Equal(t, acctRet.expectedNonce, acctRet.w.GetNonce(), acctRet.w.Address().String())
-		if acctRet.originBalance.Cmp(big.NewInt(0)) != 0 {
-			// sender account
-			require.NotEqual(t, acctRet.expectedNonce, acctRet.originNonce, acctRet.w.Address().String())
-		} else {
-			require.NoError(t, saveRandWallet(acctRet.w))
-		}
+		require.NoError(t, acctObj.w.SyncAccount())
+		require.Equal(t, acctObj.expectedBalance, acctObj.w.GetBalance(), acctObj.w.Address().String())
+		require.Equal(t, acctObj.expectedNonce, acctObj.w.GetNonce(), acctObj.w.Address().String())
 	}
 }
 
-func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt int) {
-	w := acctState.w
+func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *accountTestObj, receivers []*accountTestObj, cnt int) {
+	w := senderAcctTestObj.w
 	require.NoError(t, w.Unlock(TESTPASS))
 
-	maxAmt := new(big.Int).Div(acctState.originBalance, big.NewInt(int64(cnt)))
-	maxAmt = new(big.Int).Sub(maxAmt, gas)
-
-	//fmt.Println("\tstart account:", w.Address(), w.GetBalance(), w.GetNonce())
+	//t.Logf("bulkTransfer - account: %v, balance: %v, nonce: %v\n", w.Address(), w.GetBalance(), w.GetNonce())
 
 	subWg := sync.WaitGroup{}
 
@@ -125,19 +126,14 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 		err := tmjson.Unmarshal(result, event)
 		require.NoError(t, err)
 
-		found := false
 		txHash, err := hex.DecodeString(event.Events["tx.hash"][0])
 		require.NoError(t, err)
 
-		for _, h := range acctState.txHashes {
-			if bytes.Compare(txHash, h) == 0 {
-				found = true
-				//fmt.Println("Found Tx", event.Events["tx.hash"])
-			}
-		}
-		require.True(t, found)
+		addr, ok := senderAcctTestObj.txHashes[rbytes.HexBytes(txHash).String()]
+		require.True(t, ok)
+		require.Equal(t, w.Address(), addr)
 
-		eventDataTx := event.Data.(types.EventDataTx)
+		eventDataTx := event.Data.(tmtypes.EventDataTx)
 		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code)
 		require.Equal(t, gas, big.NewInt(eventDataTx.TxResult.Result.GasUsed))
 
@@ -145,14 +141,23 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 	})
 	require.NoError(t, err)
 
-	for i := 0; i < cnt; i++ {
+	maxAmt := new(big.Int).Div(senderAcctTestObj.originBalance, big.NewInt(int64(cnt)))
+	maxAmt = new(big.Int).Sub(maxAmt, gas)
 
-		racctState := newAccountState(client.NewWallet(TESTPASS))
+	for i := 0; i < cnt; i++ {
+		rn := rand.Intn(len(receivers))
+		if bytes.Compare(receivers[rn].w.Address(), w.Address()) == 0 {
+			rn = (rn + 1) % len(receivers)
+		}
+
+		racctState := receivers[rn]
 		raddr := racctState.w.Address()
 
-		addAccountState(raddr.String(), racctState)
-
 		randAmt := rbytes.RandBigIntN(maxAmt)
+		if randAmt.Sign() == 0 {
+			randAmt = big.NewInt(1)
+			t.Logf("bulkTransfer - from: %v, to: %v, amount: %v\n", w.Address(), raddr, randAmt)
+		}
 		needAmt := new(big.Int).Add(randAmt, gas)
 
 		subWg.Add(1) // done in subscriber's callback
@@ -161,15 +166,16 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, w.GetNonce(), ret.Hash)
 
+		// todo: this should be locked by mutex
 		// record expected state of account
-		acctState.txHashes = append(acctState.txHashes, rbytes.HexBytes(ret.Hash))
-		acctState.spentGas = new(big.Int).Add(acctState.spentGas, gas)
-		acctState.expectedBalance = new(big.Int).Sub(acctState.expectedBalance, needAmt)
-		acctState.expectedNonce += 1
+		senderAcctTestObj.txHashes[ret.Hash.String()] = w.Address()
+		senderAcctTestObj.spentGas = new(big.Int).Add(senderAcctTestObj.spentGas, gas)
+		senderAcctTestObj.expectedBalance = new(big.Int).Sub(senderAcctTestObj.expectedBalance, needAmt)
+		senderAcctTestObj.expectedNonce += 1
 
 		racctState.expectedBalance = new(big.Int).Add(racctState.expectedBalance, randAmt)
 
-		//fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
+		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
 
 		w.AddNonce()
 	}
