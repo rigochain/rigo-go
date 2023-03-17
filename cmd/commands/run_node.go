@@ -109,7 +109,7 @@ func AddNodeFlags(cmd *cobra.Command) {
 func NewRunNodeCmd(nodeProvider node.Provider) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start",
-		Aliases: []string{"rigo", "run"},
+		Aliases: []string{"run"},
 		Short:   "Run the rigo",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkGenesisHash(config); err != nil {

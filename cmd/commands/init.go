@@ -53,7 +53,7 @@ func AddInitFlags(cmd *cobra.Command) {
 		"the number of holder's accounts to generate. "+
 			"if you create a new genesis of your own blockchain, "+
 			"you need to generate accounts of genesis holders and "+
-			"these accounts will be saved at $XCNCHOME/walkeys",
+			"these accounts will be saved at $RIGOHOME/walkeys",
 	)
 	cmd.Flags().StringVar(
 		&privValSecret,

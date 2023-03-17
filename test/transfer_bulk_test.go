@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/rigochain/rigo-go/libs"
 	"github.com/rigochain/rigo-go/libs/client"
 	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -12,6 +13,7 @@ import (
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"github.com/tendermint/tendermint/types"
 	"math/big"
+	"path/filepath"
 	"sync"
 	"testing"
 )
@@ -56,20 +58,26 @@ func TestBulkTransfer(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	for i, w := range wallets {
+		if i >= 100 {
+			// limit 100 account
+			// because the max of subscription connections of rigo is 100
+			break
+		}
 
 		if bytes.Compare(w.Address(), validatorWallet.Address()) == 0 {
 			continue
 		}
 
 		require.NoError(t, w.SyncAccount())
-
-		fmt.Println("index", i, "address", w.Address(), w.GetNonce(), w.GetBalance())
+		if w.GetBalance().Sign() == 0 {
+			continue
+		}
 
 		acctState := newAccountState(w)
 		accountStates[w.Address().String()] = acctState
 
 		wg.Add(1)
-		go bulkTransfer(t, &wg, acctState, 10)
+		go bulkTransfer(t, &wg, acctState, 100)
 	}
 
 	wg.Wait()
@@ -81,12 +89,13 @@ func TestBulkTransfer(t *testing.T) {
 
 		require.NoError(t, acctRet.w.SyncAccount())
 		require.Equal(t, acctRet.expectedBalance, acctRet.w.GetBalance(), acctRet.w.Address().String())
-		require.Equal(t, acctRet.expectedNonce, acctRet.w.GetNonce(), acctRet.w.Address().String())
-
 		require.NotEqual(t, acctRet.expectedBalance, acctRet.originBalance, acctRet.w.Address().String())
+		require.Equal(t, acctRet.expectedNonce, acctRet.w.GetNonce(), acctRet.w.Address().String())
 		if acctRet.originBalance.Cmp(big.NewInt(0)) != 0 {
-			// receiver account
+			// sender account
 			require.NotEqual(t, acctRet.expectedNonce, acctRet.originNonce, acctRet.w.Address().String())
+		} else {
+			require.NoError(t, saveRandWallet(acctRet.w))
 		}
 	}
 }
@@ -107,7 +116,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 
 	require.NoError(t, err)
 	query := fmt.Sprintf("tm.event='Tx' AND tx.sender='%v'", w.Address())
-	fmt.Println("query", query)
+	//fmt.Println("query", query)
 	err = sub.Watch(query, func(sub *client.Subscriber, result []byte) {
 
 		event := &coretypes.ResultEvent{}
@@ -157,7 +166,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 
 		racctState.expectedBalance = new(big.Int).Add(racctState.expectedBalance, randAmt)
 
-		fmt.Printf("\tTx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
+		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
 
 		w.AddNonce()
 	}
@@ -165,4 +174,9 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 	subWg.Wait()
 
 	wg.Done()
+}
+
+func saveRandWallet(w *client.Wallet) error {
+	path := filepath.Join(WALKEYDIR, fmt.Sprintf("wk%X.json", w.Address()))
+	return w.Save(libs.NewFileWriter(path))
 }

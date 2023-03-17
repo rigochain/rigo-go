@@ -45,6 +45,14 @@ func OpenWallet(r io.Reader) (*Wallet, error) {
 	return ret, nil
 }
 
+func (w *Wallet) Save(wr io.Writer) error {
+	w.mtx.RLock()
+	defer w.mtx.RUnlock()
+
+	_, err := w.wkey.Save(wr)
+	return err
+}
+
 func (w *Wallet) Address() types.Address {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
