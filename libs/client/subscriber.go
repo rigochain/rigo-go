@@ -7,23 +7,24 @@ import (
 )
 
 type Subscriber struct {
+	url  string
 	conn *websocket.Conn
-	done chan interface{}
+
+	query string
 }
 
 func NewSubscriber(url string) (*Subscriber, error) {
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Subscriber{
-		conn: conn,
-		done: make(chan interface{}),
+		url: url,
 	}, nil
 }
 
-func (sub *Subscriber) Watch(query string, callback func(*Subscriber, []byte)) error {
+func (sub *Subscriber) Start(query string, callback func(*Subscriber, []byte)) error {
+	conn, _, err := websocket.DefaultDialer.Dial(sub.url, nil)
+	if err != nil {
+		return err
+	}
+
 	req, err := rpc.NewRequest("subscribe", query)
 	if err != nil {
 		return err
@@ -34,45 +35,60 @@ func (sub *Subscriber) Watch(query string, callback func(*Subscriber, []byte)) e
 		return err
 	}
 
-	err = sub.conn.WriteMessage(websocket.TextMessage, bz)
+	err = conn.WriteMessage(websocket.TextMessage, bz)
 	if err != nil {
 		return err
 	}
 
 	go func() {
 		for {
-			select {
-			case <-sub.done:
-				return
-			default:
-				ty, msg, err := sub.conn.ReadMessage()
-				if err != nil {
-					return
-				}
-
-				if ty == 1 {
-					resp := &rpc.JSONRpcResp{}
-					if err := json.Unmarshal(msg, resp); err != nil {
-						panic(err)
-					}
-
-					if resp.Error != nil {
-						panic(string(resp.Error))
-					}
-
-					if len(resp.Result) > 2 {
-						callback(sub, resp.Result)
-					}
-				}
+			ty, msg, err := conn.ReadMessage()
+			if err != nil {
+				break
 			}
 
+			if ty == websocket.TextMessage {
+				resp := &rpc.JSONRpcResp{}
+				if err := json.Unmarshal(msg, resp); err != nil {
+					panic(err)
+				}
+
+				if resp.Error != nil {
+					panic(string(resp.Error))
+				}
+
+				if len(resp.Result) > 2 {
+					callback(sub, resp.Result)
+				}
+			} else {
+				//fmt.Println("ReadMessage", "other type", ty, msg)
+			}
 		}
 	}()
+
+	sub.conn = conn
+	sub.query = query
 
 	return nil
 }
 
 func (sub *Subscriber) Stop() {
-	close(sub.done)
+	req, err := rpc.NewRequest("unsubscribe", sub.query)
+	if err != nil {
+		panic(err)
+	}
+
+	bz, err := json.Marshal(req)
+	if err != nil {
+		panic(err)
+	}
+
+	err = sub.conn.WriteMessage(websocket.TextMessage, bz)
+	if err != nil {
+		panic(err)
+	}
+	sub.query = ""
+
 	_ = sub.conn.Close()
+	sub.conn = nil
 }

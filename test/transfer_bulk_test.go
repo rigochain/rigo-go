@@ -58,8 +58,8 @@ func TestBulkTransfer(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	for i, w := range wallets {
-		if i >= 100 {
-			// limit 100 account
+		if i >= 80 {
+			// limit the number of accounts to less than 100.
 			// because the max of subscription connections of rigo is 100
 			break
 		}
@@ -82,10 +82,10 @@ func TestBulkTransfer(t *testing.T) {
 
 	wg.Wait()
 
-	fmt.Printf("Check accounts[%v] state...\n", len(accountStates))
+	t.Logf("TestBulkTransfer - Check %v accounts ...\n", len(accountStates))
 
 	for _, acctRet := range accountStates {
-		fmt.Println("\tCheck account", acctRet.w.Address())
+		//fmt.Println("\tCheck account", acctRet.w.Address())
 
 		require.NoError(t, acctRet.w.SyncAccount())
 		require.Equal(t, acctRet.expectedBalance, acctRet.w.GetBalance(), acctRet.w.Address().String())
@@ -112,12 +112,14 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 	subWg := sync.WaitGroup{}
 
 	sub, err := client.NewSubscriber("ws://localhost:26657/websocket")
-	defer sub.Stop()
+	defer func() {
+		sub.Stop()
+	}()
 
 	require.NoError(t, err)
 	query := fmt.Sprintf("tm.event='Tx' AND tx.sender='%v'", w.Address())
 	//fmt.Println("query", query)
-	err = sub.Watch(query, func(sub *client.Subscriber, result []byte) {
+	err = sub.Start(query, func(sub *client.Subscriber, result []byte) {
 
 		event := &coretypes.ResultEvent{}
 		err := tmjson.Unmarshal(result, event)
@@ -130,15 +132,16 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 		for _, h := range acctState.txHashes {
 			if bytes.Compare(txHash, h) == 0 {
 				found = true
-				fmt.Println("Found Tx", event.Events["tx.hash"])
+				//fmt.Println("Found Tx", event.Events["tx.hash"])
 			}
 		}
-		subWg.Done()
 		require.True(t, found)
 
 		eventDataTx := event.Data.(types.EventDataTx)
 		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code)
 		require.Equal(t, gas, big.NewInt(eventDataTx.TxResult.Result.GasUsed))
+
+		subWg.Done()
 	})
 	require.NoError(t, err)
 
@@ -166,7 +169,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, acctState *accountState, cnt
 
 		racctState.expectedBalance = new(big.Int).Add(racctState.expectedBalance, randAmt)
 
-		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
+		//fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
 
 		w.AddNonce()
 	}

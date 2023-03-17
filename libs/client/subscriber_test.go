@@ -2,24 +2,30 @@ package client
 
 import (
 	"github.com/stretchr/testify/require"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	"github.com/tendermint/tendermint/types"
 	"sync"
 	"testing"
 )
 
 func TestSubscriber(t *testing.T) {
-	sub, err := NewSubscriber("ws://localhost:26657/websocket") //NewSubscriber("ws://192.168.252.60:26657/websocket")
+	sub, err := NewSubscriber("ws://localhost:26657/websocket")
 	require.NoError(t, err)
 
-	success := false
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	err = sub.Watch("tm.event='NewBlockHeader'", func(sub *Subscriber, msg []byte) {
-		success = len(msg) > 10
+	err = sub.Start("tm.event='NewBlock'", func(sub *Subscriber, result []byte) {
+		event := &coretypes.ResultEvent{}
+		err := tmjson.Unmarshal(result, event)
+		require.NoError(t, err)
+		_, ok := event.Data.(types.EventDataNewBlock)
+		require.True(t, ok)
+
 		wg.Done()
 	})
 	require.NoError(t, err)
-
 	wg.Wait()
 
-	require.True(t, success)
+	sub.Stop()
 }
