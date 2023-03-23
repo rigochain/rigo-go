@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs"
 	rigoweb3 "github.com/rigochain/rigo-go/libs/web3"
@@ -90,4 +91,9 @@ func randCommonWallet() *rigoweb3.Wallet {
 			return w
 		}
 	}
+}
+
+func saveRandWallet(w *rigoweb3.Wallet) error {
+	path := filepath.Join(WALKEYDIR, fmt.Sprintf("wk%X.json", w.Address()))
+	return w.Save(libs.NewFileWriter(path))
 }

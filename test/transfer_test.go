@@ -1,68 +1,258 @@
 package test
 
 import (
+	"bytes"
+	"encoding/hex"
+	"fmt"
+	"github.com/rigochain/rigo-go/libs/web3"
+	"github.com/rigochain/rigo-go/types"
+	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"math/big"
+	"math/rand"
+	"sync"
 	"testing"
 )
 
-func TestSyncWallet(t *testing.T) {
-	for _, w := range wallets {
-		require.NoError(t, w.SyncAccount(rweb3))
+type accountTestObj struct {
+	w *web3.Wallet
+
+	originBalance *big.Int
+	originNonce   uint64
+
+	txHashes        map[string]types.Address
+	spentGas        *big.Int
+	expectedBalance *big.Int
+	expectedNonce   uint64
+
+	mtx sync.RWMutex
+}
+
+func (obj *accountTestObj) AddTxHashOfAddr(txhash string, addr types.Address) {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.txHashes[txhash] = addr
+}
+
+func (obj *accountTestObj) AddSpentGas(d *big.Int) {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.spentGas = new(big.Int).Add(obj.spentGas, d)
+}
+
+func (obj *accountTestObj) AddExpectedBalance(d *big.Int) {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.expectedBalance = new(big.Int).Add(obj.expectedBalance, d)
+}
+
+func (obj *accountTestObj) SubExpectedBalance(d *big.Int) {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.expectedBalance = new(big.Int).Sub(obj.expectedBalance, d)
+}
+
+func (obj *accountTestObj) AddExpectedNonce() {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.expectedNonce++
+}
+
+var senderAccountTestObjMap = make(map[string]*accountTestObj)
+var gmtx = &sync.Mutex{}
+
+func newAccountTestObj(w *web3.Wallet) *accountTestObj {
+	return &accountTestObj{
+		w:               w,
+		originBalance:   w.GetBalance(),
+		originNonce:     w.GetNonce(),
+		txHashes:        make(map[string]types.Address),
+		spentGas:        big.NewInt(0),
+		expectedBalance: w.GetBalance(),
+		expectedNonce:   w.GetNonce(),
 	}
 }
 
-func TestTransfer(t *testing.T) {
-	require.NoError(t, W0.SyncAccount(rweb3))
-	require.NoError(t, W1.SyncAccount(rweb3))
+func addSenderAccountTestObj(k string, v *accountTestObj) {
+	gmtx.Lock()
+	defer gmtx.Unlock()
 
-	ret, err := W0.TransferSync(W1.Address(), gas, amt, rweb3)
-	require.Error(t, err) // unlock
+	senderAccountTestObjMap[k] = v
+}
 
-	require.NoError(t, W0.Unlock(TESTPASS))
+func TestTransfer_Bulk(t *testing.T) {
 
-	ret, err = W0.TransferSync(W1.Address(), gas, amt, rweb3)
+	wg := sync.WaitGroup{}
+
+	var allAccountTestObjArr []*accountTestObj
+	senderCnt := 0
+	for _, w := range wallets {
+		if bytes.Compare(w.Address(), validatorWallet.Address()) == 0 {
+			continue
+		}
+
+		require.NoError(t, w.SyncAccount(rweb3))
+
+		acctTestObj := newAccountTestObj(w)
+		allAccountTestObjArr = append(allAccountTestObjArr, acctTestObj)
+
+		fmt.Println(w.Address(), w.GetNonce(), w.GetBalance())
+
+		if senderCnt < 90 && w.GetBalance().Cmp(big.NewInt(1000000)) >= 0 {
+			addSenderAccountTestObj(w.Address().String(), acctTestObj)
+			senderCnt++
+		}
+	}
+
+	for i := len(allAccountTestObjArr); i < 100; i++ {
+		newAcctTestObj := newAccountTestObj(web3.NewWallet(TESTPASS))
+		require.NoError(t, saveRandWallet(newAcctTestObj.w))
+		allAccountTestObjArr = append(allAccountTestObjArr, newAcctTestObj)
+	}
+
+	t.Logf("TestBulkTransfer - senders: %v, all: %v\n", len(senderAccountTestObjMap), len(allAccountTestObjArr))
+
+	for _, v := range senderAccountTestObjMap {
+		wg.Add(1)
+		go bulkTransfer(t, &wg, v, allAccountTestObjArr, 50) // 50 txs
+	}
+
+	wg.Wait()
+
+	t.Logf("TestBulkTransfer - Check %v accounts ...\n", len(allAccountTestObjArr))
+
+	for _, acctObj := range allAccountTestObjArr {
+		//fmt.Println("\tCheck account", acctObj.w.Address())
+
+		require.NoError(t, acctObj.w.SyncAccount(rweb3))
+		require.Equal(t, acctObj.expectedBalance, acctObj.w.GetBalance(), acctObj.w.Address().String())
+		require.Equal(t, acctObj.expectedNonce, acctObj.w.GetNonce(), acctObj.w.Address().String())
+	}
+}
+
+func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *accountTestObj, receivers []*accountTestObj, cnt int) {
+	w := senderAcctTestObj.w
+	require.NoError(t, w.Unlock(TESTPASS))
+
+	//t.Logf("bulkTransfer - account: %v, balance: %v, nonce: %v\n", w.Address(), w.GetBalance(), w.GetNonce())
+
+	subWg := sync.WaitGroup{}
+
+	sub, err := web3.NewSubscriber("ws://localhost:26657/websocket")
+	defer func() {
+		sub.Stop()
+	}()
+
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
-	txHash := ret.Hash
+	query := fmt.Sprintf("tm.event='Tx' AND tx.sender='%v'", w.Address())
+	//fmt.Println("query", query)
+	err = sub.Start(query, func(sub *web3.Subscriber, result []byte) {
 
-	txRet, err := waitTrxResult(txHash, 10)
+		event := &coretypes.ResultEvent{}
+		err := tmjson.Unmarshal(result, event)
+		require.NoError(t, err)
+
+		txHash, err := hex.DecodeString(event.Events["tx.hash"][0])
+		require.NoError(t, err)
+
+		addr, ok := senderAcctTestObj.txHashes[rbytes.HexBytes(txHash).String()]
+		require.True(t, ok)
+		require.Equal(t, w.Address(), addr)
+
+		eventDataTx := event.Data.(tmtypes.EventDataTx)
+		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code)
+		require.Equal(t, gas, big.NewInt(eventDataTx.TxResult.Result.GasUsed))
+
+		subWg.Done()
+	})
 	require.NoError(t, err)
 
-	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
-	require.Equal(t, txHash, txRet.Hash)
-	//require.Equal(t, trxs.TRX_TRANSFER, txRet.TxDetail.Payload.Type())
-	require.Equal(t, gas, txRet.TxDetail.Gas)
-	require.Equal(t, amt, txRet.TxDetail.Amount)
+	maxAmt := new(big.Int).Div(senderAcctTestObj.originBalance, big.NewInt(int64(cnt)))
+	maxAmt = new(big.Int).Sub(maxAmt, gas)
 
-	expectedBalance := new(big.Int).Sub(W0.GetBalance(), new(big.Int).Add(amt, gas))
-	require.NoError(t, W0.SyncAccount(rweb3))
-	require.Equal(t, expectedBalance, W0.GetBalance())
+	for i := 0; i < cnt; i++ {
+		rn := rand.Intn(len(receivers))
+		if bytes.Compare(receivers[rn].w.Address(), w.Address()) == 0 {
+			rn = (rn + 1) % len(receivers)
+		}
 
-	expectedBalance = new(big.Int).Add(W1.GetBalance(), amt)
-	require.NoError(t, W1.SyncAccount(rweb3))
-	require.Equal(t, expectedBalance, W1.GetBalance())
+		racctState := receivers[rn]
+		raddr := racctState.w.Address()
+
+		randAmt := rbytes.RandBigIntN(maxAmt)
+		if randAmt.Sign() == 0 {
+			randAmt = big.NewInt(1)
+			t.Logf("bulkTransfer - from: %v, to: %v, amount: %v\n", w.Address(), raddr, randAmt)
+		}
+		needAmt := new(big.Int).Add(randAmt, gas)
+
+		subWg.Add(1) // done in subscriber's callback
+
+		ret, err := w.TransferSync(raddr, gas, randAmt, rweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, w.GetNonce(), ret.Hash)
+
+		// todo: this should be locked by mutex
+		// record expected state of account
+		senderAcctTestObj.AddTxHashOfAddr(ret.Hash.String(), w.Address())
+		senderAcctTestObj.AddSpentGas(gas)
+		senderAcctTestObj.SubExpectedBalance(needAmt)
+		senderAcctTestObj.AddExpectedNonce()
+
+		racctState.AddExpectedBalance(randAmt)
+
+		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
+
+		w.AddNonce()
+	}
+
+	subWg.Wait()
+
+	wg.Done()
 }
 
 func TestTransfer_OverBalance(t *testing.T) {
+	require.NoError(t, W0.SyncBalance(rweb3))
+	require.NoError(t, W1.SyncBalance(rweb3))
 	require.NoError(t, W0.Unlock(TESTPASS))
 
-	ret, err := W1.TransferSync(W0.Address(), gas, amt, rweb3)
+	testObj0 := newAccountTestObj(W0)
+	testObj1 := newAccountTestObj(W1)
+
+	overAmt := W0.GetBalance() // gas is not included
+
+	ret, err := W0.TransferSync(W1.Address(), gas, overAmt, rweb3)
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrInsufficientFund.Error(), ret.Log)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
+	require.Equal(t, xerrors.ErrCheckTx.Wrap(xerrors.ErrInsufficientFund).Error(), ret.Log)
 
-	bal := W1.GetBalance()
-	amt0 := new(big.Int).Sub(bal, gas)
+	require.NoError(t, W0.SyncBalance(rweb3))
+	require.NoError(t, W1.SyncBalance(rweb3))
 
-	ret, err = W1.TransferSync(W0.Address(), amt0, gas, rweb3)
-	require.NoError(t, err) // not insufficient fund
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code)
-	txHash := ret.Hash
+	require.Equal(t, testObj0.originBalance, W0.GetBalance())
+	require.Equal(t, testObj1.originBalance, W1.GetBalance())
+	require.Equal(t, testObj0.originNonce, W0.GetNonce())
 
-	txRet, err := waitTrxResult(txHash, 10)
+	overAmt = new(big.Int).Add(new(big.Int).Sub(W0.GetBalance(), gas), big.NewInt(1)) // amt - gas + 1
+	ret, err = W0.TransferSync(W1.Address(), gas, overAmt, rweb3)
 	require.NoError(t, err)
-	require.Equal(t, txHash, txRet.Hash)
-	require.NoError(t, W1.SyncAccount(rweb3))
-	require.Equal(t, big.NewInt(0), W1.GetBalance())
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
+	require.Equal(t, xerrors.ErrCheckTx.Wrap(xerrors.ErrInsufficientFund).Error(), ret.Log)
+
+	require.NoError(t, W0.SyncBalance(rweb3))
+	require.NoError(t, W1.SyncBalance(rweb3))
+
+	require.Equal(t, testObj0.originBalance, W0.GetBalance())
+	require.Equal(t, testObj1.originBalance, W1.GetBalance())
+	require.Equal(t, testObj0.originNonce, W0.GetNonce())
+
 }
