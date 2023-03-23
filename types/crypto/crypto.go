@@ -67,7 +67,7 @@ func CompressPubkey(pub *ecdsa.PublicKey) abytes.HexBytes {
 
 func DecompressPubkey(bz []byte) (*ecdsa.PublicKey, xerrors.XError) {
 	if pubKey, err := ethcrypto.DecompressPubkey(bz); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return pubKey, nil
 	}
@@ -77,7 +77,7 @@ func Sig2Addr(msg, sig []byte) (types.Address, abytes.HexBytes, xerrors.XError) 
 	hmsg := DefaultHash(msg)
 	pubKey, err := ethcrypto.SigToPub(hmsg, sig)
 	if err != nil {
-		return nil, nil, xerrors.NewFrom(err)
+		return nil, nil, xerrors.From(err)
 	}
 
 	return Pub2Addr(pubKey), CompressPubkey(pubKey), nil

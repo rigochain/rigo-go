@@ -83,7 +83,7 @@ func (r *GovRule) Key() ledger.LedgerKey {
 func (r *GovRule) Decode(bz []byte) xerrors.XError {
 	pm := &GovRuleProto{}
 	if err := proto.Unmarshal(bz, pm); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	r.fromProto(pm)
 	return nil
@@ -91,7 +91,7 @@ func (r *GovRule) Decode(bz []byte) xerrors.XError {
 
 func (r *GovRule) Encode() ([]byte, xerrors.XError) {
 	if bz, err := proto.Marshal(r.toProto()); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}

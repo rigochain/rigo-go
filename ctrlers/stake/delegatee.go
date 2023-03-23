@@ -40,7 +40,7 @@ func (delegatee *Delegatee) Encode() ([]byte, xerrors.XError) {
 	defer delegatee.mtx.RUnlock()
 
 	if bz, err := json.Marshal(delegatee); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -51,7 +51,7 @@ func (delegatee *Delegatee) Decode(d []byte) xerrors.XError {
 	defer delegatee.mtx.Unlock()
 
 	if err := json.Unmarshal(d, delegatee); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	return nil
 }

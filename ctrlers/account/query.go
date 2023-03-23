@@ -12,7 +12,7 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 	if acct := ctrler.ReadAccount(addr); acct == nil {
 		return nil, xerrors.ErrNotFoundAccount
 	} else if raw, err := tmjson.Marshal(acct); err != nil {
-		return nil, xerrors.ErrQuery.With(err)
+		return nil, xerrors.ErrQuery.Wrap(err)
 	} else {
 		return raw, nil
 	}

@@ -17,13 +17,13 @@ type FinalityLedger[T ILedgerItem] struct {
 
 func NewFinalityLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func() T) (*FinalityLedger[T], xerrors.XError) {
 	if db, err := tmdb.NewDB(name, "goleveldb", dbDir); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else if tree, err := iavl.NewMutableTree(db, cacheSize); err != nil {
 		_ = db.Close()
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else if _, err := tree.Load(); err != nil {
 		_ = db.Close()
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return &FinalityLedger[T]{
 			SimpleLedger: SimpleLedger[T]{
@@ -125,7 +125,7 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		var vk LedgerKey
 		copy(vk[:], k[:])
 		if _, _, err := ledger.tree.Remove(vk[:]); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
+			return nil, -1, xerrors.From(err)
 		}
 		delete(ledger.finalityItems.gotItems, vk)
 		delete(ledger.finalityItems.updatedItems, vk)
@@ -143,12 +143,12 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		if bz, err := _val.Encode(); err != nil {
 			return nil, -1, err
 		} else if _, err := ledger.tree.Set(_key[:], bz); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
+			return nil, -1, xerrors.From(err)
 		}
 	}
 
 	if r1, r2, err := ledger.tree.SaveVersion(); err != nil {
-		return r1, r2, xerrors.NewFrom(err)
+		return r1, r2, xerrors.From(err)
 	} else {
 		ledger.SimpleLedger.cachedItems.refresh()
 		ledger.finalityItems.refresh()

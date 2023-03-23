@@ -104,7 +104,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 	case ctrlertypes.TRX_PROPOSAL:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
-			return xerrors.ErrInvalidTrx.With(errors.New("wrong address: the 'to' field in TRX_PROPOSAL should be zero address"))
+			return xerrors.ErrInvalidTrx.Wrap(errors.New("wrong address: the 'to' field in TRX_PROPOSAL should be zero address"))
 		}
 
 		// check right
@@ -136,7 +136,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
-			return xerrors.ErrInvalidTrxPayloadParams.With(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
+			return xerrors.ErrInvalidTrxPayloadParams.Wrap(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
 		}
 		// check tx type
 		txpayload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadVoting)
@@ -297,7 +297,7 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 				case proposal.PROPOSAL_GOVRULE:
 					newGovRule := &ctrlertypes.GovRule{}
 					if err := json.Unmarshal(prop.MajorOption.Option(), newGovRule); err != nil {
-						return xerrors.NewFrom(err)
+						return xerrors.From(err)
 					}
 					if xerr := ctrler.ruleLedger.SetFinality(newGovRule); xerr != nil {
 						return xerr

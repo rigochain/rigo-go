@@ -47,7 +47,7 @@ func (prop *GovProposal) Encode() ([]byte, xerrors.XError) {
 	defer prop.mtx.RUnlock()
 
 	if bz, err := json.Marshal(prop); err != nil {
-		return bz, xerrors.NewFrom(err)
+		return bz, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -58,7 +58,7 @@ func (prop *GovProposal) Decode(bz []byte) xerrors.XError {
 	defer prop.mtx.Unlock()
 
 	if err := json.Unmarshal(bz, prop); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	return nil
 }

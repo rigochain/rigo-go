@@ -11,7 +11,7 @@ func (tx *TrxPayloadAssetTransfer) Type() int32 {
 func (tx *TrxPayloadAssetTransfer) Decode(bz []byte) xerrors.XError {
 	//pm := TrxPayloadAssetTransferProto{}
 	//if err := proto.Unmarshal(bz, &pm); err != nil {
-	//	return xerrors.Wrap(err)
+	//	return xerrors.From(err)
 	//}
 	//tx.amount = new(big.Int).SetBytes(pm.XAmount)
 	//return nil
@@ -23,7 +23,7 @@ func (tx *TrxPayloadAssetTransfer) Encode() ([]byte, xerrors.XError) {
 	//	XAmount: tx.amount.Bytes(),
 	//}
 	//if bz, err := proto.Marshal(&pm); err != nil {
-	//	return nil, xerrors.Wrap(err)
+	//	return nil, xerrors.From(err)
 	//} else {
 	//	return bz, nil
 	//}

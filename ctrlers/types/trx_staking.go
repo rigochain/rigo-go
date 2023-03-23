@@ -31,7 +31,7 @@ func (tx *TrxPayloadUnstaking) Type() int32 {
 func (tx *TrxPayloadUnstaking) Decode(bz []byte) xerrors.XError {
 	pm := &TrxPayloadUnstakingProto{}
 	if err := proto.Unmarshal(bz, pm); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	tx.TxHash = pm.TxHash
 	return nil
@@ -43,5 +43,5 @@ func (tx *TrxPayloadUnstaking) Encode() ([]byte, xerrors.XError) {
 	}
 
 	bz, err := proto.Marshal(pm)
-	return bz, xerrors.NewFrom(err)
+	return bz, xerrors.From(err)
 }

@@ -41,7 +41,7 @@ func (s *Stake) Encode() ([]byte, xerrors.XError) {
 	defer s.mtx.RUnlock()
 
 	if bz, err := json.Marshal(s); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -52,7 +52,7 @@ func (s *Stake) Decode(d []byte) xerrors.XError {
 	defer s.mtx.Unlock()
 
 	if err := json.Unmarshal(d, s); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	return nil
 }

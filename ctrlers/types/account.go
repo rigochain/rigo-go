@@ -161,7 +161,7 @@ func (acct *Account) Encode() ([]byte, xerrors.XError) {
 		XBalance: acct.Balance.Bytes(),
 		XCode:    acct.Code,
 	}); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -170,7 +170,7 @@ func (acct *Account) Encode() ([]byte, xerrors.XError) {
 func (acct *Account) Decode(d []byte) xerrors.XError {
 	pm := &AcctProto{}
 	if err := proto.Unmarshal(d, pm); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 
 	acct.Address = pm.Address

@@ -25,9 +25,9 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 			}
 			return nil
 		}); err != nil {
-			return nil, xerrors.ErrQuery.With(err)
+			return nil, xerrors.ErrQuery.Wrap(err)
 		} else if bz, err := tmjson.Marshal(stakes); err != nil {
-			return nil, xerrors.ErrQuery.With(err)
+			return nil, xerrors.ErrQuery.Wrap(err)
 		} else {
 			return bz, nil
 		}
@@ -39,7 +39,7 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 			}
 			return nil, xerr
 		} else if v, err := tmjson.Marshal(delegatee); err != nil {
-			return nil, xerrors.ErrQuery.With(err)
+			return nil, xerrors.ErrQuery.Wrap(err)
 		} else {
 			return v, nil
 		}

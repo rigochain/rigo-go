@@ -76,7 +76,7 @@ func (tx *Trx) TypeString() string {
 func (tx *Trx) Decode(bz []byte) xerrors.XError {
 	pm := TrxProto{}
 	if err := proto.Unmarshal(bz, &pm); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	} else if err := tx.fromProto(&pm); err != nil {
 		return err
 	}
@@ -85,9 +85,9 @@ func (tx *Trx) Decode(bz []byte) xerrors.XError {
 
 func (tx *Trx) Encode() ([]byte, xerrors.XError) {
 	if pm, err := tx.toProto(); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else if bz, err := proto.Marshal(pm); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
