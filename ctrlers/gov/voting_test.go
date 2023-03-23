@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/rigochain/rigo-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
-	"github.com/rigochain/rigo-go/libs/client"
+	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -27,7 +27,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	txProposal := client.NewTrxProposal(
+	txProposal := web3.NewTrxProposal(
 		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, big.NewInt(10),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // wrong min fee
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
@@ -39,21 +39,21 @@ func init() {
 	}
 
 	// no error
-	tx0 := client.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, big.NewInt(10),
+	tx0 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, big.NewInt(10),
 		trxCtxProposal.TxHash, 0)
 
 	// no right
-	tx1 := client.NewTrxVoting(stakeHelper.PickAddress(stakeHelper.valCnt), types.ZeroAddress(), 1, big.NewInt(10),
+	tx1 := web3.NewTrxVoting(stakeHelper.PickAddress(stakeHelper.valCnt), types.ZeroAddress(), 1, big.NewInt(10),
 		trxCtxProposal.TxHash, 0)
 
 	// invalid payload params : wrong choice
-	tx2 := client.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, big.NewInt(10),
+	tx2 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, big.NewInt(10),
 		trxCtxProposal.TxHash, 1)
 	// invalid payload params : wrong choice
-	tx3 := client.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, big.NewInt(10),
+	tx3 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, big.NewInt(10),
 		trxCtxProposal.TxHash, -1)
 	// not found result
-	tx4 := client.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, big.NewInt(10),
+	tx4 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, big.NewInt(10),
 		bytes.RandBytes(32), 0)
 
 	// test cases #1
@@ -76,7 +76,7 @@ func init() {
 		//if rn%3 == 0 {
 		//	choice = 1
 		//}
-		tx := client.NewTrxVoting(addr, types.ZeroAddress(), 1, big.NewInt(10),
+		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, big.NewInt(10),
 			trxCtxProposal.TxHash, choice)
 		txs = append(txs, tx)
 	}

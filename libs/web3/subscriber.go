@@ -1,8 +1,8 @@
-package client
+package web3
 
 import (
 	"github.com/gorilla/websocket"
-	"github.com/rigochain/rigo-go/libs/client/rpc"
+	"github.com/rigochain/rigo-go/libs/web3/types"
 	"github.com/tendermint/tendermint/libs/json"
 )
 
@@ -25,7 +25,7 @@ func (sub *Subscriber) Start(query string, callback func(*Subscriber, []byte)) e
 		return err
 	}
 
-	req, err := rpc.NewRequest("subscribe", query)
+	req, err := types.NewRequest(0, "subscribe", query)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (sub *Subscriber) Start(query string, callback func(*Subscriber, []byte)) e
 			}
 
 			if ty == websocket.TextMessage {
-				resp := &rpc.JSONRpcResp{}
+				resp := &types.JSONRpcResp{}
 				if err := json.Unmarshal(msg, resp); err != nil {
 					panic(err)
 				}
@@ -73,7 +73,7 @@ func (sub *Subscriber) Start(query string, callback func(*Subscriber, []byte)) e
 }
 
 func (sub *Subscriber) Stop() {
-	req, err := rpc.NewRequest("unsubscribe", sub.query)
+	req, err := types.NewRequest(1, "unsubscribe", sub.query)
 	if err != nil {
 		panic(err)
 	}

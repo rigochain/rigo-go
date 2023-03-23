@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/rigochain/rigo-go/libs"
-	"github.com/rigochain/rigo-go/libs/client"
+	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
 	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -21,7 +21,7 @@ import (
 )
 
 type accountTestObj struct {
-	w *client.Wallet
+	w *web3.Wallet
 
 	originBalance *big.Int
 	originNonce   uint64
@@ -72,7 +72,7 @@ func (obj *accountTestObj) AddExpectedNonce() {
 var senderAccountTestObjMap = make(map[string]*accountTestObj)
 var gmtx = &sync.Mutex{}
 
-func newAccountTestObj(w *client.Wallet) *accountTestObj {
+func newAccountTestObj(w *web3.Wallet) *accountTestObj {
 	return &accountTestObj{
 		w:               w,
 		originBalance:   w.GetBalance(),
@@ -102,7 +102,7 @@ func TestBulkTransfer(t *testing.T) {
 			continue
 		}
 
-		require.NoError(t, w.SyncAccount())
+		require.NoError(t, w.SyncAccount(rweb3))
 
 		acctTestObj := newAccountTestObj(w)
 		allAccountTestObjArr = append(allAccountTestObjArr, acctTestObj)
@@ -116,7 +116,7 @@ func TestBulkTransfer(t *testing.T) {
 	}
 
 	for i := len(allAccountTestObjArr); i < 100; i++ {
-		newAcctTestObj := newAccountTestObj(client.NewWallet(TESTPASS))
+		newAcctTestObj := newAccountTestObj(web3.NewWallet(TESTPASS))
 		require.NoError(t, saveRandWallet(newAcctTestObj.w))
 		allAccountTestObjArr = append(allAccountTestObjArr, newAcctTestObj)
 	}
@@ -135,7 +135,7 @@ func TestBulkTransfer(t *testing.T) {
 	for _, acctObj := range allAccountTestObjArr {
 		//fmt.Println("\tCheck account", acctObj.w.Address())
 
-		require.NoError(t, acctObj.w.SyncAccount())
+		require.NoError(t, acctObj.w.SyncAccount(rweb3))
 		require.Equal(t, acctObj.expectedBalance, acctObj.w.GetBalance(), acctObj.w.Address().String())
 		require.Equal(t, acctObj.expectedNonce, acctObj.w.GetNonce(), acctObj.w.Address().String())
 	}
@@ -149,7 +149,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *accountTe
 
 	subWg := sync.WaitGroup{}
 
-	sub, err := client.NewSubscriber("ws://localhost:26657/websocket")
+	sub, err := web3.NewSubscriber("ws://localhost:26657/websocket")
 	defer func() {
 		sub.Stop()
 	}()
@@ -157,7 +157,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *accountTe
 	require.NoError(t, err)
 	query := fmt.Sprintf("tm.event='Tx' AND tx.sender='%v'", w.Address())
 	//fmt.Println("query", query)
-	err = sub.Start(query, func(sub *client.Subscriber, result []byte) {
+	err = sub.Start(query, func(sub *web3.Subscriber, result []byte) {
 
 		event := &coretypes.ResultEvent{}
 		err := tmjson.Unmarshal(result, event)
@@ -199,7 +199,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *accountTe
 
 		subWg.Add(1) // done in subscriber's callback
 
-		ret, err := w.TransferSync(raddr, gas, randAmt)
+		ret, err := w.TransferSync(raddr, gas, randAmt, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, w.GetNonce(), ret.Hash)
 
@@ -222,7 +222,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *accountTe
 	wg.Done()
 }
 
-func saveRandWallet(w *client.Wallet) error {
+func saveRandWallet(w *web3.Wallet) error {
 	path := filepath.Join(WALKEYDIR, fmt.Sprintf("wk%X.json", w.Address()))
 	return w.Save(libs.NewFileWriter(path))
 }

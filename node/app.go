@@ -106,8 +106,8 @@ func (ctrler *RigoApp) SetLocalClient(client abcicli.Client) {
 	defer ctrler.mtx.Unlock()
 
 	// todo: Find out how to solve the following problem.
-	// Problem: The 'client' MUST BE a client of CONSENSUS.
-	// However, there is no way to know if the 'client' is for CONSENSUS or not.
+	// Problem: The 'web3' MUST BE a web3 of CONSENSUS.
+	// However, there is no way to know if the 'web3' is for CONSENSUS or not.
 	ctrler.localClient = client
 }
 

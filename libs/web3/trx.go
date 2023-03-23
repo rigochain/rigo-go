@@ -1,4 +1,4 @@
-package client
+package web3
 
 import (
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"

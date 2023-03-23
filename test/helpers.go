@@ -3,8 +3,8 @@ package test
 import (
 	"github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs"
-	"github.com/rigochain/rigo-go/libs/client"
-	"github.com/rigochain/rigo-go/libs/client/rpc"
+	rigoweb3 "github.com/rigochain/rigo-go/libs/web3"
+	rweb3types "github.com/rigochain/rigo-go/libs/web3/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/rand"
@@ -16,15 +16,16 @@ import (
 )
 
 var (
+	rweb3           = rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider("http://localhost:26657"))
 	home, _         = os.UserHomeDir()
 	VALWALLETPATH   = filepath.Join(home, "rigo_localnet_0/config/priv_validator_key.json")
 	WALKEYDIR       = filepath.Join(home, "rigo_localnet_0/walkeys")
 	TESTPASS        = []byte("1")
-	validatorWallet *client.Wallet
-	wallets         []*client.Wallet
-	walletsMap      map[types.AcctKey]*client.Wallet
-	W0              *client.Wallet
-	W1              *client.Wallet
+	validatorWallet *rigoweb3.Wallet
+	wallets         []*rigoweb3.Wallet
+	walletsMap      map[types.AcctKey]*rigoweb3.Wallet
+	W0              *rigoweb3.Wallet
+	W1              *rigoweb3.Wallet
 	amt             = bytes.RandBigIntN(big.NewInt(1000))
 	gas             = big.NewInt(10)
 )
@@ -36,9 +37,9 @@ func init() {
 		panic(err)
 	}
 
-	walletsMap = make(map[types.AcctKey]*client.Wallet)
+	walletsMap = make(map[types.AcctKey]*rigoweb3.Wallet)
 
-	if w, err := client.OpenWallet(libs.NewFileReader(VALWALLETPATH)); err != nil {
+	if w, err := rigoweb3.OpenWallet(libs.NewFileReader(VALWALLETPATH)); err != nil {
 		panic(err)
 	} else {
 		validatorWallet = w
@@ -46,7 +47,7 @@ func init() {
 
 	for _, file := range files {
 		if !file.IsDir() {
-			if w, err := client.OpenWallet(
+			if w, err := rigoweb3.OpenWallet(
 				libs.NewFileReader(filepath.Join(WALKEYDIR, file.Name()))); err != nil {
 				panic(err)
 			} else {
@@ -61,13 +62,13 @@ func init() {
 	W1 = wallets[1]
 }
 
-func waitTrxResult(txhash []byte, maxTimes int) (*rpc.TrxResult, error) {
+func waitTrxResult(txhash []byte, maxTimes int) (*rweb3types.TrxResult, error) {
 	for i := 0; i < maxTimes; i++ {
 		time.Sleep(100 * time.Millisecond)
 
 		// todo: check why it takes more than 10 secs to fetch a transaction
 
-		txRet, err := rpc.GetTransaction(txhash)
+		txRet, err := rweb3.GetTransaction(txhash)
 		if err != nil && !strings.Contains(err.Error(), ") not found") {
 			return nil, err
 		} else if err == nil {
@@ -77,12 +78,12 @@ func waitTrxResult(txhash []byte, maxTimes int) (*rpc.TrxResult, error) {
 	return nil, xerrors.New("timeout")
 }
 
-func randWallet() *client.Wallet {
+func randWallet() *rigoweb3.Wallet {
 	rn := rand.Intn(len(wallets))
 	return wallets[rn]
 }
 
-func randCommonWallet() *client.Wallet {
+func randCommonWallet() *rigoweb3.Wallet {
 	for {
 		w := randWallet()
 		if bytes.Compare(w.Address(), validatorWallet.Address()) != 0 {

@@ -5,7 +5,7 @@ import (
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	"github.com/rigochain/rigo-go/ctrlers/types"
-	"github.com/rigochain/rigo-go/libs/client"
+	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -24,8 +24,8 @@ var (
 	govHelper   = &govHelperMock{}
 	stakeCtrler *stake.StakeCtrler
 
-	Wallets              []*client.Wallet
-	DelegateeWallets     []*client.Wallet
+	Wallets              []*web3.Wallet
+	DelegateeWallets     []*web3.Wallet
 	stakingToSelfTrxCtxs []*types.TrxContext
 	stakingTrxCtxs       []*types.TrxContext
 	unstakingTrxCtxs     []*types.TrxContext

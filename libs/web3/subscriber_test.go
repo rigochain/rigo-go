@@ -1,4 +1,4 @@
-package client
+package web3
 
 import (
 	"github.com/stretchr/testify/require"

@@ -50,7 +50,7 @@ type rigoLocalClient struct {
 
 var _ abcicli.Client = (*rigoLocalClient)(nil)
 
-// NewLocalClient creates a local client, which will be directly calling the
+// NewLocalClient creates a local web3, which will be directly calling the
 // methods of the given app.
 //
 // Both Async and Sync methods ignore the given context.Context parameter.
@@ -133,8 +133,8 @@ func (client *rigoLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverTx)
 	_ = client.Application.DeliverTx(params)
 	return nil
 
-	//res := client.Application.DeliverTx(params)
-	//return client.callback(
+	//res := web3.Application.DeliverTx(params)
+	//return web3.callback(
 	//	abcitypes.ToRequestDeliverTx(params),
 	//	abcitypes.ToResponseDeliverTx(res),
 	//)
@@ -146,7 +146,7 @@ func defualtOnTrxExecFinished(client abcicli.Client, txidx int, req *abcitypes.R
 
 func (client *rigoLocalClient) onTrxFinished(txidx int, req *abcitypes.RequestDeliverTx, res *abcitypes.ResponseDeliverTx) {
 	if txidx >= len(client.deliverTxReqReses) {
-		panic("client.deliverTxReqReses's length is wrong")
+		panic("web3.deliverTxReqReses's length is wrong")
 	}
 	rr := client.deliverTxReqReses[txidx]
 	rr.Response = abcitypes.ToResponseDeliverTx(*res)

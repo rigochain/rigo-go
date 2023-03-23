@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
-	"github.com/rigochain/rigo-go/libs/client"
+	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
 	bytes2 "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
@@ -50,7 +50,7 @@ func (a *accountHandler) Reward(to types.Address, amt *big.Int, exec bool) xerro
 
 var _ types2.IAccountHelper = (*accountHandler)(nil)
 
-func FindWallet(addr types.Address) *client.Wallet {
+func FindWallet(addr types.Address) *web3.Wallet {
 	for _, w := range Wallets {
 		if bytes.Compare(addr, w.Address()) == 0 {
 			return w
@@ -133,10 +133,10 @@ func (g *govHelperMock) PowerToReward(power int64) *big.Int {
 
 var _ types2.IGovHelper = (*govHelperMock)(nil)
 
-func makeTestWallets(n int) []*client.Wallet {
-	wallets := make([]*client.Wallet, n)
+func makeTestWallets(n int) []*web3.Wallet {
+	wallets := make([]*web3.Wallet, n)
 	for i := 0; i < n; i++ {
-		w := client.NewWallet([]byte("1"))
+		w := web3.NewWallet([]byte("1"))
 		w.GetAccount().AddBalance(types.ToSAU(100000000))
 		w.Unlock([]byte("1"))
 
@@ -166,10 +166,10 @@ func randMakeStakingTrxContext() (*types2.TrxContext, error) {
 	return makeStakingTrxContext(from, to, power)
 }
 
-func makeStakingTrxContext(from, to *client.Wallet, power int64) (*types2.TrxContext, error) {
+func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*types2.TrxContext, error) {
 	amt := govHelper.PowerToAmount(power)
 
-	tx := client.NewTrxStaking(from.Address(), to.Address(), dummyNonce, dummyGas, amt)
+	tx := web3.NewTrxStaking(from.Address(), to.Address(), dummyNonce, dummyGas, amt)
 	bz, err := tx.Encode()
 	if err != nil {
 		return nil, err
@@ -214,9 +214,9 @@ func randMakeUnstakingTrxContext() (*types2.TrxContext, error) {
 	return makeUnstakingTrxContext(from, to, stakingTxCtx.TxHash)
 }
 
-func makeUnstakingTrxContext(from, to *client.Wallet, txhash bytes2.HexBytes) (*types2.TrxContext, error) {
+func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes) (*types2.TrxContext, error) {
 
-	tx := client.NewTrxUnstaking(from.Address(), to.Address(), dummyNonce, dummyGas, txhash)
+	tx := web3.NewTrxUnstaking(from.Address(), to.Address(), dummyNonce, dummyGas, txhash)
 	tzbz, _, err := from.SignTrx(tx)
 	if err != nil {
 		return nil, err
