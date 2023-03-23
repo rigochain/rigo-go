@@ -30,6 +30,43 @@ type accountTestObj struct {
 	spentGas        *big.Int
 	expectedBalance *big.Int
 	expectedNonce   uint64
+
+	mtx sync.RWMutex
+}
+
+func (obj *accountTestObj) AddTxHashOfAddr(txhash string, addr types.Address) {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.txHashes[txhash] = addr
+}
+
+func (obj *accountTestObj) AddSpentGas(d *big.Int) {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.spentGas = new(big.Int).Add(obj.spentGas, d)
+}
+
+func (obj *accountTestObj) AddExpectedBalance(d *big.Int) {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.expectedBalance = new(big.Int).Add(obj.expectedBalance, d)
+}
+
+func (obj *accountTestObj) SubExpectedBalance(d *big.Int) {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.expectedBalance = new(big.Int).Sub(obj.expectedBalance, d)
+}
+
+func (obj *accountTestObj) AddExpectedNonce() {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	obj.expectedNonce++
 }
 
 var senderAccountTestObjMap = make(map[string]*accountTestObj)
@@ -168,12 +205,12 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *accountTe
 
 		// todo: this should be locked by mutex
 		// record expected state of account
-		senderAcctTestObj.txHashes[ret.Hash.String()] = w.Address()
-		senderAcctTestObj.spentGas = new(big.Int).Add(senderAcctTestObj.spentGas, gas)
-		senderAcctTestObj.expectedBalance = new(big.Int).Sub(senderAcctTestObj.expectedBalance, needAmt)
-		senderAcctTestObj.expectedNonce += 1
+		senderAcctTestObj.AddTxHashOfAddr(ret.Hash.String(), w.Address())
+		senderAcctTestObj.AddSpentGas(gas)
+		senderAcctTestObj.SubExpectedBalance(needAmt)
+		senderAcctTestObj.AddExpectedNonce()
 
-		racctState.expectedBalance = new(big.Int).Add(racctState.expectedBalance, randAmt)
+		racctState.AddExpectedBalance(randAmt)
 
 		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
 
