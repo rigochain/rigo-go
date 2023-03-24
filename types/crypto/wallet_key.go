@@ -210,7 +210,7 @@ func (wk *WalletKey) PrvKeyClone() []byte {
 
 func (wk *WalletKey) Sign(msg []byte) ([]byte, error) {
 	if wk.IsLock() {
-		return nil, xerrors.New("error: WalletKey is locked")
+		return nil, xerrors.NewOrdinary("error: WalletKey is locked")
 	}
 
 	return ethec.Sign(DefaultHash(msg), wk.prvKey)

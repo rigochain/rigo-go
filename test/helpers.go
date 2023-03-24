@@ -76,7 +76,7 @@ func waitTrxResult(txhash []byte, maxTimes int) (*rweb3types.TrxResult, error) {
 			return txRet, nil
 		}
 	}
-	return nil, xerrors.New("timeout")
+	return nil, xerrors.NewOrdinary("timeout")
 }
 
 func randWallet() *rigoweb3.Wallet {

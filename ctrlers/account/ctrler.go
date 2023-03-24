@@ -40,13 +40,13 @@ func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 
 	genAppState, ok := req.(*genesis.GenesisAppState)
 	if !ok {
-		return xerrors.New("wrong parameter: AcctCtrler::InitLedger requires *genesis.GenesisAppState")
+		return xerrors.ErrInitChain.Wrapf("wrong parameter: AcctCtrler::InitLedger requires *genesis.GenesisAppState")
 	}
 
 	for _, holder := range genAppState.AssetHolders {
 		addr := append(holder.Address, nil...)
 		if bal, ok := new(big.Int).SetString(holder.Balance, 10); !ok {
-			return xerrors.New("wrong balance in genesis")
+			return xerrors.ErrInitChain.Wrapf("wrong balance in genesis")
 		} else {
 			acct := &atypes.Account{
 				Address: addr,

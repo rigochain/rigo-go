@@ -143,7 +143,7 @@ func (lss *SFilePVLastSignState) CheckHRS(height int64, round int32, step int8) 
 					}
 					return true, nil
 				}
-				return false, xerrors.New("no SignBytes found")
+				return false, xerrors.NewOrdinary("no SignBytes found")
 			}
 		}
 	}

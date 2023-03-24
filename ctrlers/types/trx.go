@@ -114,9 +114,9 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 			return err
 		}
 	case TRX_EXECUTE:
-		return xerrors.New("not supported payload type")
+		return xerrors.NewOrdinary("not supported payload type")
 	default:
-		return xerrors.New("unknown payload type")
+		return xerrors.NewOrdinary("unknown payload type")
 	}
 
 	tx.Version = txProto.Version

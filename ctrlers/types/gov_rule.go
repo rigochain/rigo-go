@@ -177,15 +177,15 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 
 	amtPower, ok := new(big.Int).SetString(tm.AmountPerPower, 10)
 	if !ok {
-		return xerrors.New("amountPerPower is wrong")
+		return xerrors.NewOrdinary("amountPerPower is wrong")
 	}
 	rwdPower, ok := new(big.Int).SetString(tm.RewardPerPower, 10)
 	if !ok {
-		return xerrors.New("rewardPerPower is wrong")
+		return xerrors.NewOrdinary("rewardPerPower is wrong")
 	}
 	minFee, ok := new(big.Int).SetString(tm.MinTrxFee, 10)
 	if !ok {
-		return xerrors.New("minTrxFee is wrong")
+		return xerrors.NewOrdinary("minTrxFee is wrong")
 	}
 
 	r.mtx.Lock()

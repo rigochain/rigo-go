@@ -23,7 +23,7 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.New("provider error: " + string(resp.Error))
+		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
 		return nil, err
 	} else if err := tmjson.Unmarshal(queryResp.Value, acct); err != nil {
@@ -44,7 +44,7 @@ func (rweb3 *RigoWeb3) GetDelegatee(addr types.Address) (*stake.Delegatee, error
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.New("provider error: " + string(resp.Error))
+		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
 		return nil, err
 	} else if err := tmjson.Unmarshal(queryResp.Value, delegatee); err != nil {
@@ -62,7 +62,7 @@ func (rweb3 *RigoWeb3) GetStakes(addr types.Address) ([]*stake.Stake, error) {
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.New("provider error: " + string(resp.Error))
+		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
 		return nil, err
 	} else if err := tmjson.Unmarshal(queryResp.Value, &stakes); err != nil {
@@ -91,11 +91,11 @@ func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*cor
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.New("provider error: " + string(resp.Error))
+		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
 	} else {
 		switch method {
 		case "broadcast_tx_async":
-			return nil, xerrors.New("not supported method: " + method)
+			return nil, xerrors.NewOrdinary("not supported method: " + method)
 		case "broadcast_tx_sync":
 			ret := &coretypes.ResultBroadcastTx{}
 			if err := json.Unmarshal(resp.Result, ret); err != nil {
@@ -103,9 +103,9 @@ func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*cor
 			}
 			return ret, nil
 		case "broadcast_tx_commit":
-			return nil, xerrors.New("not supported method: " + method)
+			return nil, xerrors.NewOrdinary("not supported method: " + method)
 		default:
-			return nil, xerrors.New("unknown method: " + method)
+			return nil, xerrors.NewOrdinary("unknown method: " + method)
 		}
 	}
 }
@@ -121,7 +121,7 @@ func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, err
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.New("provider error: " + string(resp.Error))
+		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, txRet.ResultTx); err != nil {
 		return nil, err
 	} else if err := txRet.TxDetail.Decode(txRet.ResultTx.Tx); err != nil {

@@ -58,7 +58,7 @@ func Subscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultSub
 	// return error when the event subscription request is received over http session.
 	// related to: #103
 	if ctx.WSConn == nil || ctx.JSONReq == nil {
-		return nil, xerrors.New("error connection type: no websocket connection")
+		return nil, xerrors.NewOrdinary("error connection type: no websocket connection")
 	}
 	// make hex string like address or hash be uppercase
 	//  address's size is 20bytes(40characters)

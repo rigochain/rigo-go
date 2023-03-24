@@ -44,6 +44,6 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 			return v, nil
 		}
 	default:
-		return nil, xerrors.New("unknown query path")
+		return nil, xerrors.ErrQuery.Wrapf("unknown query path")
 	}
 }

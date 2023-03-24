@@ -74,7 +74,7 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 
 	genAppState, ok := req.(*genesis.GenesisAppState)
 	if !ok {
-		return xerrors.New("wrong parameter: GovCtrler::InitLedger requires *genesis.GenesisAppState")
+		return xerrors.ErrInitChain.Wrapf("wrong parameter: GovCtrler::InitLedger requires *genesis.GenesisAppState")
 	}
 	ctrler.GovRule = *genAppState.GovRule
 	_ = ctrler.ruleLedger.SetFinality(&ctrler.GovRule)
@@ -337,7 +337,7 @@ func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	}
 
 	if v0 != v1 || v1 != v2 {
-		return nil, -1, xerrors.New(fmt.Sprintf("error: GovCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2))
+		return nil, -1, xerrors.ErrCommit.Wrapf("error: GovCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2)
 	}
 
 	if ctrler.newGovRule != nil {

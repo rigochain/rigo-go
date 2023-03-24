@@ -121,7 +121,7 @@ func (ledger *SimpleLedger[T]) IterateAllItems(cb func(T) xerrors.XError) xerror
 	if err != nil {
 		return xerrors.From(err)
 	} else if stopped {
-		return xerrors.New("stop to iterate ledger tree")
+		return xerrors.NewOrdinary("stop to iterate ledger tree")
 	}
 	return nil
 }
@@ -164,7 +164,7 @@ func (ledger *SimpleLedger[T]) read(key LedgerKey) (T, xerrors.XError) {
 	} else if err := item.Decode(bz); err != nil {
 		return emptyNil, xerrors.From(err)
 	} else if key != item.Key() {
-		return emptyNil, xerrors.New("simple_ledger: the key is compromised - the requested key is not equal to the key encoded in value")
+		return emptyNil, xerrors.NewOrdinary("simple_ledger: the key is compromised - the requested key is not equal to the key encoded in value")
 	} else {
 		return item, nil
 	}

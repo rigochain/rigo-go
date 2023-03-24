@@ -107,17 +107,17 @@ func DefaultHasherName() string {
 
 var (
 	// ErrInvalidBlockSize indicates hash blocksize <= 0.
-	ErrInvalidBlockSize = xerrors.New("invalid blocksize")
+	ErrInvalidBlockSize = xerrors.NewOrdinary("invalid blocksize")
 
 	// ErrInvalidPKCS5Data indicates bad input to PKCS7 pad or unpad.
-	ErrInvalidPKCS5Data = xerrors.New("invalid PKCS5 data (empty or not padded)")
+	ErrInvalidPKCS5Data = xerrors.NewOrdinary("invalid PKCS5 data (empty or not padded)")
 	// ErrInvalidPKCS5Padding indicates PKCS5 unpad fails to bad input.
-	ErrInvalidPKCS5Padding = xerrors.New("invalid PKCS5 padding on input")
+	ErrInvalidPKCS5Padding = xerrors.NewOrdinary("invalid PKCS5 padding on input")
 
 	// ErrInvalidPKCS7Data indicates bad input to PKCS7 pad or unpad.
-	ErrInvalidPKCS7Data = xerrors.New("invalid PKCS7 data (empty or not padded)")
+	ErrInvalidPKCS7Data = xerrors.NewOrdinary("invalid PKCS7 data (empty or not padded)")
 	// ErrInvalidPKCS7Padding indicates PKCS7 unpad fails to bad input.
-	ErrInvalidPKCS7Padding = xerrors.New("invalid PKCS7 padding on input")
+	ErrInvalidPKCS7Padding = xerrors.NewOrdinary("invalid PKCS7 padding on input")
 )
 
 func PKCS5Padding(b []byte, blocksize int) ([]byte, error) {

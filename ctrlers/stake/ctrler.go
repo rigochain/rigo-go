@@ -1,7 +1,6 @@
 package stake
 
 import (
-	"fmt"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/ledger"
@@ -59,7 +58,7 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 
 	validators, ok := req.([]abcitypes.ValidatorUpdate)
 	if !ok {
-		return xerrors.New("wrong parameter: StakeCtrler::InitLedger() requires []ValidatorUpdates")
+		return xerrors.ErrInitChain.Wrapf("wrong parameter: StakeCtrler::InitLedger() requires []ValidatorUpdates")
 	}
 
 	for _, val := range validators {
@@ -361,7 +360,7 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	} else if h1, v1, xerr := ctrler.frozenLedger.Commit(); xerr != nil {
 		return nil, -1, xerr
 	} else if v0 != v1 {
-		return nil, -1, xerrors.New(fmt.Sprintf("error: StakeCtrler.Commit() has wrong version number - v0:%v, v1:%v", v0, v1))
+		return nil, -1, xerrors.ErrCommit.Wrapf("error: StakeCtrler.Commit() has wrong version number - v0:%v, v1:%v", v0, v1)
 	} else {
 		return crypto.DefaultHash(h0, h1), v0, nil
 	}

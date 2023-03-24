@@ -48,7 +48,7 @@ func (txe *TrxExecutor) ExecuteAsync(ctx *types.TrxContext) xerrors.XError {
 	i := int(ctx.Tx.From[0]) % n
 
 	if txe.txCtxChs[i] == nil {
-		return xerrors.New("channel is not available")
+		return xerrors.NewOrdinary("transaction execution channel is not available")
 	}
 	//if ctx.Exec {
 	//	txe.logger.Info("[DEBUG] TrxExecutor::ExecuteAsync", "index", i, "txhash", ctx.TxHash)
