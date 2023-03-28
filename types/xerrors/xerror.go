@@ -47,6 +47,7 @@ var (
 	ErrInvalidTrx              = New(ErrCodeInvalidTrx, "invalid transaction", nil)
 	ErrNegFee                  = ErrInvalidTrx.Wrap(errors.New("negative fee"))
 	ErrInsufficientFee         = ErrInvalidTrx.Wrap(errors.New("not enough fee"))
+	ErrInvalidAddress          = ErrInvalidTrx.Wrap(errors.New("invalid address"))
 	ErrInvalidNonce            = ErrInvalidTrx.Wrap(errors.New("invalid nonce"))
 	ErrNegAmount               = ErrInvalidTrx.Wrap(errors.New("negative amount"))
 	ErrInsufficientFund        = ErrInvalidTrx.Wrap(errors.New("insufficient fund"))

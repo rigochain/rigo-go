@@ -19,9 +19,10 @@ import (
 var (
 	rweb3           = rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider("http://localhost:26657"))
 	home, _         = os.UserHomeDir()
-	VALWALLETPATH   = filepath.Join(home, "rigo_localnet_0/config/priv_validator_key.json")
-	WALKEYDIR       = filepath.Join(home, "rigo_localnet_0/walkeys")
-	TESTPASS        = []byte("1")
+	RIGOHOME        = filepath.Join(home, ".rigo")
+	VALWALLETPATH   = filepath.Join(RIGOHOME, "config/priv_validator_key.json")
+	WALKEYDIR       = filepath.Join(RIGOHOME, "walkeys")
+	TESTPASS        = []byte("1111")
 	validatorWallet *rigoweb3.Wallet
 	wallets         []*rigoweb3.Wallet
 	walletsMap      map[types.AcctKey]*rigoweb3.Wallet

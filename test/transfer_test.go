@@ -256,3 +256,18 @@ func TestTransfer_OverBalance(t *testing.T) {
 	require.Equal(t, testObj0.originNonce, W0.GetNonce())
 
 }
+
+func TestTransfer_WrongAddr(t *testing.T) {
+	require.NoError(t, W0.SyncBalance(rweb3))
+	require.NoError(t, W0.Unlock(TESTPASS))
+	require.NotEqual(t, big.NewInt(0), W0.GetBalance())
+
+	tmpAmt := new(big.Int).Div(W0.GetBalance(), big.NewInt(2))
+	ret, err := W0.TransferSync(nil, gas, tmpAmt, rweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Code)
+
+	ret, err = W0.TransferSync([]byte{0x00}, gas, tmpAmt, rweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Code)
+}

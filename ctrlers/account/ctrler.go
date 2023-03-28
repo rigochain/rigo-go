@@ -64,6 +64,12 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
+	if len(ctx.Tx.To) != types.AddrSize {
+		return xerrors.ErrInvalidAddress
+	} else {
+		ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
+	}
+
 	// check signature
 	var fromAddr types.Address
 	var pubBytes abytes.HexBytes
@@ -91,18 +97,12 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 	} else if xerr := acct.CheckBalance(ctx.NeedAmt); xerr != nil {
 		return xerr
 	} else if xerr := acct.CheckNonce(ctx.Tx.Nonce); xerr != nil {
-		//if ctx.Exec {
-		//	ctrler.logger.Error("[DEBUG] AccountCtrler::ValidateTrx", "txhash", ctx.TxHash, "acct.nonce", acct.Nonce, "tx.nonce", ctx.Tx.Nonce)
-		//}
 		return xerr.Wrap(fmt.Errorf("txhash: %X, address: %v, expected: %v, actual:%v", ctx.TxHash, acct.Address, acct.Nonce+1, ctx.Tx.Nonce))
 	} else {
 		ctx.Sender = acct
 		ctx.SenderPubKey = pubBytes
 	}
 
-	//if ctx.Exec {
-	//	ctrler.logger.Info("[DEBUG] AccountCtrler::ValidateTrx", "txhash", ctx.TxHash, "nonce", ctx.Tx.Nonce)
-	//}
 	return nil
 }
 
@@ -115,10 +115,8 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 		return xerr
 	}
 
-	var receiver *atypes.Account
 	if ctx.Tx.Type == atypes.TRX_TRANSFER {
-		receiver = ctrler.findOrNewAccount(ctx.Tx.To, ctx.Exec)
-		if xerr := receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
+		if xerr := ctx.Receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
 			return xerr
 		}
 	}
@@ -126,17 +124,11 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 	// increase sender's nonce
 	ctx.Sender.AddNonce()
 
-	//if ctx.Exec {
-	//	ctrler.logger.Info("[DEBUG] AccountCtrler::ExecuteTrx", "txhash", ctx.TxHash, "address", ctx.Sender, "nonce", ctx.Sender.Nonce)
-	//}
-
 	// set used gas
 	ctx.GasUsed = ctx.Tx.Gas
 
 	_ = ctrler.setAccountCommittable(ctx.Sender, ctx.Exec)
-	if receiver != nil {
-		_ = ctrler.setAccountCommittable(receiver, ctx.Exec)
-	}
+	_ = ctrler.setAccountCommittable(ctx.Receiver, ctx.Exec)
 
 	return nil
 }
