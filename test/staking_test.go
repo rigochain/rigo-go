@@ -2,14 +2,25 @@ package test
 
 import (
 	"bytes"
-	abytes "github.com/rigochain/rigo-go/types/bytes"
+	rtypes0 "github.com/rigochain/rigo-go/types"
+	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 )
 
-func TestStakingToValidator(t *testing.T) {
+func TestQueryValidators(t *testing.T) {
+	ret, err := rweb3.GetValidators(1, 1, len(validatorWallets))
+
+	require.NoError(t, err)
+	require.Equal(t, len(validatorWallets), len(ret.Validators))
+	for _, val := range ret.Validators {
+		require.True(t, isValidator(rtypes0.Address(val.Address)))
+	}
+}
+
+func TestStakingToSelf(t *testing.T) {
 
 	w := randCommonWallet()
 	require.NoError(t, w.SyncAccount(rweb3))
@@ -17,11 +28,11 @@ func TestStakingToValidator(t *testing.T) {
 	bal := w.GetBalance()
 	require.True(t, bal.Cmp(big.NewInt(0)) > 0)
 
-	stakeAmt := abytes.RandBigIntN(bal)
+	stakeAmt := rbytes.RandBigIntN(bal)
 
 	require.NoError(t, w.Unlock(TESTPASS))
 	// self staking
-	ret, err := w.StakingSync(validatorWallet.Address(), gas, stakeAmt, rweb3)
+	ret, err := w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
 	require.NoError(t, err)
 
 	require.NoError(t, err)
@@ -47,9 +58,13 @@ func TestStakingToValidator(t *testing.T) {
 	}
 	require.True(t, found)
 	require.NoError(t, err)
+
+	addValidatorWallet(w)
+
+	TestQueryValidators(t)
 }
 
-func TestStakingToSelf(t *testing.T) {
+func TestDelegating(t *testing.T) {
 
 	w := randCommonWallet()
 	require.NoError(t, w.SyncAccount(rweb3))
@@ -57,11 +72,11 @@ func TestStakingToSelf(t *testing.T) {
 	bal := w.GetBalance()
 	require.True(t, bal.Cmp(big.NewInt(0)) > 0)
 
-	stakeAmt := abytes.RandBigIntN(bal)
+	stakeAmt := rbytes.RandBigIntN(bal)
 
 	require.NoError(t, w.Unlock(TESTPASS))
 	// self staking
-	ret, err := w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
+	ret, err := w.StakingSync(validatorWallets[0].Address(), gas, stakeAmt, rweb3)
 	require.NoError(t, err)
 
 	require.NoError(t, err)

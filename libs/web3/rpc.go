@@ -10,15 +10,14 @@ import (
 	"github.com/rigochain/rigo-go/types/xerrors"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	"strconv"
 )
 
 func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, error) {
 	queryResp := &rpc.QueryResult{}
 	acct := ctrlertypes.NewAccount(nil)
 
-	rweb3.callId++
-
-	if req, err := rweb3types.NewRequest(rweb3.callId, "account", addr.String()); err != nil {
+	if req, err := rweb3.NewRequest("account", addr.String()); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -37,9 +36,7 @@ func (rweb3 *RigoWeb3) GetDelegatee(addr types.Address) (*stake.Delegatee, error
 	queryResp := &rpc.QueryResult{}
 	delegatee := stake.NewDelegatee(nil, nil)
 
-	rweb3.callId++
-
-	if req, err := rweb3types.NewRequest(rweb3.callId, "delegatee", addr.String()); err != nil {
+	if req, err := rweb3.NewRequest("delegatee", addr.String()); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -57,7 +54,7 @@ func (rweb3 *RigoWeb3) GetDelegatee(addr types.Address) (*stake.Delegatee, error
 func (rweb3 *RigoWeb3) GetStakes(addr types.Address) ([]*stake.Stake, error) {
 	queryResp := &rpc.QueryResult{}
 	var stakes []*stake.Stake
-	if req, err := rweb3types.NewRequest(rweb3.callId, "stakes", addr.String()); err != nil {
+	if req, err := rweb3.NewRequest("stakes", addr.String()); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -86,7 +83,7 @@ func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*cor
 
 	if txbz, err := tx.Encode(); err != nil {
 		return nil, err
-	} else if req, err := rweb3types.NewRequest(rweb3.callId, method, txbz); err != nil {
+	} else if req, err := rweb3.NewRequest(method, txbz); err != nil {
 		return nil, err
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -116,7 +113,7 @@ func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, err
 		TxDetail: &ctrlertypes.Trx{},
 	}
 
-	if req, err := rweb3types.NewRequest(rweb3.callId, "tx", txhash, false); err != nil {
+	if req, err := rweb3.NewRequest("tx", txhash, false); err != nil {
 		return nil, err
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -129,4 +126,26 @@ func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, err
 	} else {
 		return txRet, nil
 	}
+}
+
+func (rweb3 *RigoWeb3) GetValidators(height int64, page, perPage int) (*coretypes.ResultValidators, error) {
+	retVals := &coretypes.ResultValidators{}
+
+	_height := strconv.FormatInt(height, 10)
+	if page == 0 {
+		page = 1
+	}
+	_page := strconv.Itoa(page)
+	_perPage := strconv.Itoa(perPage)
+
+	if req, err := rweb3.NewRequest("validators", _height, _page, _perPage); err != nil {
+		return nil, err
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, retVals); err != nil {
+		return nil, err
+	}
+	return retVals, nil
 }

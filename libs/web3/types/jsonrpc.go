@@ -1,6 +1,8 @@
 package types
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type JSONRpcReq struct {
 	Version string          `json:"jsonrpc"`
@@ -26,12 +28,5 @@ func NewRequest(id int64, method string, args ...interface{}) (*JSONRpcReq, erro
 		Method: method,
 		Params: params,
 	}
-
-	//ret.Params = "["
-	//for _, a := range args {
-	//	ret.Params += a
-	//}
-	//ret.Params += "]"
-
 	return ret, nil
 }

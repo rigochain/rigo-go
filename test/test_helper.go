@@ -2,10 +2,11 @@ package test
 
 import (
 	"fmt"
-	"github.com/rigochain/rigo-go/ctrlers/types"
+	rtypes1 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs"
 	rigoweb3 "github.com/rigochain/rigo-go/libs/web3"
 	rweb3types "github.com/rigochain/rigo-go/libs/web3/types"
+	rtypes0 "github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/rand"
@@ -17,19 +18,19 @@ import (
 )
 
 var (
-	rweb3           = rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider("http://localhost:26657"))
-	home, _         = os.UserHomeDir()
-	RIGOHOME        = filepath.Join(home, ".rigo")
-	VALWALLETPATH   = filepath.Join(RIGOHOME, "config/priv_validator_key.json")
-	WALKEYDIR       = filepath.Join(RIGOHOME, "walkeys")
-	TESTPASS        = []byte("1111")
-	validatorWallet *rigoweb3.Wallet
-	wallets         []*rigoweb3.Wallet
-	walletsMap      map[types.AcctKey]*rigoweb3.Wallet
-	W0              *rigoweb3.Wallet
-	W1              *rigoweb3.Wallet
-	amt             = bytes.RandBigIntN(big.NewInt(1000))
-	gas             = big.NewInt(10)
+	rweb3            = rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider("http://localhost:26657"))
+	home, _          = os.UserHomeDir()
+	RIGOHOME         = filepath.Join(home, ".rigo")
+	VALWALLETPATH    = filepath.Join(RIGOHOME, "config/priv_validator_key.json")
+	WALKEYDIR        = filepath.Join(RIGOHOME, "walkeys")
+	TESTPASS         = []byte("1111")
+	validatorWallets []*rigoweb3.Wallet
+	wallets          []*rigoweb3.Wallet
+	walletsMap       map[rtypes1.AcctKey]*rigoweb3.Wallet
+	W0               *rigoweb3.Wallet
+	W1               *rigoweb3.Wallet
+	amt              = bytes.RandBigIntN(big.NewInt(1000))
+	gas              = big.NewInt(10)
 )
 
 func init() {
@@ -39,12 +40,12 @@ func init() {
 		panic(err)
 	}
 
-	walletsMap = make(map[types.AcctKey]*rigoweb3.Wallet)
+	walletsMap = make(map[rtypes1.AcctKey]*rigoweb3.Wallet)
 
 	if w, err := rigoweb3.OpenWallet(libs.NewFileReader(VALWALLETPATH)); err != nil {
 		panic(err)
 	} else {
-		validatorWallet = w
+		addValidatorWallet(w)
 	}
 
 	for _, file := range files {
@@ -55,7 +56,7 @@ func init() {
 			} else {
 				wallets = append(wallets, w)
 
-				acctKey := types.ToAcctKey(w.Address())
+				acctKey := rtypes1.ToAcctKey(w.Address())
 				walletsMap[acctKey] = w
 			}
 		}
@@ -85,10 +86,30 @@ func randWallet() *rigoweb3.Wallet {
 	return wallets[rn]
 }
 
+func addValidatorWallet(w *rigoweb3.Wallet) {
+	gmtx.Lock()
+	defer gmtx.Unlock()
+
+	validatorWallets = append(validatorWallets, w)
+}
+
+func isValidatorWallet(w *rigoweb3.Wallet) bool {
+	return isValidator(w.Address())
+}
+
+func isValidator(addr rtypes0.Address) bool {
+	for _, vw := range validatorWallets {
+		if bytes.Compare(vw.Address(), addr) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func randCommonWallet() *rigoweb3.Wallet {
 	for {
 		w := randWallet()
-		if bytes.Compare(w.Address(), validatorWallet.Address()) != 0 {
+		if isValidatorWallet(w) == false {
 			return w
 		}
 	}

@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/rigochain/rigo-go/libs/web3"
-	"github.com/rigochain/rigo-go/types"
 	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
@@ -18,110 +17,39 @@ import (
 	"testing"
 )
 
-type accountTestObj struct {
-	w *web3.Wallet
-
-	originBalance *big.Int
-	originNonce   uint64
-
-	txHashes        map[string]types.Address
-	spentGas        *big.Int
-	expectedBalance *big.Int
-	expectedNonce   uint64
-
-	mtx sync.RWMutex
-}
-
-func (obj *accountTestObj) AddTxHashOfAddr(txhash string, addr types.Address) {
-	obj.mtx.Lock()
-	defer obj.mtx.Unlock()
-
-	obj.txHashes[txhash] = addr
-}
-
-func (obj *accountTestObj) AddSpentGas(d *big.Int) {
-	obj.mtx.Lock()
-	defer obj.mtx.Unlock()
-
-	obj.spentGas = new(big.Int).Add(obj.spentGas, d)
-}
-
-func (obj *accountTestObj) AddExpectedBalance(d *big.Int) {
-	obj.mtx.Lock()
-	defer obj.mtx.Unlock()
-
-	obj.expectedBalance = new(big.Int).Add(obj.expectedBalance, d)
-}
-
-func (obj *accountTestObj) SubExpectedBalance(d *big.Int) {
-	obj.mtx.Lock()
-	defer obj.mtx.Unlock()
-
-	obj.expectedBalance = new(big.Int).Sub(obj.expectedBalance, d)
-}
-
-func (obj *accountTestObj) AddExpectedNonce() {
-	obj.mtx.Lock()
-	defer obj.mtx.Unlock()
-
-	obj.expectedNonce++
-}
-
-var senderAccountTestObjMap = make(map[string]*accountTestObj)
-var gmtx = &sync.Mutex{}
-
-func newAccountTestObj(w *web3.Wallet) *accountTestObj {
-	return &accountTestObj{
-		w:               w,
-		originBalance:   w.GetBalance(),
-		originNonce:     w.GetNonce(),
-		txHashes:        make(map[string]types.Address),
-		spentGas:        big.NewInt(0),
-		expectedBalance: w.GetBalance(),
-		expectedNonce:   w.GetNonce(),
-	}
-}
-
-func addSenderAccountTestObj(k string, v *accountTestObj) {
-	gmtx.Lock()
-	defer gmtx.Unlock()
-
-	senderAccountTestObjMap[k] = v
-}
-
 func TestTransfer_Bulk(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 
-	var allAccountTestObjArr []*accountTestObj
+	var allAccountTestObjArr []*acctHelper
 	senderCnt := 0
 	for _, w := range wallets {
-		if bytes.Compare(w.Address(), validatorWallet.Address()) == 0 {
+		if isValidatorWallet(w) {
 			continue
 		}
 
 		require.NoError(t, w.SyncAccount(rweb3))
 
-		acctTestObj := newAccountTestObj(w)
+		acctTestObj := newAcctHelper(w)
 		allAccountTestObjArr = append(allAccountTestObjArr, acctTestObj)
 
 		fmt.Println(w.Address(), w.GetNonce(), w.GetBalance())
 
 		if senderCnt < 90 && w.GetBalance().Cmp(big.NewInt(1000000)) >= 0 {
-			addSenderAccountTestObj(w.Address().String(), acctTestObj)
+			addSenderAccotHelper(w.Address().String(), acctTestObj)
 			senderCnt++
 		}
 	}
 
 	for i := len(allAccountTestObjArr); i < 100; i++ {
-		newAcctTestObj := newAccountTestObj(web3.NewWallet(TESTPASS))
+		newAcctTestObj := newAcctHelper(web3.NewWallet(TESTPASS))
 		require.NoError(t, saveRandWallet(newAcctTestObj.w))
 		allAccountTestObjArr = append(allAccountTestObjArr, newAcctTestObj)
 	}
 
-	t.Logf("TestBulkTransfer - senders: %v, all: %v\n", len(senderAccountTestObjMap), len(allAccountTestObjArr))
+	t.Logf("TestBulkTransfer - senders: %v, all: %v\n", len(senderAcctHelpers), len(allAccountTestObjArr))
 
-	for _, v := range senderAccountTestObjMap {
+	for _, v := range senderAcctHelpers {
 		wg.Add(1)
 		go bulkTransfer(t, &wg, v, allAccountTestObjArr, 50) // 50 txs
 	}
@@ -139,7 +67,7 @@ func TestTransfer_Bulk(t *testing.T) {
 	}
 }
 
-func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *accountTestObj, receivers []*accountTestObj, cnt int) {
+func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *acctHelper, receivers []*acctHelper, cnt int) {
 	w := senderAcctTestObj.w
 	require.NoError(t, w.Unlock(TESTPASS))
 
@@ -203,12 +131,12 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *accountTe
 
 		// todo: this should be locked by mutex
 		// record expected state of account
-		senderAcctTestObj.AddTxHashOfAddr(ret.Hash.String(), w.Address())
-		senderAcctTestObj.AddSpentGas(gas)
-		senderAcctTestObj.SubExpectedBalance(needAmt)
-		senderAcctTestObj.AddExpectedNonce()
+		senderAcctTestObj.addTxHashOfAddr(ret.Hash.String(), w.Address())
+		senderAcctTestObj.addSpentGas(gas)
+		senderAcctTestObj.subExpectedBalance(needAmt)
+		senderAcctTestObj.addExpectedNonce()
 
-		racctState.AddExpectedBalance(randAmt)
+		racctState.addExpectedBalance(randAmt)
 
 		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
 
@@ -225,8 +153,8 @@ func TestTransfer_OverBalance(t *testing.T) {
 	require.NoError(t, W1.SyncBalance(rweb3))
 	require.NoError(t, W0.Unlock(TESTPASS))
 
-	testObj0 := newAccountTestObj(W0)
-	testObj1 := newAccountTestObj(W1)
+	testObj0 := newAcctHelper(W0)
+	testObj1 := newAcctHelper(W1)
 
 	overAmt := W0.GetBalance() // gas is not included
 
