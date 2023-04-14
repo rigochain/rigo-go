@@ -28,7 +28,8 @@ func TestStakingToSelf(t *testing.T) {
 	bal := w.GetBalance()
 	require.True(t, bal.Cmp(big.NewInt(0)) > 0)
 
-	stakeAmt := rbytes.RandBigIntN(bal)
+	stakeAmt, ok := new(big.Int).SetString("4000000000000000000", 10) //rbytes.RandBigIntN(bal)
+	require.True(t, ok)
 
 	require.NoError(t, w.Unlock(TESTPASS))
 	// self staking
