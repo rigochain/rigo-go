@@ -95,9 +95,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
-
 	case ctrlertypes.TRX_UNSTAKING:
-
 	default:
 		return xerrors.ErrUnknownTrxType
 	}
@@ -149,7 +147,8 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovHelper)
 	if xerr := delegatee.addStake(s0); xerr != nil {
 		return xerr
-	} else if xerr := setUpdateDelegatee(delegatee); xerr != nil {
+	}
+	if xerr := setUpdateDelegatee(delegatee); xerr != nil {
 		return xerr
 	}
 
@@ -278,8 +277,10 @@ func (ctrler *StakeCtrler) updateValidators(maxVals int) []abcitypes.ValidatorUp
 	// IterateAllFinalityItems() returns delegatees, which are committed at previous block.
 	// So, if staking tx is executed at block N,
 	//     stake is saved(committed) at block N,
-	//     the account becomes validator at block N+1, and it is notified to consensus engine
-	//     the account can sign a block from block N+2 in consensus engine
+	//     it(updated validators) is notified to consensus engine at block N+1,
+	//	   consensus add this account to validator set at block (N+1)+1+1.
+	//	   (Refer to the comments in updateState(...) at github.com/tendermint/tendermint@v0.34.20/state/execution.go)
+	// So, the account can sign a block from block N+3 in consensus engine
 	if xerr := ctrler.delegateeLedger.IterateAllFinalityItems(func(d *Delegatee) xerrors.XError {
 		allDelegatees = append(allDelegatees, d)
 		return nil

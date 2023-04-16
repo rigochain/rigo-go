@@ -24,7 +24,8 @@ type IGovHelper interface {
 	MinTrxFee() *big.Int
 	MinVotingPeriodBlocks() int64
 	MaxVotingPeriodBlocks() int64
-	// util methods
+
+	// utility methods
 	MaxStakeAmount() *big.Int
 	MaxTotalPower() int64
 	AmountToPower(*big.Int) int64

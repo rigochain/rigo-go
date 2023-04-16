@@ -55,7 +55,6 @@ var (
 	ErrInvalidTrxPayloadType   = ErrInvalidTrx.Wrap(errors.New("wrong transaction payload type"))
 	ErrInvalidTrxPayloadParams = ErrInvalidTrx.Wrap(errors.New("invalid params of transaction payload"))
 	ErrInvalidTrxSig           = ErrInvalidTrx.Wrap(errors.New("invalid signature"))
-	ErrTooManyPower            = ErrInvalidTrx.Wrap(errors.New("too many power"))
 	ErrNotFoundTx              = New(ErrCodeNotFoundTx, "not found tx", nil)
 	ErrNotFoundDelegatee       = New(ErrCodeNotFoundDelegatee, "not found delegatee", nil)
 	ErrNotFoundStake           = New(ErrCodeNotFoundStake, "not found stake", nil)

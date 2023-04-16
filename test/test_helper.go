@@ -9,11 +9,14 @@ import (
 	rtypes0 "github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/rand"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -106,6 +109,10 @@ func isValidator(addr rtypes0.Address) bool {
 	return false
 }
 
+func validators(height int64) (*coretypes.ResultValidators, error) {
+	return rweb3.GetValidators(height, 1, len(validatorWallets))
+}
+
 func randCommonWallet() *rigoweb3.Wallet {
 	for {
 		w := randWallet()
@@ -118,4 +125,30 @@ func randCommonWallet() *rigoweb3.Wallet {
 func saveRandWallet(w *rigoweb3.Wallet) error {
 	path := filepath.Join(WALKEYDIR, fmt.Sprintf("wk%X.json", w.Address()))
 	return w.Save(libs.NewFileWriter(path))
+}
+
+func waitEvent(query string, cb func(*coretypes.ResultEvent, error) bool) (*sync.WaitGroup, error) {
+	subWg := sync.WaitGroup{}
+	sub, err := rigoweb3.NewSubscriber("ws://localhost:26657/websocket")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		sub.Stop()
+	}()
+
+	err = sub.Start(query, func(sub *rigoweb3.Subscriber, result []byte) {
+
+		event := &coretypes.ResultEvent{}
+		err := tmjson.Unmarshal(result, event)
+		if cb(event, err) {
+			sub.Stop()
+			subWg.Done()
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &subWg, nil
 }
