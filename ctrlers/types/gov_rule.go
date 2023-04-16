@@ -23,6 +23,9 @@ type GovRule struct {
 	minVotingPeriodBlocks int64
 	maxVotingPeriodBlocks int64
 
+	minSelfStakeRatio      int64 // todo: add min equity stake
+	maxUpdatableStakeRatio int64 // todo: add max updatable stake
+
 	mtx sync.RWMutex
 }
 
