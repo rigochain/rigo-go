@@ -42,6 +42,7 @@ func (ledger *SimpleLedger[T]) Set(item T) xerrors.XError {
 	defer ledger.mtx.Unlock()
 
 	ledger.cachedItems.setUpdatedItem(item)
+	ledger.cachedItems.setGotItem(item)
 	return nil
 }
 
@@ -50,6 +51,7 @@ func (ledger *SimpleLedger[T]) CancelSet(key LedgerKey) xerrors.XError {
 	defer ledger.mtx.Unlock()
 
 	ledger.cachedItems.delUpdatedItem(key)
+	ledger.cachedItems.delGotItem(key)
 	return nil
 }
 

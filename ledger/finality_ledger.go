@@ -42,6 +42,7 @@ func (ledger *FinalityLedger[T]) SetFinality(item T) xerrors.XError {
 	defer ledger.mtx.Unlock()
 
 	ledger.finalityItems.setUpdatedItem(item)
+	ledger.finalityItems.setGotItem(item)
 	return nil
 }
 
@@ -50,6 +51,7 @@ func (ledger *FinalityLedger[T]) CancelSetFinality(key LedgerKey) xerrors.XError
 	defer ledger.mtx.Unlock()
 
 	ledger.finalityItems.delUpdatedItem(key)
+	ledger.finalityItems.delGotItem(key)
 	return nil
 }
 
@@ -78,6 +80,10 @@ func (ledger *FinalityLedger[T]) DelFinality(key LedgerKey) (T, xerrors.XError) 
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
+	// in case of deleting,
+	// it should be removed from SimpleLedger too.
+	_, _ = ledger.SimpleLedger.Del(key)
+
 	var emptyNil T
 
 	if item, err := ledger.getFinality(key); err != nil {
@@ -86,6 +92,7 @@ func (ledger *FinalityLedger[T]) DelFinality(key LedgerKey) (T, xerrors.XError) 
 		ledger.finalityItems.delGotItem(key)       // delete(ledger.gotItems, key)
 		ledger.finalityItems.delUpdatedItem(key)   // delete(ledger.updatedItems, key)
 		ledger.finalityItems.appendRemovedKey(key) // ledger.removedKeys = append(ledger.removedKeys, key)
+
 		return item, nil
 	}
 }
@@ -129,6 +136,10 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		}
 		delete(ledger.finalityItems.gotItems, vk)
 		delete(ledger.finalityItems.updatedItems, vk)
+
+		// this item should be removed from SimpleLedger too.
+		delete(ledger.SimpleLedger.cachedItems.gotItems, vk)
+		delete(ledger.SimpleLedger.cachedItems.updatedItems, vk)
 	}
 
 	// update
@@ -136,6 +147,7 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 	for k, _ := range ledger.finalityItems.updatedItems {
 		keys = append(keys, k)
 	}
+	// root hash may be different by update order
 	sort.Sort(keys)
 	for _, k := range keys {
 		_val := ledger.finalityItems.updatedItems[k]
