@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/holiman/uint256"
+	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
 	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -33,21 +34,23 @@ func TestTransfer_Bulk(t *testing.T) {
 		acctTestObj := newAcctHelper(w)
 		allAccountTestObjArr = append(allAccountTestObjArr, acctTestObj)
 
-		fmt.Println(w.Address(), w.GetNonce(), w.GetBalance())
+		fmt.Println("TestBulkTransfer - used accounts:", w.Address(), w.GetNonce(), w.GetBalance())
 
 		if senderCnt < 90 && w.GetBalance().Cmp(uint256.NewInt(1000000)) >= 0 {
-			addSenderAccotHelper(w.Address().String(), acctTestObj)
+			addSenderAcctHelper(w.Address().String(), acctTestObj)
 			senderCnt++
 		}
 	}
 
+	// 최대 100 개 까지 계정 생성하여 리시버로 사용.
+	// 100 개 이상이면 이미 있는 계정 사용.
 	for i := len(allAccountTestObjArr); i < 100; i++ {
 		newAcctTestObj := newAcctHelper(web3.NewWallet(TESTPASS))
 		require.NoError(t, saveRandWallet(newAcctTestObj.w))
 		allAccountTestObjArr = append(allAccountTestObjArr, newAcctTestObj)
 	}
 
-	t.Logf("TestBulkTransfer - senders: %v, all: %v\n", len(senderAcctHelpers), len(allAccountTestObjArr))
+	fmt.Printf("TestBulkTransfer - senders: %v, all: %v\n", len(senderAcctHelpers), len(allAccountTestObjArr))
 
 	for _, v := range senderAcctHelpers {
 		wg.Add(1)
@@ -56,7 +59,7 @@ func TestTransfer_Bulk(t *testing.T) {
 
 	wg.Wait()
 
-	t.Logf("TestBulkTransfer - Check %v accounts ...\n", len(allAccountTestObjArr))
+	fmt.Printf("TestBulkTransfer - Check %v accounts ...\n", len(allAccountTestObjArr))
 
 	for _, acctObj := range allAccountTestObjArr {
 		//fmt.Println("\tCheck account", acctObj.w.Address())
@@ -71,7 +74,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *acctHelpe
 	w := senderAcctTestObj.w
 	require.NoError(t, w.Unlock(TESTPASS))
 
-	//t.Logf("bulkTransfer - account: %v, balance: %v, nonce: %v\n", w.Address(), w.GetBalance(), w.GetNonce())
+	fmt.Printf("Begin of bulkTransfer - account: %v, balance: %v, nonce: %v\n", w.Address(), w.GetBalance(), w.GetNonce())
 
 	subWg := sync.WaitGroup{}
 
@@ -99,6 +102,13 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *acctHelpe
 		eventDataTx := event.Data.(tmtypes.EventDataTx)
 		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code)
 		require.Equal(t, gas, uint256.NewInt(uint64(eventDataTx.TxResult.Result.GasUsed)))
+
+		tx := &ctrlertypes.Trx{}
+		err = tx.Decode(eventDataTx.Tx)
+		require.NoError(t, err)
+
+		fmt.Println("bulkTransfer - event: ", rbytes.HexBytes(txHash), tx.From, tx.To, tx.Amount.Dec())
+
 		subWg.Done()
 	})
 	require.NoError(t, err)
@@ -118,7 +128,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *acctHelpe
 		randAmt := rbytes.RandU256IntN(maxAmt)
 		if randAmt.Sign() == 0 {
 			randAmt = uint256.NewInt(1)
-			t.Logf("bulkTransfer - from: %v, to: %v, amount: %v\n", w.Address(), raddr, randAmt)
+			fmt.Printf("bulkTransfer - from: %v, to: %v, amount: %v\n", w.Address(), raddr, randAmt)
 		}
 		needAmt := new(uint256.Int).Add(randAmt, gas)
 
@@ -145,6 +155,9 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *acctHelpe
 	subWg.Wait()
 
 	wg.Done()
+
+	fmt.Printf("End of bulkTransfer - account: %v, balance: %v, nonce: %v\n", w.Address(), w.GetBalance(), w.GetNonce())
+
 }
 
 func TestTransfer_OverBalance(t *testing.T) {
