@@ -107,6 +107,8 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 }
 
 func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
+	// todo: Remove Lock()/Unlock() or Use RLock()/RUlock() to improve performance
+	// Lock()/Unlock() make txs to be processed serially
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
