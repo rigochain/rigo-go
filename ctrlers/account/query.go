@@ -8,10 +8,28 @@ import (
 )
 
 func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
-	addr := types.Address(req.Data)
-	if acct := ctrler.ReadAccount(addr); acct == nil {
+	acct := ctrler.ReadAccount(req.Data)
+	if acct == nil {
 		return nil, xerrors.ErrNotFoundAccount
-	} else if raw, err := tmjson.Marshal(acct); err != nil {
+	}
+
+	// NOTE
+	// `Account::Balance`, which type is *uint256.Int, is marshaled to hex-string.
+	// To marshal this value to decimal format...
+	_acct := &struct {
+		Address types.Address `json:"address"`
+		Name    string        `json:"name,omitempty"`
+		Nonce   uint64        `json:"nonce,string"`
+		Balance string        `json:"balance"`
+		Code    []byte        `json:"code,omitempty"`
+	}{
+		Address: acct.Address,
+		Name:    acct.Name,
+		Nonce:   acct.Nonce,
+		Balance: acct.Balance.Dec(),
+		Code:    acct.Code,
+	}
+	if raw, err := tmjson.Marshal(_acct); err != nil {
 		return nil, xerrors.ErrQuery.Wrap(err)
 	} else {
 		return raw, nil

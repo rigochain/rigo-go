@@ -2,6 +2,7 @@ package stake_test
 
 import (
 	"bytes"
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	"github.com/rigochain/rigo-go/ctrlers/types"
@@ -10,7 +11,6 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	types2 "github.com/tendermint/tendermint/proto/tendermint/types"
-	"math/big"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -30,13 +30,15 @@ var (
 	stakingTrxCtxs       []*types.TrxContext
 	unstakingTrxCtxs     []*types.TrxContext
 
-	dummyGas   = big.NewInt(0)
+	dummyGas   = uint256.NewInt(0)
 	dummyNonce = uint64(0)
 
 	lastHeight = int64(1)
 )
 
 func TestMain(m *testing.M) {
+	os.RemoveAll(DBDIR)
+
 	config.DBPath = DBDIR
 	stakeCtrler, _ = stake.NewStakeCtrler(config, govHelper, tmlog.NewNopLogger())
 
@@ -94,14 +96,14 @@ func TestMain(m *testing.M) {
 }
 
 func TestStakingToSelfByTx(t *testing.T) {
-	sumAmt := big.NewInt(0)
+	sumAmt := uint256.NewInt(0)
 	sumPower := int64(0)
 
 	for _, txctx := range stakingToSelfTrxCtxs {
 		err := stakeCtrler.ExecuteTrx(txctx)
 		require.NoError(t, err)
 
-		sumAmt.Add(sumAmt, txctx.Tx.Amount)
+		_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
 		sumPower += txctx.GovHelper.AmountToPower(txctx.Tx.Amount)
 	}
 
@@ -120,7 +122,7 @@ func TestStakingByTx(t *testing.T) {
 		err := stakeCtrler.ExecuteTrx(txctx)
 		require.NoError(t, err)
 
-		sumAmt.Add(sumAmt, txctx.Tx.Amount)
+		_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
 		sumPower += txctx.GovHelper.AmountToPower(txctx.Tx.Amount)
 	}
 
@@ -134,7 +136,7 @@ func TestStakingByTx(t *testing.T) {
 func TestUnstakingByTx(t *testing.T) {
 	sumAmt0 := stakeCtrler.GetTotalAmount()
 	sumPower0 := stakeCtrler.GetTotalPower()
-	sumUnstakingAmt := big.NewInt(0)
+	sumUnstakingAmt := uint256.NewInt(0)
 	sumUnstakingPower := int64(0)
 
 	for _, txctx := range unstakingTrxCtxs {
@@ -152,14 +154,14 @@ func TestUnstakingByTx(t *testing.T) {
 	_, _, err := stakeCtrler.Commit()
 	require.NoError(t, err)
 
-	require.Equal(t, new(big.Int).Sub(sumAmt0, sumUnstakingAmt).String(), stakeCtrler.GetTotalAmount().String())
+	require.Equal(t, new(uint256.Int).Sub(sumAmt0, sumUnstakingAmt).String(), stakeCtrler.GetTotalAmount().String())
 	require.Equal(t, sumPower0-sumUnstakingPower, stakeCtrler.GetTotalPower())
 
 	// test freezing reward
 	frozenStakes := stakeCtrler.GetFrozenStakes()
 	require.Equal(t, len(unstakingTrxCtxs), len(frozenStakes))
 
-	sumFrozenAmount := big.NewInt(0)
+	sumFrozenAmount := uint256.NewInt(0)
 	sumFrozenPower := int64(0)
 	for _, s := range frozenStakes {
 		sumFrozenAmount.Add(sumFrozenAmount, s.Amount)
@@ -179,7 +181,7 @@ func TestUnfreezing(t *testing.T) {
 				Height: lastHeight,
 			},
 		},
-		Fee:        big.NewInt(10),
+		Fee:        uint256.NewInt(10),
 		TxsCnt:     0,
 		GovHelper:  govHelper,
 		AcctHelper: acctHelper,

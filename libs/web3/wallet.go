@@ -1,6 +1,7 @@
 package web3
 
 import (
+	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
@@ -8,7 +9,6 @@ import (
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"io"
-	"math/big"
 	"sync"
 )
 
@@ -84,12 +84,12 @@ func (w *Wallet) GetNonce() uint64 {
 	return w.acct.GetNonce()
 }
 
-func (w *Wallet) GetBalance() *big.Int {
+func (w *Wallet) GetBalance() *uint256.Int {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
 	if w.acct == nil {
-		return big.NewInt(0)
+		return uint256.NewInt(0)
 	} else {
 		return w.acct.GetBalance()
 	}
@@ -130,7 +130,7 @@ func (w *Wallet) SignTrx(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error)
 	}
 }
 
-func (w *Wallet) TransferSync(to types.Address, gas, amt *big.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) TransferSync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
 		w.acct.GetNonce()+1,
@@ -143,7 +143,7 @@ func (w *Wallet) TransferSync(to types.Address, gas, amt *big.Int, rweb3 *RigoWe
 	}
 }
 
-func (w *Wallet) StakingSync(to types.Address, gas, amt *big.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) StakingSync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxStaking(
 		w.Address(), to,
 		w.acct.GetNonce()+1,

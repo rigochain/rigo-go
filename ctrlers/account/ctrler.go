@@ -3,6 +3,7 @@ package account
 import (
 	"bytes"
 	"fmt"
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	atypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/genesis"
@@ -12,7 +13,6 @@ import (
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/big"
 	"sync"
 )
 
@@ -45,16 +45,12 @@ func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 
 	for _, holder := range genAppState.AssetHolders {
 		addr := append(holder.Address, nil...)
-		if bal, ok := new(big.Int).SetString(holder.Balance, 10); !ok {
-			return xerrors.ErrInitChain.Wrapf("wrong balance in genesis")
-		} else {
-			acct := &atypes.Account{
-				Address: addr,
-				Balance: bal,
-			}
-			if xerr := ctrler.setAccountCommittable(acct, true); xerr != nil {
-				return xerr
-			}
+		acct := &atypes.Account{
+			Address: addr,
+			Balance: holder.Balance.Clone(),
+		}
+		if xerr := ctrler.setAccountCommittable(acct, true); xerr != nil {
+			return xerr
 		}
 	}
 	return nil
@@ -246,7 +242,7 @@ func (ctrler *AcctCtrler) readAccount(addr types.Address) *atypes.Account {
 	}
 }
 
-func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *big.Int, exec bool) xerrors.XError {
+func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
@@ -265,7 +261,7 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *big.Int, exec bo
 	return nil
 }
 
-func (ctrler *AcctCtrler) transfer(from, to *atypes.Account, amt *big.Int) xerrors.XError {
+func (ctrler *AcctCtrler) transfer(from, to *atypes.Account, amt *uint256.Int) xerrors.XError {
 	if err := from.SubBalance(amt); err != nil {
 		return err
 	}
@@ -276,7 +272,7 @@ func (ctrler *AcctCtrler) transfer(from, to *atypes.Account, amt *big.Int) xerro
 	return nil
 }
 
-func (ctrler *AcctCtrler) Reward(to types.Address, amt *big.Int, exec bool) xerrors.XError {
+func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 

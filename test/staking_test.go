@@ -3,12 +3,12 @@ package test
 import (
 	"bytes"
 	"fmt"
+	"github.com/holiman/uint256"
 	rtypes0 "github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"math/big"
 	"testing"
 )
 
@@ -28,8 +28,7 @@ func TestInvalidStakeAmount(t *testing.T) {
 	require.NoError(t, w.Unlock(TESTPASS))
 
 	// too small
-	stakeAmt, ok := new(big.Int).SetString("1111", 10)
-	require.True(t, ok)
+	stakeAmt := uint256.MustFromDecimal("1111")
 
 	ret, err := w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
 	require.NoError(t, err)
@@ -37,8 +36,7 @@ func TestInvalidStakeAmount(t *testing.T) {
 	t.Log(ret.Log)
 
 	// not multiple
-	stakeAmt, ok = new(big.Int).SetString("1000000000000000001", 10)
-	require.True(t, ok)
+	stakeAmt = uint256.MustFromDecimal("1000000000000000001")
 
 	ret, err = w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
 	require.NoError(t, err)
@@ -52,10 +50,9 @@ func TestStakingToSelf(t *testing.T) {
 	require.NoError(t, w.SyncAccount(rweb3))
 
 	bal := w.GetBalance()
-	require.True(t, bal.Cmp(big.NewInt(0)) > 0)
+	require.Greater(t, bal, uint256.NewInt(0))
 
-	stakeAmt, ok := new(big.Int).SetString("4000000000000000000", 10) //rbytes.RandBigIntN(bal)
-	require.True(t, ok)
+	stakeAmt := uint256.MustFromDecimal("4000000000000000000") //rbytes.RandU256IntN(bal)
 
 	require.NoError(t, w.Unlock(TESTPASS))
 	// self staking
@@ -70,7 +67,7 @@ func TestStakingToSelf(t *testing.T) {
 		require.True(t, ok)
 
 		require.Equal(t, xerrors.ErrCodeSuccess, evtTx.Result.Code)
-		require.Equal(t, gas.Int64(), evtTx.Result.GasUsed)
+		require.Equal(t, int64(gas.Uint64()), evtTx.Result.GasUsed)
 
 		return true // done and stop subscriber
 	})
@@ -98,9 +95,9 @@ func TestDelegating(t *testing.T) {
 	require.NoError(t, w.SyncAccount(rweb3))
 
 	bal := w.GetBalance()
-	require.True(t, bal.Cmp(big.NewInt(0)) > 0)
+	require.Greater(t, bal, uint256.NewInt(0))
 
-	stakeAmt := big.NewInt(1000000000000000000) //rbytes.RandBigIntN(bal)
+	stakeAmt := uint256.NewInt(1000000000000000000) //rbytes.RandU256IntN(bal)
 
 	require.NoError(t, w.Unlock(TESTPASS))
 	// self staking

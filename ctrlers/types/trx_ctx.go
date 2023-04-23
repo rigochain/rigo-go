@@ -1,10 +1,10 @@
 package types
 
 import (
+	"github.com/holiman/uint256"
 	bytes2 "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/types"
-	"math/big"
 )
 
 type TrxContext struct {
@@ -17,8 +17,8 @@ type TrxContext struct {
 	SenderPubKey []byte
 	Sender       *Account
 	Receiver     *Account
-	NeedAmt      *big.Int
-	GasUsed      *big.Int
+	NeedAmt      *uint256.Int
+	GasUsed      *uint256.Int
 
 	GovHandler   ITrxHandler
 	AcctHandler  ITrxHandler
@@ -52,7 +52,7 @@ func NewTrxContext(txbz []byte, height int64, exec bool, cbfns ...NewTrxContextC
 		TxHash:  types.Tx(txbz).Hash(),
 		Height:  height,
 		Exec:    exec,
-		GasUsed: big.NewInt(0),
+		GasUsed: uint256.NewInt(0),
 	}
 
 	for _, fn := range cbfns {

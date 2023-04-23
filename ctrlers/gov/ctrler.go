@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
@@ -15,7 +16,6 @@ import (
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
-	"math/big"
 	"sync"
 )
 
@@ -100,7 +100,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	// validation by tx type
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
-		q, r := new(big.Int).QuoRem(ctx.Tx.Amount, ctrler.AmountPerPower(), new(big.Int))
+		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrler.AmountPerPower(), new(uint256.Int))
 		// `ctx.Tx.Amount` MUST be greater than or equal to `ctrler.govHelper.AmountPerPower()`
 		//    ==> q.Sign() > 0
 		if q.Sign() <= 0 {

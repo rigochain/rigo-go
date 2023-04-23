@@ -2,6 +2,7 @@ package gov
 
 import (
 	"encoding/json"
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/ledger"
@@ -9,7 +10,6 @@ import (
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
-	"math/big"
 	"testing"
 )
 
@@ -30,11 +30,11 @@ func init() {
 	}
 
 	tx0 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, big.NewInt(5),
+		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, uint256.NewInt(5),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // wrong min fee
 
 	tx1 := web3.NewTrxProposal( // no right
-		stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, big.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 
 	// Not testable,
@@ -57,15 +57,15 @@ func init() {
 	//	"test govrule proposal", 10, 259200, proposal.PROPOSAL_COMMON, bz) // wrong option type
 
 	tx4 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, big.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal", 10, 159200, proposal.PROPOSAL_GOVRULE, bzOpt) // wrong period
 
 	tx5 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, big.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // it will be used to test wrong start height
 
 	tx6 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, big.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // all right
 
 	cases1 = []*Case{
@@ -77,7 +77,7 @@ func init() {
 	}
 
 	tx7 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, big.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal2", 11, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 	cases2 = []*Case{
 		{txctx: makeTrxCtx(tx7, 1, true), err: nil}, // first success, second fail

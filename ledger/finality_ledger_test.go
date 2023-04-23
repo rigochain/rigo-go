@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	testLedger IFinalityLedger[*MyItem]
-	testItem   *MyItem
+	testLedger *FinalityLedger[*MyItem]
+	testItem0  *MyItem
+	testItem1  *MyItem
 )
 
 func resetLedger(t *testing.T) {
@@ -26,60 +27,68 @@ func resetLedger(t *testing.T) {
 	testLedger, err = NewFinalityLedger[*MyItem]("treeLedger1", dbDir, 256, func() *MyItem { return &MyItem{} })
 	require.NoError(t, err)
 
-	testItem = NewMyItem(bytes.RandHexString(32), rand.Int32())
+	testItem0 = NewMyItem(bytes.RandHexString(32), rand.Int32())
+	testItem1 = NewMyItem(bytes.RandHexString(32), rand.Int32())
 }
 
 func TestFinalityLedger_Set(t *testing.T) {
 	resetLedger(t)
 
 	// do set only
-	require.NoError(t, testLedger.Set(testItem))
+	require.NoError(t, testLedger.Set(testItem0))
 
 	// not committed finally
-	item, err := testLedger.Get(testItem.Key())
-	require.Error(t, err)
-	require.Nil(t, item)
-}
+	item, err := testLedger.Get(testItem0.Key())
+	require.NoError(t, err)
+	require.NotNil(t, item)
 
-func TestFinalityLedger_SetCommit(t *testing.T) {
-	_, _, err := testLedger.Commit()
+	// testLedger is FinalityLedger.
+	// So Commit() do commit FinalityLedger::finalityItems to disk not SimpleLedger::cachedItems.
+	_, _, err = testLedger.Commit()
 	require.NoError(t, err)
 
-	// not committed finally
-	item, err := testLedger.Get(testItem.Key())
+	// get item that was previously set to SimpleLedger::cachedItems
+	item, err = testLedger.Get(testItem0.Key())
+	require.NoError(t, err)
+	require.NotNil(t, item)
+
+	// not committed(finalized)
+	item, err = testLedger.Read(testItem0.Key())
 	require.Error(t, err)
 	require.Nil(t, item)
 }
 
 func TestFinalityLedger_SetFinality(t *testing.T) {
+	// set finality
+	require.NoError(t, testLedger.SetFinality(testItem1))
 
-	// do set finality
-	require.NoError(t, testLedger.SetFinality(testItem))
-
-	// not committed yet
-	item, err := testLedger.Get(testItem.Key())
+	//  not found: testItem1 is set to FinalityLedger::finalityItems, not SimpleLedger::cachedItems
+	item, err := testLedger.Get(testItem1.Key())
 	require.Error(t, err)
 	require.Nil(t, item)
 
-	item, err = testLedger.GetFinality(testItem.Key())
+	item, err = testLedger.GetFinality(testItem1.Key())
+	require.NoError(t, err)
+	require.NotNil(t, item)
+
+	// not committed(finalized)
+	item, err = testLedger.Read(testItem1.Key())
 	require.Error(t, err)
 	require.Nil(t, item)
-}
 
-func TestFinalityLedger_SetFinalityCommit(t *testing.T) {
-	// commit finality items
-	_, _, err := testLedger.Commit()
+	// commit finalityItems
+	_, _, err = testLedger.Commit()
 	require.NoError(t, err)
 
-	item, err := testLedger.Get(testItem.Key())
+	item, err = testLedger.Get(testItem1.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
-	require.Equal(t, testItem, item)
+	require.Equal(t, testItem1, item)
 
-	item, err = testLedger.GetFinality(testItem.Key())
+	item, err = testLedger.Read(testItem1.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
-	require.Equal(t, testItem, item)
+	require.Equal(t, testItem1, item)
 }
 
 func TestFinalityLedger_Del(t *testing.T) {
@@ -88,51 +97,46 @@ func TestFinalityLedger_Del(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, item)
 
-	item, err = testLedger.Del(testItem.Key())
+	item, err = testLedger.Del(testItem1.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
-	require.Equal(t, testItem, item)
+	require.Equal(t, testItem1, item)
 
 	// not finally deleted yet
-	item, err = testLedger.Get(testItem.Key())
+	item, err = testLedger.Get(testItem1.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
-	require.Equal(t, testItem, item)
-}
-
-func TestFinalityLedger_DelCommit(t *testing.T) {
-	// commit finality items
-	_, _, err := testLedger.Commit()
-	require.NoError(t, err)
+	require.Equal(t, testItem1, item)
 
 	// not finally deleted yet
-	item, err := testLedger.Get(testItem.Key())
+	item, err = testLedger.Read(testItem1.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
-	require.Equal(t, testItem, item)
+	require.Equal(t, testItem1, item)
 }
 
 func TestFinalityLedger_DelFinality(t *testing.T) {
-	item, err := testLedger.DelFinality(testItem.Key())
+	item, err := testLedger.DelFinality(testItem1.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
-	require.Equal(t, testItem, item)
+	require.Equal(t, testItem1, item)
 
 	// not finally deleted and committed
-	item, err = testLedger.Get(testItem.Key())
+	item, err = testLedger.Get(testItem1.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
-	require.Equal(t, testItem, item)
+	require.Equal(t, testItem1, item)
 
-}
-
-func TestFinalityLedger_DelFinalityCommit(t *testing.T) {
 	// commit finality items
-	_, _, err := testLedger.Commit()
+	_, _, err = testLedger.Commit()
 	require.NoError(t, err)
 
-	// not finally deleted and committed
-	item, err := testLedger.Get(testItem.Key())
+	// finally deleted
+	item, err = testLedger.Get(testItem1.Key())
+	require.Error(t, err)
+	require.Nil(t, item)
+
+	item, err = testLedger.GetFinality(testItem1.Key())
 	require.Error(t, err)
 	require.Nil(t, item)
 }
@@ -141,20 +145,20 @@ func TestFinalityLedger_CancelSetFinality(t *testing.T) {
 	resetLedger(t)
 
 	// do set and delete
-	require.NoError(t, testLedger.SetFinality(testItem))
-	err := testLedger.CancelSetFinality(testItem.Key())
+	require.NoError(t, testLedger.SetFinality(testItem0))
+	err := testLedger.CancelSetFinality(testItem0.Key())
 	require.NoError(t, err)
 
 	_, _, err = testLedger.Commit()
 	require.NoError(t, err)
 
 	// not exists
-	item, err := testLedger.Get(testItem.Key())
+	item, err := testLedger.Get(testItem0.Key())
 	require.Error(t, err)
 	require.Nil(t, item)
 
 	// not exists
-	item, err = testLedger.GetFinality(testItem.Key())
+	item, err = testLedger.GetFinality(testItem0.Key())
 	require.Error(t, err)
 	require.Nil(t, item)
 

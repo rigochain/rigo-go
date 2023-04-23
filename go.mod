@@ -6,6 +6,8 @@ require (
 	github.com/cosmos/iavl v0.19.1
 	github.com/ethereum/go-ethereum v1.10.23
 	github.com/gogo/protobuf v1.3.2
+	github.com/gorilla/websocket v1.5.0
+	github.com/holiman/uint256 v1.2.2
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.0
@@ -39,10 +41,8 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/orderedcode v0.0.1 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gtank/merlin v0.1.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/holiman/uint256 v1.2.1 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
 	github.com/lib/pq v1.10.6 // indirect

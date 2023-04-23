@@ -66,6 +66,7 @@ func TestSimpleLedger(t *testing.T) {
 	require.NotNil(t, item)
 	require.Equal(t, i0, item)
 
+	// not committed yet
 	item, err = ledger.Get(i1.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
@@ -81,6 +82,7 @@ func TestSimpleLedger(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, item)
 
+	// only commit i0
 	_, _, err = ledger.Commit()
 	require.NoError(t, err)
 
@@ -103,5 +105,4 @@ func TestSimpleLedger(t *testing.T) {
 	item, err = ledger.Del(i3.Key())
 	require.Error(t, err)
 	require.Nil(t, item)
-
 }

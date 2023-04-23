@@ -1,7 +1,7 @@
 package types
 
 import (
-	"math/big"
+	"github.com/holiman/uint256"
 )
 
 const (
@@ -21,16 +21,21 @@ const (
 	TXCO                 = "1000000000000000000000000000000" // 10^30 sau
 )
 
+// Simplest Asset Unit (SAU)
+
 var (
-	XCOsau, _ = new(big.Int).SetString(XCO, 10)
+	//XCOsau, _ = new(big.Int).SetString(XCO, 10)
+	XCOsau = uint256.MustFromDecimal(XCO)
 )
 
-func ToSAU(n int64) *big.Int {
-	return new(big.Int).Mul(big.NewInt(n), XCOsau)
+// Coint to SAU
+func ToSAU(n uint64) *uint256.Int {
+	return new(uint256.Int).Mul(uint256.NewInt(n), XCOsau)
 }
 
-func FromSAU(sau *big.Int) (int64, int64) {
-	r := new(big.Int)
-	q, r := new(big.Int).QuoRem(sau, XCOsau, r)
-	return q.Int64(), r.Int64()
+// from sau to COIN and Remain
+func FromSAU(sau *uint256.Int) (uint64, uint64) {
+	r := new(uint256.Int)
+	q, r := new(uint256.Int).DivMod(sau, XCOsau, r)
+	return q.Uint64(), r.Uint64()
 }

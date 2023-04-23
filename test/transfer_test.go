@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/libs/web3"
 	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -11,7 +12,6 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"math/big"
 	"math/rand"
 	"sync"
 	"testing"
@@ -35,7 +35,7 @@ func TestTransfer_Bulk(t *testing.T) {
 
 		fmt.Println(w.Address(), w.GetNonce(), w.GetBalance())
 
-		if senderCnt < 90 && w.GetBalance().Cmp(big.NewInt(1000000)) >= 0 {
+		if senderCnt < 90 && w.GetBalance().Cmp(uint256.NewInt(1000000)) >= 0 {
 			addSenderAccotHelper(w.Address().String(), acctTestObj)
 			senderCnt++
 		}
@@ -98,14 +98,13 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *acctHelpe
 
 		eventDataTx := event.Data.(tmtypes.EventDataTx)
 		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code)
-		require.Equal(t, gas, big.NewInt(eventDataTx.TxResult.Result.GasUsed))
-
+		require.Equal(t, gas, uint256.NewInt(uint64(eventDataTx.TxResult.Result.GasUsed)))
 		subWg.Done()
 	})
 	require.NoError(t, err)
 
-	maxAmt := new(big.Int).Div(senderAcctTestObj.originBalance, big.NewInt(int64(cnt)))
-	maxAmt = new(big.Int).Sub(maxAmt, gas)
+	maxAmt := new(uint256.Int).Div(senderAcctTestObj.originBalance, uint256.NewInt(uint64(cnt)))
+	maxAmt = new(uint256.Int).Sub(maxAmt, gas)
 
 	for i := 0; i < cnt; i++ {
 		rn := rand.Intn(len(receivers))
@@ -116,12 +115,12 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *acctHelpe
 		racctState := receivers[rn]
 		raddr := racctState.w.Address()
 
-		randAmt := rbytes.RandBigIntN(maxAmt)
+		randAmt := rbytes.RandU256IntN(maxAmt)
 		if randAmt.Sign() == 0 {
-			randAmt = big.NewInt(1)
+			randAmt = uint256.NewInt(1)
 			t.Logf("bulkTransfer - from: %v, to: %v, amount: %v\n", w.Address(), raddr, randAmt)
 		}
-		needAmt := new(big.Int).Add(randAmt, gas)
+		needAmt := new(uint256.Int).Add(randAmt, gas)
 
 		subWg.Add(1) // done in subscriber's callback
 
@@ -170,7 +169,7 @@ func TestTransfer_OverBalance(t *testing.T) {
 	require.Equal(t, testObj1.originBalance, W1.GetBalance())
 	require.Equal(t, testObj0.originNonce, W0.GetNonce())
 
-	overAmt = new(big.Int).Add(new(big.Int).Sub(W0.GetBalance(), gas), big.NewInt(1)) // amt - gas + 1
+	overAmt = new(uint256.Int).Add(new(uint256.Int).Sub(W0.GetBalance(), gas), uint256.NewInt(1)) // amt - gas + 1
 	ret, err = W0.TransferSync(W1.Address(), gas, overAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
@@ -188,9 +187,9 @@ func TestTransfer_OverBalance(t *testing.T) {
 func TestTransfer_WrongAddr(t *testing.T) {
 	require.NoError(t, W0.SyncBalance(rweb3))
 	require.NoError(t, W0.Unlock(TESTPASS))
-	require.NotEqual(t, big.NewInt(0), W0.GetBalance())
+	require.NotEqual(t, uint256.NewInt(0), W0.GetBalance())
 
-	tmpAmt := new(big.Int).Div(W0.GetBalance(), big.NewInt(2))
+	tmpAmt := new(uint256.Int).Div(W0.GetBalance(), uint256.NewInt(2))
 	ret, err := W0.TransferSync(nil, gas, tmpAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Code)

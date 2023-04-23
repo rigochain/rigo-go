@@ -20,12 +20,13 @@ func TestStakeCtrler_validatorUpdates(t *testing.T) {
 
 func testValidatorUpdates(t *testing.T, delegateeCnt, maxValCnt int) {
 	var allDelegatees DelegateeArray
+	maxCapPower := math.MaxInt64 / int64(delegateeCnt)
 	for i := 0; i < delegateeCnt; i++ {
 		prvKey := secp256k1.GenPrivKey()
 		pubBytes := prvKey.PubKey().Bytes()
 		addr, _ := crypto.PubBytes2Addr(pubBytes)
 		d := NewDelegatee(addr, pubBytes)
-		d.TotalPower = rand.Int63n(math.MaxInt64 - 1000000)
+		d.TotalPower = rand.Int63n(maxCapPower)
 		allDelegatees = append(allDelegatees, d)
 	}
 	sort.Sort(PowerOrderDelegatees(allDelegatees))

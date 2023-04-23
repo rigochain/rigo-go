@@ -3,8 +3,7 @@ package bytes
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"math/big"
-	mrand "math/rand"
+	"github.com/holiman/uint256"
 )
 
 func RandBytes(n int) []byte {
@@ -27,21 +26,13 @@ func RandHexString(n int) string {
 	return "0x" + hex.EncodeToString(bz)
 }
 
-func RandBigIntN(cap *big.Int) *big.Int {
-	r, _ := rand.Int(rand.Reader, cap)
-	return r
+func RandU256IntN(cap *uint256.Int) *uint256.Int {
+	b, _ := rand.Int(rand.Reader, cap.ToBig())
+	return uint256.MustFromBig(b)
 }
 
-func RandBigInt() *big.Int {
-	return new(big.Int).SetBytes(RandBytes(32))
-}
-
-func RandInt63() int64 {
-	return mrand.Int63()
-}
-
-func RandInt63n(n int64) int64 {
-	return mrand.Int63n(n)
+func RandU256Int() *uint256.Int {
+	return new(uint256.Int).SetBytes(RandBytes(32))
 }
 
 func ClearBytes(b []byte) {

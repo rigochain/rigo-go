@@ -1,12 +1,12 @@
 package types
 
 import (
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
-	"math/big"
 	"time"
 )
 
@@ -38,14 +38,14 @@ type Trx struct {
 	Nonce   uint64         `json:"nonce"`
 	From    types.Address  `json:"from"`
 	To      types.Address  `json:"to"`
-	Amount  *big.Int       `json:"amount"`
-	Gas     *big.Int       `json:"gas"`
+	Amount  *uint256.Int   `json:"amount"`
+	Gas     *uint256.Int   `json:"gas"`
 	Type    int32          `json:"type"`
 	Payload ITrxPayload    `json:"payload,omitempty"`
 	Sig     bytes.HexBytes `json:"sig"`
 }
 
-func NewTrx(ver uint32, from, to types.Address, nonce uint64, gas, amt *big.Int, payload ITrxPayload) *Trx {
+func NewTrx(ver uint32, from, to types.Address, nonce uint64, gas, amt *uint256.Int, payload ITrxPayload) *Trx {
 	return &Trx{
 		Version: ver,
 		Time:    time.Now().Round(0).UTC().UnixNano(),
@@ -124,8 +124,8 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 	tx.Nonce = txProto.Nonce
 	tx.From = txProto.From
 	tx.To = txProto.To
-	tx.Amount = new(big.Int).SetBytes(txProto.XAmount)
-	tx.Gas = new(big.Int).SetBytes(txProto.XGas)
+	tx.Amount = new(uint256.Int).SetBytes(txProto.XAmount)
+	tx.Gas = new(uint256.Int).SetBytes(txProto.XGas)
 	tx.Type = txProto.Type
 	tx.Payload = payload
 	tx.Sig = txProto.Sig

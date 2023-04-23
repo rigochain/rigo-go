@@ -2,11 +2,11 @@ package types_test
 
 import (
 	"encoding/hex"
+	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/stretchr/testify/require"
-	"math/big"
 	"math/rand"
 	"testing"
 	"time"
@@ -19,8 +19,8 @@ func TestTrxEncode(t *testing.T) {
 		Nonce:   rand.Uint64(),
 		From:    types.RandAddress(),
 		To:      types.RandAddress(),
-		Amount:  bytes.RandBigInt(),
-		Gas:     big.NewInt(rand.Int63()),
+		Amount:  bytes.RandU256Int(),
+		Gas:     uint256.NewInt(rand.Uint64()),
 		Type:    types2.TRX_TRANSFER,
 	}
 	require.Equal(t, types2.TRX_TRANSFER, tx0.GetType())
@@ -60,8 +60,8 @@ func BenchmarkTrxEncode(b *testing.B) {
 		Nonce:   rand.Uint64(),
 		From:    types.RandAddress(),
 		To:      types.RandAddress(),
-		Amount:  bytes.RandBigInt(),
-		Gas:     big.NewInt(rand.Int63()),
+		Amount:  bytes.RandU256Int(),
+		Gas:     uint256.NewInt(rand.Uint64()),
 		Payload: &types2.TrxPayloadAssetTransfer{},
 	}
 	require.Equal(b, types2.TRX_TRANSFER, tx0.GetType())
@@ -80,8 +80,8 @@ func BenchmarkTrxDecode(b *testing.B) {
 		Nonce:   rand.Uint64(),
 		From:    types.RandAddress(),
 		To:      types.RandAddress(),
-		Amount:  bytes.RandBigInt(),
-		Gas:     big.NewInt(rand.Int63()),
+		Amount:  bytes.RandU256Int(),
+		Gas:     uint256.NewInt(rand.Uint64()),
 		Payload: &types2.TrxPayloadAssetTransfer{},
 	}
 	require.Equal(b, types2.TRX_TRANSFER, tx0.GetType())

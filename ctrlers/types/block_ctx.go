@@ -2,14 +2,14 @@ package types
 
 import (
 	"encoding/json"
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"math/big"
 )
 
 type BlockContext struct {
 	BlockInfo   abcitypes.RequestBeginBlock `json:"blockInfo"`
-	Fee         *big.Int                    `json:"fee"`
+	Fee         *uint256.Int                `json:"fee"`
 	TxsCnt      int                         `json:"TxsCnt"`
 	GovHelper   IGovHelper
 	AcctHelper  IAccountHelper
@@ -21,7 +21,7 @@ type BlockContext struct {
 func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 	_bctx := &struct {
 		BlockInfo abcitypes.RequestBeginBlock `json:"blockInfo"`
-		Fee       *big.Int                    `json:"fee"`
+		Fee       *uint256.Int                `json:"fee"`
 	}{
 		BlockInfo: bctx.BlockInfo,
 		Fee:       bctx.Fee,
@@ -33,7 +33,7 @@ func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	_bctx := &struct {
 		BlockInfo abcitypes.RequestBeginBlock `json:"blockInfo"`
-		Fee       *big.Int                    `json:"fee"`
+		Fee       *uint256.Int                `json:"fee"`
 	}{}
 
 	if err := json.Unmarshal(bz, _bctx); err != nil {
