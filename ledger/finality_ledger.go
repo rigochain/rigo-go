@@ -82,7 +82,7 @@ func (ledger *FinalityLedger[T]) DelFinality(key LedgerKey) (T, xerrors.XError) 
 
 	// in case of deleting,
 	// it should be removed from SimpleLedger too.
-	_, _ = ledger.SimpleLedger.Del(key)
+	_, _ = ledger.SimpleLedger.del(key)
 
 	var emptyNil T
 

@@ -1,6 +1,7 @@
 package stake
 
 import (
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/ledger"
@@ -10,7 +11,6 @@ import (
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/big"
 	"sort"
 	"sync"
 )
@@ -312,14 +312,14 @@ func validatorUpdates(existing, newers DelegateeArray) []abcitypes.ValidatorUpda
 		} else if ret == 0 {
 			if existing[i].TotalPower != newers[j].TotalPower {
 				// if power is changed, add newser
-				valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+				valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, int64(newers[j].TotalPower), "secp256k1"))
 			} else {
 				// if the power is not changed, exclude the validator in updated validators
 			}
 			i++
 			j++
 		} else { // ret > 0
-			valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+			valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, int64(newers[j].TotalPower), "secp256k1"))
 			j++
 		}
 	}
@@ -330,7 +330,7 @@ func validatorUpdates(existing, newers DelegateeArray) []abcitypes.ValidatorUpda
 	}
 	for ; j < len(newers); j++ {
 		// added newer
-		valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+		valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, int64(newers[j].TotalPower), "secp256k1"))
 	}
 
 	return valUpdates
@@ -394,7 +394,7 @@ func (ctrler *StakeCtrler) Validators() ([]*abcitypes.Validator, int64) {
 		totalPower += v.TotalPower
 		ret = append(ret, &abcitypes.Validator{
 			Address: v.Addr,
-			Power:   v.TotalPower,
+			Power:   int64(v.TotalPower),
 		})
 	}
 
@@ -423,8 +423,8 @@ func (ctrler *StakeCtrler) PowerOf(addr types.Address) int64 {
 	}
 }
 
-func (ctrler *StakeCtrler) GetTotalAmount() *big.Int {
-	ret := big.NewInt(0)
+func (ctrler *StakeCtrler) GetTotalAmount() *uint256.Int {
+	ret := uint256.NewInt(0)
 	_ = ctrler.delegateeLedger.IterateAllFinalityItems(func(delegatee *Delegatee) xerrors.XError {
 		_ = ret.Add(ret, delegatee.TotalAmount)
 		return nil

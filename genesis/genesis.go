@@ -1,6 +1,7 @@
 package genesis
 
 import (
+	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/crypto"
@@ -12,13 +13,13 @@ import (
 
 type GenesisAssetHolder struct {
 	Address types.Address `json:"address"`
-	Balance string        `json:"balance"`
+	Balance *uint256.Int  `json:"balance"`
 }
 
 func (gh *GenesisAssetHolder) Hash() []byte {
 	hasher := crypto.DefaultHasher()
 	hasher.Write(gh.Address[:])
-	hasher.Write([]byte(gh.Balance))
+	hasher.Write(gh.Balance.Bytes())
 	return hasher.Sum(nil)
 }
 

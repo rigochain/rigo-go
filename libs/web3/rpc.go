@@ -2,6 +2,7 @@ package web3
 
 import (
 	"encoding/json"
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	rweb3types "github.com/rigochain/rigo-go/libs/web3/types"
@@ -11,11 +12,11 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"strconv"
+	"strings"
 )
 
 func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, error) {
 	queryResp := &rpc.QueryResult{}
-	acct := ctrlertypes.NewAccount(nil)
 
 	if req, err := rweb3.NewRequest("account", addr.String()); err != nil {
 		panic(err)
@@ -25,10 +26,33 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
 		return nil, err
-	} else if err := tmjson.Unmarshal(queryResp.Value, acct); err != nil {
+	}
+
+	_acct := &struct {
+		Address types.Address `json:"address"`
+		Name    string        `json:"name,omitempty"`
+		Nonce   uint64        `json:"nonce,string"`
+		Balance string        `json:"balance"`
+		Code    []byte        `json:"code,omitempty"`
+	}{}
+
+	if err := tmjson.Unmarshal(queryResp.Value, _acct); err != nil {
 		return nil, err
 	} else {
-		return acct, nil
+		var bal *uint256.Int
+		if strings.HasPrefix(_acct.Balance, "0x") {
+			bal = uint256.MustFromHex(_acct.Balance)
+		} else {
+			bal = uint256.MustFromDecimal(_acct.Balance)
+		}
+
+		return &ctrlertypes.Account{
+			Address: _acct.Address,
+			Name:    _acct.Name,
+			Nonce:   _acct.Nonce,
+			Balance: bal,
+			Code:    _acct.Code,
+		}, nil
 	}
 }
 

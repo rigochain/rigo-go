@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"github.com/holiman/uint256"
 	rtypes1 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs"
 	rigoweb3 "github.com/rigochain/rigo-go/libs/web3"
@@ -12,7 +13,6 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/rand"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,8 +32,8 @@ var (
 	walletsMap       map[rtypes1.AcctKey]*rigoweb3.Wallet
 	W0               *rigoweb3.Wallet
 	W1               *rigoweb3.Wallet
-	amt              = bytes.RandBigIntN(big.NewInt(1000))
-	gas              = big.NewInt(10)
+	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
+	gas              = uint256.NewInt(10)
 )
 
 func init() {

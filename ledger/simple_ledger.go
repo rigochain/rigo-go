@@ -82,6 +82,10 @@ func (ledger *SimpleLedger[T]) Del(key LedgerKey) (T, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
+	return ledger.del(key)
+}
+
+func (ledger *SimpleLedger[T]) del(key LedgerKey) (T, xerrors.XError) {
 	var emptyNil T
 
 	if item, err := ledger.get(key); err != nil {

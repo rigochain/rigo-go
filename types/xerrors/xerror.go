@@ -103,6 +103,9 @@ func NewOrdinary(msg string) XError {
 }
 
 func From(err error) XError {
+	if err == nil {
+		return nil
+	}
 	return NewOrdinary(err.Error())
 }
 
@@ -162,5 +165,5 @@ func (e *xerror) Wrap(err error) XError {
 }
 
 func (e *xerror) Wrapf(format string, args ...any) XError {
-	return e.Wrap(fmt.Errorf(format, args))
+	return e.Wrap(fmt.Errorf(format, args...))
 }

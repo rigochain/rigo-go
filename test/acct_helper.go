@@ -1,21 +1,21 @@
 package test
 
 import (
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
-	"math/big"
 	"sync"
 )
 
 type acctHelper struct {
 	w *web3.Wallet
 
-	originBalance *big.Int
+	originBalance *uint256.Int
 	originNonce   uint64
 
 	txHashes        map[string]types.Address
-	spentGas        *big.Int
-	expectedBalance *big.Int
+	spentGas        *uint256.Int
+	expectedBalance *uint256.Int
 	expectedNonce   uint64
 
 	mtx sync.RWMutex
@@ -27,7 +27,7 @@ func newAcctHelper(w *web3.Wallet) *acctHelper {
 		originBalance:   w.GetBalance(),
 		originNonce:     w.GetNonce(),
 		txHashes:        make(map[string]types.Address),
-		spentGas:        big.NewInt(0),
+		spentGas:        uint256.NewInt(0),
 		expectedBalance: w.GetBalance(),
 		expectedNonce:   w.GetNonce(),
 	}
@@ -40,25 +40,25 @@ func (obj *acctHelper) addTxHashOfAddr(txhash string, addr types.Address) {
 	obj.txHashes[txhash] = addr
 }
 
-func (obj *acctHelper) addSpentGas(d *big.Int) {
+func (obj *acctHelper) addSpentGas(d *uint256.Int) {
 	obj.mtx.Lock()
 	defer obj.mtx.Unlock()
 
-	obj.spentGas = new(big.Int).Add(obj.spentGas, d)
+	_ = obj.spentGas.Add(obj.spentGas, d)
 }
 
-func (obj *acctHelper) addExpectedBalance(d *big.Int) {
+func (obj *acctHelper) addExpectedBalance(d *uint256.Int) {
 	obj.mtx.Lock()
 	defer obj.mtx.Unlock()
 
-	obj.expectedBalance = new(big.Int).Add(obj.expectedBalance, d)
+	_ = obj.expectedBalance.Add(obj.expectedBalance, d)
 }
 
-func (obj *acctHelper) subExpectedBalance(d *big.Int) {
+func (obj *acctHelper) subExpectedBalance(d *uint256.Int) {
 	obj.mtx.Lock()
 	defer obj.mtx.Unlock()
 
-	obj.expectedBalance = new(big.Int).Sub(obj.expectedBalance, d)
+	_ = obj.expectedBalance.Sub(obj.expectedBalance, d)
 }
 
 func (obj *acctHelper) addExpectedNonce() {
@@ -71,7 +71,7 @@ func (obj *acctHelper) addExpectedNonce() {
 var senderAcctHelpers = make(map[string]*acctHelper)
 var gmtx = &sync.Mutex{}
 
-func addSenderAccotHelper(k string, v *acctHelper) {
+func addSenderAcctHelper(k string, v *acctHelper) {
 	gmtx.Lock()
 	defer gmtx.Unlock()
 

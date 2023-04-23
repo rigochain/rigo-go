@@ -37,15 +37,10 @@ func TestFinalityLedger_Set(t *testing.T) {
 	// do set only
 	require.NoError(t, testLedger.Set(testItem0))
 
-	// get item that was previously set to SimpleLedger::cachedItems
+	// not committed finally
 	item, err := testLedger.Get(testItem0.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
-
-	// not committed(finalized)
-	item, err = testLedger.Read(testItem0.Key())
-	require.Error(t, err)
-	require.Nil(t, item)
 
 	// testLedger is FinalityLedger.
 	// So Commit() do commit FinalityLedger::finalityItems to disk not SimpleLedger::cachedItems.

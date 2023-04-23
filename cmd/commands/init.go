@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/genesis"
@@ -163,7 +164,7 @@ func initFilesWithConfig(config *cfg.Config) error {
 				}
 				holders[i] = &genesis.GenesisAssetHolder{
 					Address: wk.Address,
-					Balance: "100000000000000000000000000", // 100_000_000_000000000000000000
+					Balance: uint256.MustFromDecimal("100000000000000000000000000"), // 100_000_000 * 1_000_000_000_000_000_000
 				}
 			}
 			defer func() {

@@ -3,13 +3,13 @@ package account
 import (
 	"errors"
 	"fmt"
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/big"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -46,7 +46,7 @@ func initialize() error {
 		addr := bytes.RandBytes(types.AddrSize)
 		for j := 0; j < len(acctCtrlers); j++ {
 			acct := acctCtrlers[j].FindOrNewAccount(addr, true)
-			acct.AddBalance(big.NewInt(10000000))
+			acct.AddBalance(uint256.NewInt(10000000))
 			acctCtrlers[j].setAccountCommittable(acct, true)
 		}
 		addrs = append(addrs, addr)
@@ -84,7 +84,7 @@ func simuRand(n int) error {
 		r0, r1, r2 := rand.Intn(len(addrs)), rand.Intn(len(addrs)), rand.Intn(len(acctCtrlers))
 		addr0, addr1, ctrler := addrs[r0], addrs[r1], acctCtrlers[r2]
 
-		if err := ctrler.Transfer(addr0, addr1, big.NewInt(1), false); err != nil {
+		if err := ctrler.Transfer(addr0, addr1, uint256.NewInt(1), false); err != nil {
 			return err
 		}
 	}
@@ -95,7 +95,7 @@ func execRand(n int) error {
 		r0, r1, r2 := rand.Intn(len(addrs)), rand.Intn(len(addrs)), rand.Intn(len(acctCtrlers))
 		addr0, addr1, ctrler := addrs[r0], addrs[r1], acctCtrlers[r2]
 
-		if err := ctrler.Transfer(addr0, addr1, big.NewInt(1), true); err != nil {
+		if err := ctrler.Transfer(addr0, addr1, uint256.NewInt(1), true); err != nil {
 			return err
 		}
 	}
@@ -109,7 +109,7 @@ func execSame(n int) error {
 
 		for j := 0; j < len(acctCtrlers); j++ {
 
-			if err := acctCtrlers[j].Transfer(addr0, addr1, big.NewInt(1), true); err != nil {
+			if err := acctCtrlers[j].Transfer(addr0, addr1, uint256.NewInt(1), true); err != nil {
 				return err
 			}
 		}
