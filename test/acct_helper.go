@@ -77,3 +77,10 @@ func addSenderAcctHelper(k string, v *acctHelper) {
 
 	senderAcctHelpers[k] = v
 }
+
+func clearSenderAcctHelper() {
+	gmtx.Lock()
+	defer gmtx.Unlock()
+
+	senderAcctHelpers = make(map[string]*acctHelper)
+}

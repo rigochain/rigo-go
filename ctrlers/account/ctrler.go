@@ -211,6 +211,10 @@ func (ctrler *AcctCtrler) findOrNewAccount(addr types.Address, exec bool) *atype
 }
 
 func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atypes.Account {
+	// Use Lock instead of RLock,
+	// because new account is set to `ctrler.acctLedger`
+	// in findOrNewAccount()
+
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -295,7 +299,6 @@ func (ctrler *AcctCtrler) setAccountCommittable(acct *atypes.Account, exec bool)
 	fn := ctrler.acctLedger.Set
 	if exec {
 		fn = ctrler.acctLedger.SetFinality
-		fmt.Println("setAccountCommittable :", acct.Address, acct.Balance.Dec())
 	}
 
 	return fn(acct)
