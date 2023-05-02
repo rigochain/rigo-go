@@ -21,12 +21,7 @@ import (
 )
 
 var (
-	rweb3            = rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider("http://localhost:26657"))
-	home, _          = os.UserHomeDir()
-	RIGOHOME         = filepath.Join(home, ".rigo")
-	VALWALLETPATH    = filepath.Join(RIGOHOME, "config/priv_validator_key.json")
-	WALKEYDIR        = filepath.Join(RIGOHOME, "walkeys")
-	TESTPASS         = []byte("1111")
+	rweb3            *rigoweb3.RigoWeb3
 	validatorWallets []*rigoweb3.Wallet
 	wallets          []*rigoweb3.Wallet
 	walletsMap       map[rtypes1.AcctKey]*rigoweb3.Wallet
@@ -36,16 +31,17 @@ var (
 	gas              = uint256.NewInt(10)
 )
 
-func init() {
+func prepareTest() {
+	rweb3 = rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(rpcURL))
 
-	files, err := os.ReadDir(WALKEYDIR)
+	files, err := os.ReadDir(walletPath())
 	if err != nil {
 		panic(err)
 	}
 
 	walletsMap = make(map[rtypes1.AcctKey]*rigoweb3.Wallet)
 
-	if w, err := rigoweb3.OpenWallet(libs.NewFileReader(VALWALLETPATH)); err != nil {
+	if w, err := rigoweb3.OpenWallet(libs.NewFileReader(privValKeyPath())); err != nil {
 		panic(err)
 	} else {
 		addValidatorWallet(w)
@@ -54,7 +50,7 @@ func init() {
 	for _, file := range files {
 		if !file.IsDir() {
 			if w, err := rigoweb3.OpenWallet(
-				libs.NewFileReader(filepath.Join(WALKEYDIR, file.Name()))); err != nil {
+				libs.NewFileReader(filepath.Join(walletPath(), file.Name()))); err != nil {
 				panic(err)
 			} else {
 				wallets = append(wallets, w)
@@ -123,13 +119,13 @@ func randCommonWallet() *rigoweb3.Wallet {
 }
 
 func saveRandWallet(w *rigoweb3.Wallet) error {
-	path := filepath.Join(WALKEYDIR, fmt.Sprintf("wk%X.json", w.Address()))
+	path := filepath.Join(walletPath(), fmt.Sprintf("wk%X.json", w.Address()))
 	return w.Save(libs.NewFileWriter(path))
 }
 
 func waitEvent(query string, cb func(*coretypes.ResultEvent, error) bool) (*sync.WaitGroup, error) {
 	subWg := sync.WaitGroup{}
-	sub, err := rigoweb3.NewSubscriber("ws://localhost:26657/websocket")
+	sub, err := rigoweb3.NewSubscriber(wsEndpoint)
 	if err != nil {
 		return nil, err
 	}

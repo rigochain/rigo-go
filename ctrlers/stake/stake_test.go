@@ -6,19 +6,21 @@ import (
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/stretchr/testify/require"
+	"math/rand"
 	"testing"
+	"time"
 )
 
-var (
-	addr0 = types.RandAddress()
-	addr1 = types.RandAddress()
-)
+type stakeTestObj struct {
+	s              *stake.Stake
+	expectedReward *uint256.Int
+}
 
 func TestNewStake(t *testing.T) {
 	amt := bytes.RandU256IntN(govHelper.MaxStakeAmount())
 	s0 := stake.NewStakeWithAmount(
-		addr0,
-		addr1,
+		types.RandAddress(),
+		types.RandAddress(),
 		amt, 1, nil,
 		govHelper)
 
@@ -30,27 +32,32 @@ func TestNewStake(t *testing.T) {
 }
 
 func TestApplyRewardByStake(t *testing.T) {
-	stakes := make([]*stake.Stake, 1000)
+	stakeTestObjs := make([]*stakeTestObj, 1000)
 
 	for i := 0; i < 1000; i++ {
 		amt := bytes.RandU256IntN(new(uint256.Int).Div(govHelper.MaxStakeAmount(), uint256.NewInt(1000)))
 		txhash := bytes.RandBytes(32)
-		stakes[i] = stake.NewStakeWithAmount(
-			addr0,
-			addr1,
-			amt, 1, txhash,
-			govHelper)
+		stakeTestObjs[i] = &stakeTestObj{
+			s: stake.NewStakeWithAmount(
+				types.RandAddress(),
+				types.RandAddress(),
+				amt, 1, txhash,
+				govHelper),
+			expectedReward: new(uint256.Int),
+		}
 	}
 
-	for i := 0; i < 1000; i++ {
-		_ = stakes[i].ApplyReward()
-		require.True(t, stakes[i].ReceivedReward.Sign() > 0)
-		require.Equal(t, stakes[i].BlockRewardUnit, stakes[i].ReceivedReward)
+	// reward for 20000 blocks
+	rand.Seed(time.Now().UnixNano())
+	blocks := 20000
+	for n := 0; n < blocks; n++ {
+		i := rand.Int() % len(stakeTestObjs)
+		stake := stakeTestObjs[i].s
+		_ = stake.ApplyReward()
+		_ = stakeTestObjs[i].expectedReward.Add(stakeTestObjs[i].expectedReward, stake.BlockRewardUnit)
 	}
 
-	for i := 0; i < 1000; i++ {
-		_ = stakes[i].ApplyReward()
-		expected := new(uint256.Int).Mul(stakes[i].BlockRewardUnit, uint256.NewInt(2))
-		require.Equal(t, expected, stakes[i].ReceivedReward)
+	for i := 0; i < len(stakeTestObjs); i++ {
+		require.Equal(t, stakeTestObjs[i].expectedReward, stakeTestObjs[i].s.ReceivedReward)
 	}
 }

@@ -126,7 +126,7 @@ func (s *Stake) ApplyReward() *uint256.Int {
 }
 
 func (s *Stake) applyReward() *uint256.Int {
-	s.ReceivedReward = new(uint256.Int).Add(s.ReceivedReward, s.BlockRewardUnit)
+	_ = s.ReceivedReward.Add(s.ReceivedReward, s.BlockRewardUnit)
 	return s.BlockRewardUnit
 }
 

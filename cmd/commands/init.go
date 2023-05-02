@@ -23,7 +23,7 @@ import (
 //}
 
 var (
-	chainID       = "mainnet"
+	rigoChainID   = "mainnet"
 	walkeyCnt     = 9
 	privValSecret string
 )
@@ -43,9 +43,9 @@ func NewInitFilesCmd() *cobra.Command {
 func AddInitFlags(cmd *cobra.Command) {
 	// bind flags
 	cmd.Flags().StringVar(
-		&chainID,
+		&rigoChainID,
 		"chain_id",
-		chainID, // default name
+		rigoChainID, // default name
 		"the id of chain to generate (e.g. mainnet, testnet, devnet and others)")
 	cmd.Flags().IntVar(
 		&walkeyCnt,
@@ -65,31 +65,31 @@ func AddInitFlags(cmd *cobra.Command) {
 }
 
 func initFiles(cmd *cobra.Command, args []string) error {
-	return initFilesWithConfig(config)
-}
-
-func initFilesWithConfig(config *cfg.Config) error {
 	var s []byte
 	if privValSecret != "" {
 		s = []byte(privValSecret)
 		privValSecret = ""
 	} else {
-		s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(config.PrivValidatorKeyFile())))
+		s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(rootConfig.PrivValidatorKeyFile())))
 	}
 	defer libs.ClearCredential(s)
 
+	return InitFilesWith(rigoChainID, rootConfig, s)
+}
+
+func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 	// private validator
 	privValKeyFile := config.PrivValidatorKeyFile()
 	privValStateFile := config.PrivValidatorStateFile()
 	var pv *acrypto.SFilePV
 	if tmos.FileExists(privValKeyFile) {
-		pv = acrypto.LoadSFilePV(privValKeyFile, privValStateFile, s)
+		pv = acrypto.LoadSFilePV(privValKeyFile, privValStateFile, secret)
 		logger.Info("Found private validator", "keyFile", privValKeyFile,
 			"stateFile", privValStateFile)
-		//pv.SaveWith(s) // encrypt with new driven key.
+		//pv.SaveWith(secret) // encrypt with new driven key.
 	} else {
 		pv = acrypto.GenSFilePV(privValKeyFile, privValStateFile)
-		pv.SaveWith(s)
+		pv.SaveWith(secret)
 		logger.Info("Generated private validator", "keyFile", privValKeyFile,
 			"stateFile", privValStateFile)
 	}
@@ -130,7 +130,7 @@ func initFilesWithConfig(config *cfg.Config) error {
 				return err
 			}
 
-			walkeys, err := acrypto.CreateWalletKeyFiles(s, walkeyCnt, defaultWalkeyDirPath)
+			walkeys, err := acrypto.CreateWalletKeyFiles(secret, walkeyCnt, defaultWalkeyDirPath)
 			if err != nil {
 				return err
 			}
@@ -159,7 +159,7 @@ func initFilesWithConfig(config *cfg.Config) error {
 			walkeys = append(walkeys, pvWalKey)
 			holders := make([]*genesis.GenesisAssetHolder, len(walkeys))
 			for i, wk := range walkeys {
-				if err := wk.Unlock(s); err != nil {
+				if err := wk.Unlock(secret); err != nil {
 					return err
 				}
 				holders[i] = &genesis.GenesisAssetHolder{

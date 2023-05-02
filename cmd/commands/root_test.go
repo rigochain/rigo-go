@@ -35,7 +35,7 @@ func clearConfig(dir string) {
 		panic(err)
 	}
 	viper.Reset()
-	config = cfg.DefaultConfig()
+	rootConfig = cfg.DefaultConfig()
 }
 
 // prepare new rootCmd
@@ -80,10 +80,10 @@ func TestRootHome(t *testing.T) {
 		err := testSetup(defaultRoot, tc.args, tc.env)
 		require.Nil(t, err, idxString)
 
-		assert.Equal(t, tc.root, config.RootDir, idxString)
-		assert.Equal(t, tc.root, config.P2P.RootDir, idxString)
-		assert.Equal(t, tc.root, config.Consensus.RootDir, idxString)
-		assert.Equal(t, tc.root, config.Mempool.RootDir, idxString)
+		assert.Equal(t, tc.root, rootConfig.RootDir, idxString)
+		assert.Equal(t, tc.root, rootConfig.P2P.RootDir, idxString)
+		assert.Equal(t, tc.root, rootConfig.Consensus.RootDir, idxString)
+		assert.Equal(t, tc.root, rootConfig.Mempool.RootDir, idxString)
 	}
 }
 
@@ -111,7 +111,7 @@ func TestRootFlagsEnv(t *testing.T) {
 		err := testSetup(defaultRoot, tc.args, tc.env)
 		require.Nil(t, err, idxString)
 
-		assert.Equal(t, tc.logLevel, config.LogLevel, idxString)
+		assert.Equal(t, tc.logLevel, rootConfig.LogLevel, idxString)
 	}
 }
 
@@ -156,7 +156,7 @@ func TestRootConfig(t *testing.T) {
 		err = cli.RunWithArgs(cmd, tc.args, tc.env)
 		require.Nil(t, err, idxString)
 
-		assert.Equal(t, tc.logLvl, config.LogLevel, idxString)
+		assert.Equal(t, tc.logLvl, rootConfig.LogLevel, idxString)
 	}
 }
 

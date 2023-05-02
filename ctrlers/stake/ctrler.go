@@ -238,7 +238,7 @@ func (ctrler *StakeCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.X
 
 func (ctrler *StakeCtrler) doReward() xerrors.XError {
 
-	// todo: implement completely
+	// todo: implement completely: issue #29
 	// GetFinality() returns delegatee which is updated in execStaking / execUnstaking.
 	// So, the stakes, that is staked or un-staked at this block, is rewarded. is it right?
 	for _, val := range ctrler.lastValidators {

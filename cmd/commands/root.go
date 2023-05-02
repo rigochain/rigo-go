@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	config = cfg.DefaultConfig()
-	logger = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+	rootConfig = cfg.DefaultConfig()
+	logger     = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 )
 
 func init() {
@@ -25,7 +25,7 @@ func init() {
 }
 
 func registerFlagsRootCmd(cmd *cobra.Command) {
-	cmd.PersistentFlags().String("log_level", config.LogLevel, "log level")
+	cmd.PersistentFlags().String("log_level", rootConfig.LogLevel, "log level")
 }
 
 // ParseConfig retrieves the default environment configuration,
@@ -39,7 +39,7 @@ func ParseConfig() (*cfg.Config, error) {
 	conf.SetRoot(conf.RootDir)
 	tmcfg.EnsureRoot(conf.RootDir)
 	if err := conf.ValidateBasic(); err != nil {
-		return nil, fmt.Errorf("error in config file: %v", err)
+		return nil, fmt.Errorf("error in rootConfig file: %v", err)
 	}
 	return &cfg.Config{conf}, nil
 }
@@ -53,16 +53,16 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
-		config, err = ParseConfig()
+		rootConfig, err = ParseConfig()
 		if err != nil {
 			return err
 		}
 
-		if config.LogFormat == tmcfg.LogFormatJSON {
+		if rootConfig.LogFormat == tmcfg.LogFormatJSON {
 			logger = log.NewTMJSONLogger(log.NewSyncWriter(os.Stdout))
 		}
 
-		logger, err = tmflags.ParseLogLevel(config.LogLevel, logger, tmcfg.DefaultLogLevel)
+		logger, err = tmflags.ParseLogLevel(rootConfig.LogLevel, logger, tmcfg.DefaultLogLevel)
 		if err != nil {
 			return err
 		}
