@@ -67,7 +67,7 @@ func CompressPubkey(pub *ecdsa.PublicKey) abytes.HexBytes {
 
 func DecompressPubkey(bz []byte) (*ecdsa.PublicKey, xerrors.XError) {
 	if pubKey, err := ethcrypto.DecompressPubkey(bz); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return pubKey, nil
 	}
@@ -77,7 +77,7 @@ func Sig2Addr(msg, sig []byte) (types.Address, abytes.HexBytes, xerrors.XError) 
 	hmsg := DefaultHash(msg)
 	pubKey, err := ethcrypto.SigToPub(hmsg, sig)
 	if err != nil {
-		return nil, nil, xerrors.NewFrom(err)
+		return nil, nil, xerrors.From(err)
 	}
 
 	return Pub2Addr(pubKey), CompressPubkey(pubKey), nil
@@ -107,17 +107,17 @@ func DefaultHasherName() string {
 
 var (
 	// ErrInvalidBlockSize indicates hash blocksize <= 0.
-	ErrInvalidBlockSize = xerrors.New("invalid blocksize")
+	ErrInvalidBlockSize = xerrors.NewOrdinary("invalid blocksize")
 
 	// ErrInvalidPKCS5Data indicates bad input to PKCS7 pad or unpad.
-	ErrInvalidPKCS5Data = xerrors.New("invalid PKCS5 data (empty or not padded)")
+	ErrInvalidPKCS5Data = xerrors.NewOrdinary("invalid PKCS5 data (empty or not padded)")
 	// ErrInvalidPKCS5Padding indicates PKCS5 unpad fails to bad input.
-	ErrInvalidPKCS5Padding = xerrors.New("invalid PKCS5 padding on input")
+	ErrInvalidPKCS5Padding = xerrors.NewOrdinary("invalid PKCS5 padding on input")
 
 	// ErrInvalidPKCS7Data indicates bad input to PKCS7 pad or unpad.
-	ErrInvalidPKCS7Data = xerrors.New("invalid PKCS7 data (empty or not padded)")
+	ErrInvalidPKCS7Data = xerrors.NewOrdinary("invalid PKCS7 data (empty or not padded)")
 	// ErrInvalidPKCS7Padding indicates PKCS7 unpad fails to bad input.
-	ErrInvalidPKCS7Padding = xerrors.New("invalid PKCS7 padding on input")
+	ErrInvalidPKCS7Padding = xerrors.NewOrdinary("invalid PKCS7 padding on input")
 )
 
 func PKCS5Padding(b []byte, blocksize int) ([]byte, error) {

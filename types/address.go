@@ -29,10 +29,10 @@ func HexToAddress(_hex string) (Address, error) {
 	}
 	bzAddr, err := hex.DecodeString(_hex)
 	if err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	}
 	if len(bzAddr) != crypto.AddressSize {
-		return nil, xerrors.New("error of address length: address length should be 20 bytes")
+		return nil, xerrors.NewOrdinary("error of address length: address length should be 20 bytes")
 	}
 	return bzAddr, nil
 }

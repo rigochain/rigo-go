@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ledger"
 	"github.com/rigochain/rigo-go/types"
 	bytes2 "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
-	"math/big"
 	"sort"
 	"sync"
 )
@@ -17,13 +17,13 @@ type Delegatee struct {
 	Addr   types.Address   `json:"address"`
 	PubKey bytes2.HexBytes `json:"pubKey"`
 
-	SelfAmount  *big.Int `json:"selfAmount"`
-	SelfPower   int64    `json:"selfPower"`
-	TotalAmount *big.Int `json:"totalAmount"`
-	TotalPower  int64    `json:"totalPower"`
+	SelfAmount  *uint256.Int `json:"selfAmount"`
+	SelfPower   int64        `json:"selfPower,string"`
+	TotalAmount *uint256.Int `json:"totalAmount"`
+	TotalPower  int64        `json:"totalPower,string"`
 
-	RewardAmount *big.Int `json:"rewardAmount"`
-	Stakes       []*Stake `json:"stakes"`
+	RewardAmount *uint256.Int `json:"rewardAmount"`
+	Stakes       []*Stake     `json:"stakes"`
 
 	mtx sync.RWMutex
 }
@@ -40,7 +40,7 @@ func (delegatee *Delegatee) Encode() ([]byte, xerrors.XError) {
 	defer delegatee.mtx.RUnlock()
 
 	if bz, err := json.Marshal(delegatee); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -51,7 +51,7 @@ func (delegatee *Delegatee) Decode(d []byte) xerrors.XError {
 	defer delegatee.mtx.Unlock()
 
 	if err := json.Unmarshal(d, delegatee); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	return nil
 }
@@ -62,11 +62,11 @@ func NewDelegatee(addr types.Address, pubKey bytes2.HexBytes) *Delegatee {
 	return &Delegatee{
 		Addr:         addr,
 		PubKey:       pubKey,
-		SelfAmount:   big.NewInt(0),
+		SelfAmount:   uint256.NewInt(0),
 		SelfPower:    0,
 		TotalPower:   0,
-		TotalAmount:  big.NewInt(0),
-		RewardAmount: big.NewInt(0),
+		TotalAmount:  uint256.NewInt(0),
+		RewardAmount: uint256.NewInt(0),
 	}
 }
 
@@ -84,11 +84,11 @@ func (delegatee *Delegatee) addStake(stakes ...*Stake) xerrors.XError {
 	for _, s := range stakes {
 		if s.IsSelfStake() {
 			delegatee.SelfPower += s.Power
-			delegatee.SelfAmount = new(big.Int).Add(delegatee.SelfAmount, s.Amount)
+			_ = delegatee.SelfAmount.Add(delegatee.SelfAmount, s.Amount)
 		}
 		delegatee.TotalPower += s.Power
-		delegatee.TotalAmount = new(big.Int).Add(delegatee.TotalAmount, s.Amount)
-		delegatee.RewardAmount = new(big.Int).Add(delegatee.RewardAmount, s.ReceivedReward)
+		_ = delegatee.TotalAmount.Add(delegatee.TotalAmount, s.Amount)
+		_ = delegatee.RewardAmount.Add(delegatee.RewardAmount, s.ReceivedReward)
 	}
 	return nil
 }
@@ -105,11 +105,11 @@ func (delegatee *Delegatee) DelStake(txhash bytes2.HexBytes) *Stake {
 	if s := delegatee.delStakeByIdx(i); s != nil {
 		if s.IsSelfStake() {
 			delegatee.SelfPower -= s.Power
-			delegatee.SelfAmount = new(big.Int).Sub(delegatee.SelfAmount, s.Amount)
+			_ = delegatee.SelfAmount.Sub(delegatee.SelfAmount, s.Amount)
 		}
 		delegatee.TotalPower -= s.Power
-		delegatee.TotalAmount = new(big.Int).Sub(delegatee.TotalAmount, s.Amount)
-		delegatee.RewardAmount = new(big.Int).Sub(delegatee.RewardAmount, s.ReceivedReward)
+		_ = delegatee.TotalAmount.Sub(delegatee.TotalAmount, s.Amount)
+		_ = delegatee.RewardAmount.Sub(delegatee.RewardAmount, s.ReceivedReward)
 		return s
 	}
 	return nil
@@ -134,8 +134,8 @@ func (delegatee *Delegatee) DelAllStakes() []*Stake {
 
 	for _, s := range stakes {
 		delegatee.TotalPower -= s.Power
-		delegatee.TotalAmount = new(big.Int).Sub(delegatee.TotalAmount, s.Amount)
-		delegatee.RewardAmount = new(big.Int).Sub(delegatee.RewardAmount, s.ReceivedReward)
+		_ = delegatee.TotalAmount.Sub(delegatee.TotalAmount, s.Amount)
+		_ = delegatee.RewardAmount.Sub(delegatee.RewardAmount, s.ReceivedReward)
 	}
 
 	return stakes
@@ -215,36 +215,36 @@ func (delegatee *Delegatee) StakesLen() int {
 	return len(delegatee.Stakes)
 }
 
-func (delegatee *Delegatee) GetSelfAmount() *big.Int {
+func (delegatee *Delegatee) GetSelfAmount() *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return delegatee.SelfAmount
+	return delegatee.SelfAmount.Clone()
 }
 
-func (delegatee *Delegatee) GetTotalAmount() *big.Int {
+func (delegatee *Delegatee) GetTotalAmount() *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return delegatee.TotalAmount
+	return delegatee.TotalAmount.Clone()
 }
 
-func (delegatee *Delegatee) SumAmount() *big.Int {
+func (delegatee *Delegatee) SumAmount() *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
 	return delegatee.sumAmountOf(nil)
 }
 
-func (delegatee *Delegatee) SumAmountOf(addr types.Address) *big.Int {
+func (delegatee *Delegatee) SumAmountOf(addr types.Address) *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
 	return delegatee.sumAmountOf(addr)
 }
 
-func (delegatee *Delegatee) sumAmountOf(addr types.Address) *big.Int {
-	amt := big.NewInt(0)
+func (delegatee *Delegatee) sumAmountOf(addr types.Address) *uint256.Int {
+	amt := uint256.NewInt(0)
 	for _, s0 := range delegatee.Stakes {
 		if addr == nil || bytes.Compare(s0.From, addr) == 0 {
 			_ = amt.Add(amt, s0.Amount)
@@ -297,29 +297,29 @@ func (delegatee *Delegatee) sumPowerOf(addr types.Address) int64 {
 	return power
 }
 
-func (delegatee *Delegatee) GetRewardAmount() *big.Int {
+func (delegatee *Delegatee) GetRewardAmount() *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return new(big.Int).Set(delegatee.RewardAmount)
+	return delegatee.RewardAmount.Clone()
 }
 
-func (delegatee *Delegatee) SumBlockReward() *big.Int {
+func (delegatee *Delegatee) SumBlockReward() *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
 	return delegatee.sumBlockRewardOf(nil)
 }
 
-func (delegatee *Delegatee) SumBlockRewardOf(addr types.Address) *big.Int {
+func (delegatee *Delegatee) SumBlockRewardOf(addr types.Address) *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
 	return delegatee.sumBlockRewardOf(addr)
 }
 
-func (delegatee *Delegatee) sumBlockRewardOf(addr types.Address) *big.Int {
-	reward := big.NewInt(0)
+func (delegatee *Delegatee) sumBlockRewardOf(addr types.Address) *uint256.Int {
+	reward := uint256.NewInt(0)
 	for _, s := range delegatee.Stakes {
 		if addr == nil || bytes.Compare(addr, s.From) == 0 {
 			_ = reward.Add(reward, s.ReceivedReward)
@@ -328,19 +328,19 @@ func (delegatee *Delegatee) sumBlockRewardOf(addr types.Address) *big.Int {
 	return reward
 }
 
-func (delegatee *Delegatee) DoReward() *big.Int {
+func (delegatee *Delegatee) DoReward() *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
 	return delegatee.doBlockReward()
 }
 
-func (delegatee *Delegatee) doBlockReward() *big.Int {
-	reward := big.NewInt(0)
+func (delegatee *Delegatee) doBlockReward() *uint256.Int {
+	reward := uint256.NewInt(0)
 	for _, s := range delegatee.Stakes {
-		reward = new(big.Int).Add(reward, s.applyReward())
+		_ = reward.Add(reward, s.applyReward())
 	}
-	delegatee.RewardAmount.Add(delegatee.RewardAmount, reward)
+	_ = delegatee.RewardAmount.Add(delegatee.RewardAmount, reward)
 	return reward
 }
 
@@ -357,10 +357,10 @@ func (delegatee *Delegatee) String() string {
 
 type DelegateeArray []*Delegatee
 
-func (vs DelegateeArray) SumTotalAmount() *big.Int {
-	var amt *big.Int
+func (vs DelegateeArray) SumTotalAmount() *uint256.Int {
+	amt := uint256.NewInt(0)
 	for _, val := range vs {
-		amt = new(big.Int).Add(amt, val.TotalAmount)
+		_ = amt.Add(amt, val.TotalAmount)
 	}
 	return amt
 }
@@ -373,18 +373,18 @@ func (vs DelegateeArray) SumTotalPower() int64 {
 	return power
 }
 
-func (vs DelegateeArray) SumTotalReward() *big.Int {
-	var reward *big.Int
+func (vs DelegateeArray) SumTotalReward() *uint256.Int {
+	reward := uint256.NewInt(0)
 	for _, val := range vs {
-		reward = new(big.Int).Add(reward, val.GetRewardAmount())
+		_ = reward.Add(reward, val.GetRewardAmount())
 	}
 	return reward
 }
 
-func (vs DelegateeArray) SumBlockReward() *big.Int {
-	var reward *big.Int
+func (vs DelegateeArray) SumBlockReward() *uint256.Int {
+	reward := uint256.NewInt(0)
 	for _, val := range vs {
-		reward = new(big.Int).Add(reward, val.RewardAmount)
+		_ = reward.Add(reward, val.RewardAmount)
 	}
 	return reward
 }

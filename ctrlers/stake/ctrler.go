@@ -1,7 +1,7 @@
 package stake
 
 import (
-	"fmt"
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/ledger"
@@ -11,7 +11,6 @@ import (
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/big"
 	"sort"
 	"sync"
 )
@@ -59,7 +58,7 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 
 	validators, ok := req.([]abcitypes.ValidatorUpdate)
 	if !ok {
-		return xerrors.New("wrong parameter: StakeCtrler::InitLedger() requires []ValidatorUpdates")
+		return xerrors.ErrInitChain.Wrapf("wrong parameter: StakeCtrler::InitLedger() requires []ValidatorUpdates")
 	}
 
 	for _, val := range validators {
@@ -96,9 +95,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
-
 	case ctrlertypes.TRX_UNSTAKING:
-
 	default:
 		return xerrors.ErrUnknownTrxType
 	}
@@ -150,7 +147,8 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovHelper)
 	if xerr := delegatee.addStake(s0); xerr != nil {
 		return xerr
-	} else if xerr := setUpdateDelegatee(delegatee); xerr != nil {
+	}
+	if xerr := setUpdateDelegatee(delegatee); xerr != nil {
 		return xerr
 	}
 
@@ -279,8 +277,10 @@ func (ctrler *StakeCtrler) updateValidators(maxVals int) []abcitypes.ValidatorUp
 	// IterateAllFinalityItems() returns delegatees, which are committed at previous block.
 	// So, if staking tx is executed at block N,
 	//     stake is saved(committed) at block N,
-	//     the account becomes validator at block N+1, and it is notified to consensus engine
-	//     the account can sign a block from block N+2 in consensus engine
+	//     it(updated validators) is notified to consensus engine at block N+1,
+	//	   consensus add this account to validator set at block (N+1)+1+1.
+	//	   (Refer to the comments in updateState(...) at github.com/tendermint/tendermint@v0.34.20/state/execution.go)
+	// So, the account can sign a block from block N+3 in consensus engine
 	if xerr := ctrler.delegateeLedger.IterateAllFinalityItems(func(d *Delegatee) xerrors.XError {
 		allDelegatees = append(allDelegatees, d)
 		return nil
@@ -312,14 +312,14 @@ func validatorUpdates(existing, newers DelegateeArray) []abcitypes.ValidatorUpda
 		} else if ret == 0 {
 			if existing[i].TotalPower != newers[j].TotalPower {
 				// if power is changed, add newser
-				valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+				valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, int64(newers[j].TotalPower), "secp256k1"))
 			} else {
 				// if the power is not changed, exclude the validator in updated validators
 			}
 			i++
 			j++
 		} else { // ret > 0
-			valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+			valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, int64(newers[j].TotalPower), "secp256k1"))
 			j++
 		}
 	}
@@ -330,7 +330,7 @@ func validatorUpdates(existing, newers DelegateeArray) []abcitypes.ValidatorUpda
 	}
 	for ; j < len(newers); j++ {
 		// added newer
-		valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, newers[j].TotalPower, "secp256k1"))
+		valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, int64(newers[j].TotalPower), "secp256k1"))
 	}
 
 	return valUpdates
@@ -361,7 +361,7 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	} else if h1, v1, xerr := ctrler.frozenLedger.Commit(); xerr != nil {
 		return nil, -1, xerr
 	} else if v0 != v1 {
-		return nil, -1, xerrors.New(fmt.Sprintf("error: StakeCtrler.Commit() has wrong version number - v0:%v, v1:%v", v0, v1))
+		return nil, -1, xerrors.ErrCommit.Wrapf("error: StakeCtrler.Commit() has wrong version number - v0:%v, v1:%v", v0, v1)
 	} else {
 		return crypto.DefaultHash(h0, h1), v0, nil
 	}
@@ -394,7 +394,7 @@ func (ctrler *StakeCtrler) Validators() ([]*abcitypes.Validator, int64) {
 		totalPower += v.TotalPower
 		ret = append(ret, &abcitypes.Validator{
 			Address: v.Addr,
-			Power:   v.TotalPower,
+			Power:   int64(v.TotalPower),
 		})
 	}
 
@@ -423,8 +423,8 @@ func (ctrler *StakeCtrler) PowerOf(addr types.Address) int64 {
 	}
 }
 
-func (ctrler *StakeCtrler) GetTotalAmount() *big.Int {
-	ret := big.NewInt(0)
+func (ctrler *StakeCtrler) GetTotalAmount() *uint256.Int {
+	ret := uint256.NewInt(0)
 	_ = ctrler.delegateeLedger.IterateAllFinalityItems(func(delegatee *Delegatee) xerrors.XError {
 		_ = ret.Add(ret, delegatee.TotalAmount)
 		return nil

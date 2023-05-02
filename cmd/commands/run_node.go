@@ -53,14 +53,14 @@ func AddNodeFlags(cmd *cobra.Command) {
 			" 'counter_serial' or 'noop' for local testing.")
 	cmd.Flags().String("abci", config.ABCI, "specify abci transport (socket | grpc)")
 
-	// rpc flags
+	// provider flags
 	cmd.Flags().String("rpc.laddr", config.RPC.ListenAddress, "RPC listen address. Port required")
 	cmd.Flags().StringSlice("rpc.cors_allowed_origins", config.RPC.CORSAllowedOrigins, "")
 	cmd.Flags().String(
 		"rpc.grpc_laddr",
 		config.RPC.GRPCListenAddress,
 		"GRPC listen address (BroadcastTx only). Port required")
-	cmd.Flags().Bool("rpc.unsafe", config.RPC.Unsafe, "enabled unsafe rpc methods")
+	cmd.Flags().Bool("rpc.unsafe", config.RPC.Unsafe, "enabled unsafe provider methods")
 	cmd.Flags().String("rpc.pprof_laddr", config.RPC.PprofListenAddress, "pprof listen address (https://golang.org/pkg/net/http/pprof)")
 
 	// p2p flags
@@ -109,7 +109,7 @@ func AddNodeFlags(cmd *cobra.Command) {
 func NewRunNodeCmd(nodeProvider node.Provider) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start",
-		Aliases: []string{"rigo", "run"},
+		Aliases: []string{"run"},
 		Short:   "Run the rigo",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkGenesisHash(config); err != nil {
@@ -142,7 +142,7 @@ func NewRunNodeCmd(nodeProvider node.Provider) *cobra.Command {
 			trapSignal(logger, func() {
 				if n.IsRunning() {
 					if err := n.ProxyApp().Stop(); err != nil {
-						logger.Error("unable to stop the rigo client", "error", err)
+						logger.Error("unable to stop the rigo web3", "error", err)
 					}
 					if err := n.Stop(); err != nil {
 						logger.Error("unable to stop the rigo node", "error", err)

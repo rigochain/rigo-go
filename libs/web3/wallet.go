@@ -1,15 +1,14 @@
-package client
+package web3
 
 import (
+	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
-	"github.com/rigochain/rigo-go/libs/client/rpc"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"io"
-	"math/big"
 	"sync"
 )
 
@@ -45,6 +44,14 @@ func OpenWallet(r io.Reader) (*Wallet, error) {
 	return ret, nil
 }
 
+func (w *Wallet) Save(wr io.Writer) error {
+	w.mtx.RLock()
+	defer w.mtx.RUnlock()
+
+	_, err := w.wkey.Save(wr)
+	return err
+}
+
 func (w *Wallet) Address() types.Address {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
@@ -59,26 +66,6 @@ func (w *Wallet) GetAccount() *types2.Account {
 	return w.acct
 }
 
-func (w *Wallet) syncAccount() error {
-	if acct, err := rpc.GetAccount(w.wkey.Address); err != nil {
-		return err
-	} else {
-		w.acct = acct
-	}
-	return nil
-}
-
-func (w *Wallet) SyncAccount() error {
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
-
-	return w.syncAccount()
-}
-
-func (w *Wallet) syncNonce() error {
-	return w.syncAccount()
-}
-
 func (w *Wallet) AddNonce() {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
@@ -90,13 +77,6 @@ func (w *Wallet) addNonce() {
 	w.acct.AddNonce()
 }
 
-func (w *Wallet) SyncNonce() error {
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
-
-	return w.syncNonce()
-}
-
 func (w *Wallet) GetNonce() uint64 {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
@@ -104,23 +84,12 @@ func (w *Wallet) GetNonce() uint64 {
 	return w.acct.GetNonce()
 }
 
-func (w *Wallet) syncBalance() error {
-	return w.syncAccount()
-}
-
-func (w *Wallet) SyncBalance() error {
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
-
-	return w.syncBalance()
-}
-
-func (w *Wallet) GetBalance() *big.Int {
+func (w *Wallet) GetBalance() *uint256.Int {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
 	if w.acct == nil {
-		return big.NewInt(0)
+		return uint256.NewInt(0)
 	} else {
 		return w.acct.GetBalance()
 	}
@@ -161,7 +130,7 @@ func (w *Wallet) SignTrx(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error)
 	}
 }
 
-func (w *Wallet) TransferSync(to types.Address, gas, amt *big.Int) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) TransferSync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
 		w.acct.GetNonce()+1,
@@ -170,11 +139,11 @@ func (w *Wallet) TransferSync(to types.Address, gas, amt *big.Int) (*coretypes.R
 	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err
 	} else {
-		return rpc.SendTransactionSync(tx)
+		return rweb3.SendTransactionSync(tx)
 	}
 }
 
-func (w *Wallet) StakingSync(to types.Address, gas, amt *big.Int) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) StakingSync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxStaking(
 		w.Address(), to,
 		w.acct.GetNonce()+1,
@@ -183,6 +152,44 @@ func (w *Wallet) StakingSync(to types.Address, gas, amt *big.Int) (*coretypes.Re
 	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err
 	} else {
-		return rpc.SendTransactionSync(tx)
+		return rweb3.SendTransactionSync(tx)
 	}
+}
+
+func (w *Wallet) syncAccount(rweb3 *RigoWeb3) error {
+	if acct, err := rweb3.GetAccount(w.wkey.Address); err != nil {
+		return err
+	} else {
+		w.acct = acct
+	}
+	return nil
+}
+
+func (w *Wallet) SyncAccount(rweb3 *RigoWeb3) error {
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
+
+	return w.syncAccount(rweb3)
+}
+
+func (w *Wallet) syncNonce(rweb3 *RigoWeb3) error {
+	return w.syncAccount(rweb3)
+}
+
+func (w *Wallet) SyncNonce(rweb3 *RigoWeb3) error {
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
+
+	return w.syncNonce(rweb3)
+}
+
+func (w *Wallet) syncBalance(rweb3 *RigoWeb3) error {
+	return w.syncAccount(rweb3)
+}
+
+func (w *Wallet) SyncBalance(rweb3 *RigoWeb3) error {
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
+
+	return w.syncBalance(rweb3)
 }

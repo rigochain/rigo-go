@@ -123,9 +123,9 @@ func (ledger *MemLedger[T]) Read(key LedgerKey) (T, xerrors.XError) {
 func (ledger *MemLedger[T]) read(key LedgerKey) (T, xerrors.XError) {
 	var emptyNil T
 	if item, ok := ledger.memStorage[key]; !ok {
-		return item, xerrors.New("simple_ledger: not found")
+		return item, xerrors.NewOrdinary("simple_ledger: not found")
 	} else if key != item.Key() {
-		return emptyNil, xerrors.New("simple_ledger: the key is compromised - the requested key is not equal to the key encoded in value")
+		return emptyNil, xerrors.NewOrdinary("simple_ledger: the key is compromised - the requested key is not equal to the key encoded in value")
 	} else {
 		return item, nil
 	}

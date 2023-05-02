@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
@@ -74,7 +75,7 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 
 	genAppState, ok := req.(*genesis.GenesisAppState)
 	if !ok {
-		return xerrors.New("wrong parameter: GovCtrler::InitLedger requires *genesis.GenesisAppState")
+		return xerrors.ErrInitChain.Wrapf("wrong parameter: GovCtrler::InitLedger requires *genesis.GenesisAppState")
 	}
 	ctrler.GovRule = *genAppState.GovRule
 	_ = ctrler.ruleLedger.SetFinality(&ctrler.GovRule)
@@ -99,12 +100,20 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	// validation by tx type
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
-		if ctrler.AmountPerPower().Cmp(ctx.Tx.Amount) > 0 {
+		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrler.AmountPerPower(), new(uint256.Int))
+		// `ctx.Tx.Amount` MUST be greater than or equal to `ctrler.govHelper.AmountPerPower()`
+		//    ==> q.Sign() > 0
+		if q.Sign() <= 0 {
 			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be greater than %v", ctrler.AmountPerPower()))
+		}
+		// `ctx.Tx.Amount` MUST be multiple to `ctrler.govHelper.AmountPerPower()`
+		//    ==> r.Sign() == 0
+		if r.Sign() != 0 {
+			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be multiple of %v", ctrler.AmountPerPower()))
 		}
 	case ctrlertypes.TRX_PROPOSAL:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
-			return xerrors.ErrInvalidTrx.With(errors.New("wrong address: the 'to' field in TRX_PROPOSAL should be zero address"))
+			return xerrors.ErrInvalidTrx.Wrap(errors.New("wrong address: the 'to' field in TRX_PROPOSAL should be zero address"))
 		}
 
 		// check right
@@ -136,7 +145,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
-			return xerrors.ErrInvalidTrxPayloadParams.With(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
+			return xerrors.ErrInvalidTrxPayloadParams.Wrap(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
 		}
 		// check tx type
 		txpayload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadVoting)
@@ -297,7 +306,7 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 				case proposal.PROPOSAL_GOVRULE:
 					newGovRule := &ctrlertypes.GovRule{}
 					if err := json.Unmarshal(prop.MajorOption.Option(), newGovRule); err != nil {
-						return xerrors.NewFrom(err)
+						return xerrors.From(err)
 					}
 					if xerr := ctrler.ruleLedger.SetFinality(newGovRule); xerr != nil {
 						return xerr
@@ -337,7 +346,7 @@ func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	}
 
 	if v0 != v1 || v1 != v2 {
-		return nil, -1, xerrors.New(fmt.Sprintf("error: GovCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2))
+		return nil, -1, xerrors.ErrCommit.Wrapf("error: GovCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2)
 	}
 
 	if ctrler.newGovRule != nil {

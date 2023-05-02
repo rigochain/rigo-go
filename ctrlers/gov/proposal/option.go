@@ -22,7 +22,7 @@ func NewVoteOptions(opts ...[]byte) []*voteOption {
 
 func (opt *voteOption) Encode() ([]byte, xerrors.XError) {
 	if bz, err := json.Marshal(opt); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -30,7 +30,7 @@ func (opt *voteOption) Encode() ([]byte, xerrors.XError) {
 
 func (opt *voteOption) Decode(bz []byte) xerrors.XError {
 	if err := json.Unmarshal(bz, opt); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	return nil
 }

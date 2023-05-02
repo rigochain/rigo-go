@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/cmd/version"
 	"github.com/rigochain/rigo-go/ctrlers/account"
@@ -14,12 +15,12 @@ import (
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/json"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	tmver "github.com/tendermint/tendermint/version"
-	"math/big"
 	"runtime"
 	"sync"
+	"sync/atomic"
 )
 
 var _ abcitypes.Application = (*RigoApp)(nil)
@@ -36,6 +37,8 @@ type RigoApp struct {
 	txExecutor  *TrxExecutor
 
 	localClient abcicli.Client
+
+	started int32
 
 	logger log.Logger
 	mtx    sync.Mutex
@@ -75,7 +78,9 @@ func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
 }
 
 func (ctrler *RigoApp) Start() error {
-	ctrler.txExecutor.Start()
+	if atomic.CompareAndSwapInt32(&ctrler.started, 0, 1) {
+		ctrler.txExecutor.Start()
+	}
 	return nil
 }
 
@@ -100,6 +105,9 @@ func (ctrler *RigoApp) SetLocalClient(client abcicli.Client) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
+	// todo: Find out how to solve the following problem.
+	// Problem: The 'web3' MUST BE a web3 of CONSENSUS.
+	// However, there is no way to know if the 'web3' is for CONSENSUS or not.
 	ctrler.localClient = client
 }
 
@@ -118,7 +126,7 @@ func (ctrler *RigoApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 // InitChain is called only when the ResponseInfo::LastBlockHeight which is returned in Info() is 0.
 func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	appState := genesis.GenesisAppState{}
-	if err := json.Unmarshal(req.AppStateBytes, &appState); err != nil {
+	if err := tmjson.Unmarshal(req.AppStateBytes, &appState); err != nil {
 		panic(err)
 	}
 
@@ -159,7 +167,7 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 			func(_txctx *types2.TrxContext) xerrors.XError {
 				_tx := _txctx.Tx
 
-				_txctx.NeedAmt = new(big.Int).Add(_tx.Amount, _tx.Gas)
+				_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
 				_txctx.GovHandler = ctrler.govCtrler
 				_txctx.AcctHandler = ctrler.acctCtrler
 				_txctx.StakeHandler = ctrler.stakeCtrler
@@ -175,8 +183,8 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 			response.Code = xerr.Code()
 			response.Log = xerr.Error()
 		} else {
-			response.GasWanted = txctx.Tx.Gas.Int64()
-			response.GasUsed = txctx.GasUsed.Int64()
+			response.GasWanted = int64(txctx.Tx.Gas.Uint64())
+			response.GasUsed = int64(txctx.GasUsed.Uint64())
 		}
 	case abcitypes.CheckTxType_Recheck:
 		// do nothing
@@ -193,7 +201,7 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 	ctrler.currBlockCtx = &types2.BlockContext{
 		BlockInfo:   req,
 		TxsCnt:      0,
-		Fee:         big.NewInt(0),
+		Fee:         uint256.NewInt(0),
 		GovHelper:   ctrler.govCtrler,
 		AcctHelper:  ctrler.acctCtrler,
 		StakeHelper: ctrler.stakeCtrler,
@@ -219,7 +227,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt
 			ctrler.currBlockCtx.TxsCnt++
 
-			_txctx.NeedAmt = new(big.Int).Add(_tx.Amount, _tx.Gas)
+			_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
 			_txctx.GovHandler = ctrler.govCtrler
 			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
@@ -238,8 +246,8 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 	} else {
 
 		_ = ctrler.currBlockCtx.Fee.Add(ctrler.currBlockCtx.Fee, txctx.GasUsed)
-		response.GasWanted = txctx.Tx.Gas.Int64()
-		response.GasUsed = txctx.GasUsed.Int64()
+		response.GasWanted = int64(txctx.Tx.Gas.Uint64())
+		response.GasUsed = int64(txctx.GasUsed.Uint64())
 
 		response.Events = []abcitypes.Event{
 			{
@@ -270,7 +278,7 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 
 			_txctx.TxIdx = txIdx
 
-			_txctx.NeedAmt = new(big.Int).Add(_tx.Amount, _tx.Gas)
+			_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
 			_txctx.GovHandler = ctrler.govCtrler
 			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
@@ -291,8 +299,8 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 
 					_ = ctrler.currBlockCtx.Fee.Add(ctrler.currBlockCtx.Fee, ctx.GasUsed)
 
-					response.GasWanted = ctx.Tx.Gas.Int64()
-					response.GasUsed = ctx.GasUsed.Int64()
+					response.GasWanted = int64(ctx.Tx.Gas.Uint64())
+					response.GasUsed = int64(ctx.GasUsed.Uint64())
 					response.Events = []abcitypes.Event{
 						{
 							Type: "tx",

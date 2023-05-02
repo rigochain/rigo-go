@@ -47,7 +47,7 @@ func (prop *GovProposal) Encode() ([]byte, xerrors.XError) {
 	defer prop.mtx.RUnlock()
 
 	if bz, err := json.Marshal(prop); err != nil {
-		return bz, xerrors.NewFrom(err)
+		return bz, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -58,7 +58,7 @@ func (prop *GovProposal) Decode(bz []byte) xerrors.XError {
 	defer prop.mtx.Unlock()
 
 	if err := json.Unmarshal(bz, prop); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	return nil
 }
@@ -72,7 +72,7 @@ func (prop *GovProposal) DoVote(addr types.Address, choice int32) xerrors.XError
 	// cancel previous vote
 	voter := prop.Voters[addr.String()]
 	if voter == nil {
-		return xerrors.New("not found voter")
+		return xerrors.NewOrdinary("not found voter")
 	}
 
 	prop.cancelVote(voter)
@@ -93,7 +93,7 @@ func (prop *GovProposal) doVote(voter *Voter, choice int32) {
 	if choice >= 0 {
 		opt := prop.Options[choice]
 		if opt == nil {
-			return //xerrors.New("not found option")
+			return //xerrors.NewOrdinary("not found option")
 		}
 
 		opt.DoVote(voter.Power)

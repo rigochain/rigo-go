@@ -9,11 +9,11 @@ import (
 )
 
 func TestConvertAsset(t *testing.T) {
-	r := rand.Int63()
+	r := rand.Uint64()
 	sau := types.ToSAU(r)
-	require.Equal(t, strconv.FormatInt(r, 10)+"000000000000000000", sau.String())
+	require.Equal(t, strconv.FormatUint(r, 10)+"000000000000000000", sau.Dec())
 
 	xco, rem := types.FromSAU(sau)
 	require.Equal(t, r, xco)
-	require.Equal(t, int64(0), rem)
+	require.Equal(t, uint64(0), rem)
 }

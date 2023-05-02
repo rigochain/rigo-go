@@ -77,7 +77,8 @@ func showWalletKeyDir(path string) error {
 		} else if err := showWalletKeyFile(entry); err != nil {
 			return err
 		}
-		fmt.Println("---\n")
+		fmt.Println("---")
+		fmt.Println(" ")
 		return nil
 	})
 	return err

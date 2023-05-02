@@ -22,7 +22,7 @@ func (tx *TrxPayloadProposal) Type() int32 {
 func (tx *TrxPayloadProposal) Decode(bz []byte) xerrors.XError {
 	pm := &TrxPayloadProposalProto{}
 	if err := proto.Unmarshal(bz, pm); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 
 	tx.Message = pm.Message
@@ -43,7 +43,7 @@ func (tx *TrxPayloadProposal) Encode() ([]byte, xerrors.XError) {
 	}
 
 	bz, err := proto.Marshal(pm)
-	return bz, xerrors.NewFrom(err)
+	return bz, xerrors.From(err)
 }
 
 func (tx *TrxPayloadProposal) GetOptionCount() int {

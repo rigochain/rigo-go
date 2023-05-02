@@ -92,3 +92,11 @@ func (m *memItems[T]) reset() {
 	m.updatedItems = make(map[LedgerKey]T)
 	m.removedKeys = nil
 }
+
+func (m *memItems[T]) refresh() {
+	for k, v := range m.updatedItems {
+		m.gotItems[k] = v
+	}
+	m.updatedItems = make(map[LedgerKey]T)
+	m.removedKeys = nil
+}

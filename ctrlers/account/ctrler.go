@@ -3,6 +3,7 @@ package account
 import (
 	"bytes"
 	"fmt"
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	atypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/genesis"
@@ -12,7 +13,6 @@ import (
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/big"
 	"sync"
 )
 
@@ -40,27 +40,37 @@ func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 
 	genAppState, ok := req.(*genesis.GenesisAppState)
 	if !ok {
-		return xerrors.New("wrong parameter: AcctCtrler::InitLedger requires *genesis.GenesisAppState")
+		return xerrors.ErrInitChain.Wrapf("wrong parameter: AcctCtrler::InitLedger requires *genesis.GenesisAppState")
 	}
 
 	for _, holder := range genAppState.AssetHolders {
 		addr := append(holder.Address, nil...)
-		if bal, ok := new(big.Int).SetString(holder.Balance, 10); !ok {
-			return xerrors.New("wrong balance in genesis")
-		} else {
-			acct := &atypes.Account{
-				Address: addr,
-				Balance: bal,
-			}
-			if xerr := ctrler.setAccountCommittable(acct, true); xerr != nil {
-				return xerr
-			}
+		acct := &atypes.Account{
+			Address: addr,
+			Balance: holder.Balance.Clone(),
+		}
+		if xerr := ctrler.setAccountCommittable(acct, true); xerr != nil {
+			return xerr
 		}
 	}
 	return nil
 }
 
 func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
+	if len(ctx.Tx.From) != types.AddrSize {
+		return xerrors.ErrInvalidAddress
+	} else if acct := ctrler.FindAccount(ctx.Tx.From, ctx.Exec); acct == nil {
+		return xerrors.ErrNotFoundAccount
+	} else {
+		ctx.Sender = acct
+	}
+
+	if len(ctx.Tx.To) != types.AddrSize {
+		return xerrors.ErrInvalidAddress
+	} else {
+		ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
+	}
+
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
@@ -82,24 +92,23 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 		if bytes.Compare(fromAddr, tx.From) != 0 {
 			return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
 		}
+		ctx.SenderPubKey = pubBytes
 	} else {
 		fromAddr = ctx.Tx.From
 	}
 
-	if acct := ctrler.findAccount(fromAddr, ctx.Exec); acct == nil {
-		return xerrors.ErrNotFoundAccount
-	} else if xerr := acct.CheckBalance(ctx.NeedAmt); xerr != nil {
+	if xerr := ctx.Sender.CheckBalance(ctx.NeedAmt); xerr != nil {
 		return xerr
-	} else if xerr := acct.CheckNonce(ctx.Tx.Nonce); xerr != nil {
-		return xerr
-	} else {
-		ctx.Sender = acct
-		ctx.SenderPubKey = pubBytes
+	} else if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
+		return xerr.Wrap(fmt.Errorf("txhash: %X, address: %v, expected: %v, actual:%v", ctx.TxHash, ctx.Sender.Address, ctx.Sender.Nonce+1, ctx.Tx.Nonce))
 	}
+
 	return nil
 }
 
 func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
+	// todo: Remove Lock()/Unlock() or Use RLock()/RUlock() to improve performance
+	// Lock()/Unlock() make txs to be processed serially
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -108,23 +117,20 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 		return xerr
 	}
 
-	var receiver *atypes.Account
 	if ctx.Tx.Type == atypes.TRX_TRANSFER {
-		receiver = ctrler.findOrNewAccount(ctx.Tx.To, ctx.Exec)
-		if xerr := receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
+		if xerr := ctx.Receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
 			return xerr
 		}
 	}
 
 	// increase sender's nonce
 	ctx.Sender.AddNonce()
+
 	// set used gas
 	ctx.GasUsed = ctx.Tx.Gas
 
 	_ = ctrler.setAccountCommittable(ctx.Sender, ctx.Exec)
-	if receiver != nil {
-		_ = ctrler.setAccountCommittable(receiver, ctx.Exec)
-	}
+	_ = ctrler.setAccountCommittable(ctx.Receiver, ctx.Exec)
 
 	return nil
 }
@@ -195,26 +201,22 @@ func (ctrler *AcctCtrler) findOrNewAccount(addr types.Address, exec bool) *atype
 	if acct := ctrler.findAccount(addr, exec); acct != nil {
 		return acct
 	}
-	return atypes.NewAccountWithName(addr, "")
-}
-
-func (ctrler *AcctCtrler) FindAccount_ExecLedger(addr types.Address) *atypes.Account {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	return ctrler.findAccount(addr, true)
-}
-
-func (ctrler *AcctCtrler) FindAccount_SimuLedger(addr types.Address) *atypes.Account {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	return ctrler.findAccount(addr, false)
+	acct := atypes.NewAccountWithName(addr, "")
+	fn := ctrler.acctLedger.Set
+	if exec {
+		fn = ctrler.acctLedger.SetFinality
+	}
+	_ = fn(acct)
+	return acct
 }
 
 func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atypes.Account {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
+	// Use Lock instead of RLock,
+	// because new account is set to `ctrler.acctLedger`
+	// in findOrNewAccount()
+
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
 
 	return ctrler.findOrNewAccount(addr, exec)
 }
@@ -242,7 +244,7 @@ func (ctrler *AcctCtrler) readAccount(addr types.Address) *atypes.Account {
 	}
 }
 
-func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *big.Int, exec bool) xerrors.XError {
+func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
@@ -261,7 +263,7 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *big.Int, exec bo
 	return nil
 }
 
-func (ctrler *AcctCtrler) transfer(from, to *atypes.Account, amt *big.Int) xerrors.XError {
+func (ctrler *AcctCtrler) transfer(from, to *atypes.Account, amt *uint256.Int) xerrors.XError {
 	if err := from.SubBalance(amt); err != nil {
 		return err
 	}
@@ -272,7 +274,7 @@ func (ctrler *AcctCtrler) transfer(from, to *atypes.Account, amt *big.Int) xerro
 	return nil
 }
 
-func (ctrler *AcctCtrler) Reward(to types.Address, amt *big.Int, exec bool) xerrors.XError {
+func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 

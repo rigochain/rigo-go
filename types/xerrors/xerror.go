@@ -2,12 +2,14 @@ package xerrors
 
 import (
 	"errors"
+	"fmt"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
 const (
 	ErrCodeSuccess uint32 = abcitypes.CodeTypeOK + iota
-	ErrCodeGeneric
+	ErrCodeOrdinary
+	ErrCodeInitChain
 	ErrCodeCheckTx
 	ErrCodeBeginBlock
 	ErrCodeDeliverTx
@@ -22,8 +24,6 @@ const (
 	ErrCodeNotFoundProposal
 )
 
-type xerr2 error
-
 const (
 	ErrCodeQuery uint32 = 1000 + iota
 	ErrCodeInvalidQueryPath
@@ -33,51 +33,52 @@ const (
 )
 
 var (
-	ErrCheckTx    = NewWith(ErrCodeCheckTx, "CheckTx failed")
-	ErrBeginBlock = NewWith(ErrCodeBeginBlock, "BeginBlock failed")
-	ErrDeliverTx  = NewWith(ErrCodeDeliverTx, "DeliverTx failed")
-	ErrEndBlock   = NewWith(ErrCodeEndBlock, "EndBlock failed")
-	ErrCommit     = NewWith(ErrCodeCommit, "Commit failed")
-	ErrQuery      = NewWith(ErrCodeQuery, "query failed")
+	ErrCommon     = New(ErrCodeOrdinary, "rigo error", nil)
+	ErrInitChain  = New(ErrCodeInitChain, "InitChain failed", nil)
+	ErrCheckTx    = New(ErrCodeCheckTx, "CheckTx failed", nil)
+	ErrBeginBlock = New(ErrCodeBeginBlock, "BeginBlock failed", nil)
+	ErrDeliverTx  = New(ErrCodeDeliverTx, "DeliverTx failed", nil)
+	ErrEndBlock   = New(ErrCodeEndBlock, "EndBlock failed", nil)
+	ErrCommit     = New(ErrCodeCommit, "Commit failed", nil)
+	ErrQuery      = New(ErrCodeQuery, "query failed", nil)
 
-	ErrNotFoundAccount         = NewWith(ErrCodeNotFoundAccount, "not found account")
-	ErrInvalidAccountType      = NewWith(ErrCodeInvalidAccountType, "invalid account type")
-	ErrInvalidTrx              = NewWith(ErrCodeInvalidTrx, "invalid transaction")
+	ErrNotFoundAccount         = New(ErrCodeNotFoundAccount, "not found account", nil)
+	ErrInvalidAccountType      = New(ErrCodeInvalidAccountType, "invalid account type", nil)
+	ErrInvalidTrx              = New(ErrCodeInvalidTrx, "invalid transaction", nil)
 	ErrNegFee                  = ErrInvalidTrx.Wrap(errors.New("negative fee"))
 	ErrInsufficientFee         = ErrInvalidTrx.Wrap(errors.New("not enough fee"))
+	ErrInvalidAddress          = ErrInvalidTrx.Wrap(errors.New("invalid address"))
 	ErrInvalidNonce            = ErrInvalidTrx.Wrap(errors.New("invalid nonce"))
 	ErrNegAmount               = ErrInvalidTrx.Wrap(errors.New("negative amount"))
 	ErrInsufficientFund        = ErrInvalidTrx.Wrap(errors.New("insufficient fund"))
 	ErrInvalidTrxType          = ErrInvalidTrx.Wrap(errors.New("wrong transaction type"))
 	ErrInvalidTrxPayloadType   = ErrInvalidTrx.Wrap(errors.New("wrong transaction payload type"))
-	ErrInvalidTrxPayloadParams = ErrInvalidTrx.With(errors.New("invalid params of transaction payload"))
-	ErrInvalidTrxSig           = ErrInvalidTrx.With(errors.New("invalid signature"))
-	ErrTooManyPower            = ErrInvalidTrx.With(errors.New("too many power"))
-	ErrNotFoundTx              = NewWith(ErrCodeNotFoundTx, "not found tx")
-	ErrNotFoundDelegatee       = NewWith(ErrCodeNotFoundDelegatee, "not found delegatee")
-	ErrNotFoundStake           = NewWith(ErrCodeNotFoundStake, "not found stake")
-	ErrNotFoundProposal        = NewWith(ErrCodeNotFoundProposal, "not found proposal")
+	ErrInvalidTrxPayloadParams = ErrInvalidTrx.Wrap(errors.New("invalid params of transaction payload"))
+	ErrInvalidTrxSig           = ErrInvalidTrx.Wrap(errors.New("invalid signature"))
+	ErrNotFoundTx              = New(ErrCodeNotFoundTx, "not found tx", nil)
+	ErrNotFoundDelegatee       = New(ErrCodeNotFoundDelegatee, "not found delegatee", nil)
+	ErrNotFoundStake           = New(ErrCodeNotFoundStake, "not found stake", nil)
+	ErrNotFoundProposal        = New(ErrCodeNotFoundProposal, "not found proposal", nil)
 
-	ErrInvalidQueryPath   = NewWith(ErrCodeInvalidQueryPath, "invalid query path")
-	ErrInvalidQueryParams = NewWith(ErrCodeInvalidQueryParams, "invalid query parameters")
+	ErrInvalidQueryPath   = New(ErrCodeInvalidQueryPath, "invalid query path", nil)
+	ErrInvalidQueryParams = New(ErrCodeInvalidQueryParams, "invalid query parameters", nil)
 
-	ErrNotFoundResult = NewWith(ErrCodeNotFoundResult, "not found result")
+	ErrNotFoundResult = New(ErrCodeNotFoundResult, "not found result", nil)
 
 	// new style errors
-	ErrUnknownTrxType        = New("unknown transaction type")
-	ErrUnknownTrxPayloadType = New("unknown transaction payload type")
-	ErrNoRight               = New("no right")
-	ErrNotVotingPeriod       = New("not voting period")
-	ErrDuplicatedKey         = New("already existed key")
+	ErrUnknownTrxType        = NewOrdinary("unknown transaction type")
+	ErrUnknownTrxPayloadType = NewOrdinary("unknown transaction payload type")
+	ErrNoRight               = NewOrdinary("no right")
+	ErrNotVotingPeriod       = NewOrdinary("not voting period")
+	ErrDuplicatedKey         = NewOrdinary("already existed key")
 )
 
 type XError interface {
 	Code() uint32
 	Error() string
 	Cause() error
-	With(error) XError
 	Wrap(error) XError
-	Unwrap() error
+	Wrapf(string, ...any) XError
 }
 
 type xerror struct {
@@ -86,61 +87,83 @@ type xerror struct {
 	cause error
 }
 
-func New(m string) XError {
+func New(code uint32, msg string, err error) XError {
 	return &xerror{
-		code: ErrCodeGeneric,
-		msg:  m,
+		code:  code,
+		msg:   msg,
+		cause: err,
 	}
 }
 
-func NewWith(code uint32, msg string) XError {
+func NewOrdinary(msg string) XError {
 	return &xerror{
-		code: code,
+		code: ErrCodeOrdinary,
 		msg:  msg,
 	}
 }
 
-func NewFrom(err error) XError {
-	if err != nil {
-		return &xerror{
-			code: ErrCodeGeneric,
-			msg:  err.Error(),
-		}
+func From(err error) XError {
+	if err == nil {
+		return nil
 	}
-	return nil
+	return NewOrdinary(err.Error())
+}
+
+func Wrap(err error, msg string) XError {
+	return &xerror{
+		code:  ErrCodeOrdinary,
+		msg:   msg,
+		cause: err,
+	}
+}
+
+func Cause(err error) error {
+	for err != nil {
+		cause, ok := err.(XError)
+		if !ok {
+			break
+		}
+		err = cause.Cause()
+	}
+	return err
 }
 
 func (e *xerror) Code() uint32 {
+	type hascode interface {
+		Cause() error
+	}
+
 	return e.code
 }
 
 func (e *xerror) Error() string {
+	msg := e.msg
+
 	if e.cause != nil {
-		return e.msg + "<<" + e.cause.Error()
+		msg += "\n\t" + e.cause.Error()
 	}
-	return e.msg
+
+	return msg
+
 }
 
 func (e *xerror) Cause() error {
 	return e.cause
 }
 
-func (e *xerror) Unwrap() error {
-	return e.Cause()
-}
-
-func (e *xerror) With(err error) XError {
-	return &xerror{
-		code:  e.code,
-		msg:   e.msg,
-		cause: err,
-	}
-}
-
 func (e *xerror) Wrap(err error) XError {
+	w, ok := e.cause.(XError)
+	if w != nil && ok {
+		err = w.Wrap(err)
+	}
+
 	return &xerror{
 		code:  e.code,
 		msg:   e.msg,
 		cause: err,
 	}
+}
+
+func (e *xerror) Wrapf(format string, args ...any) XError {
+	return e.Wrap(fmt.Errorf(format, args...))
 }

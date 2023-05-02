@@ -20,13 +20,13 @@ type SimpleLedger[T ILedgerItem] struct {
 
 func NewSimpleLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func() T) (*SimpleLedger[T], xerrors.XError) {
 	if db, err := tmdb.NewDB(name, "goleveldb", dbDir); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else if tree, err := iavl.NewMutableTree(db, cacheSize); err != nil {
 		_ = db.Close()
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else if _, err := tree.Load(); err != nil {
 		_ = db.Close()
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return &SimpleLedger[T]{
 			db:          db,
@@ -42,6 +42,7 @@ func (ledger *SimpleLedger[T]) Set(item T) xerrors.XError {
 	defer ledger.mtx.Unlock()
 
 	ledger.cachedItems.setUpdatedItem(item)
+	ledger.cachedItems.setGotItem(item)
 	return nil
 }
 
@@ -50,6 +51,7 @@ func (ledger *SimpleLedger[T]) CancelSet(key LedgerKey) xerrors.XError {
 	defer ledger.mtx.Unlock()
 
 	ledger.cachedItems.delUpdatedItem(key)
+	ledger.cachedItems.delGotItem(key)
 	return nil
 }
 
@@ -80,6 +82,10 @@ func (ledger *SimpleLedger[T]) Del(key LedgerKey) (T, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
+	return ledger.del(key)
+}
+
+func (ledger *SimpleLedger[T]) del(key LedgerKey) (T, xerrors.XError) {
 	var emptyNil T
 
 	if item, err := ledger.get(key); err != nil {
@@ -119,9 +125,9 @@ func (ledger *SimpleLedger[T]) IterateAllItems(cb func(T) xerrors.XError) xerror
 	})
 
 	if err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	} else if stopped {
-		return xerrors.New("stop to iterate ledger tree")
+		return xerrors.NewOrdinary("stop to iterate ledger tree")
 	}
 	return nil
 }
@@ -158,13 +164,13 @@ func (ledger *SimpleLedger[T]) read(key LedgerKey) (T, xerrors.XError) {
 	item := ledger.getNewItem()
 
 	if bz, err := ledger.tree.Get(key[:]); err != nil {
-		return emptyNil, xerrors.NewFrom(err)
+		return emptyNil, xerrors.From(err)
 	} else if bz == nil {
 		return emptyNil, xerrors.ErrNotFoundResult
 	} else if err := item.Decode(bz); err != nil {
-		return emptyNil, xerrors.NewFrom(err)
+		return emptyNil, xerrors.From(err)
 	} else if key != item.Key() {
-		return emptyNil, xerrors.New("simple_ledger: the key is compromised - the requested key is not equal to the key encoded in value")
+		return emptyNil, xerrors.NewOrdinary("simple_ledger: the key is compromised - the requested key is not equal to the key encoded in value")
 	} else {
 		return item, nil
 	}
@@ -186,7 +192,7 @@ func (ledger *SimpleLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		if bz, err := _val.Encode(); err != nil {
 			return nil, -1, err
 		} else if _, err := ledger.tree.Set(_key[:], bz); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
+			return nil, -1, xerrors.From(err)
 		}
 	}
 
@@ -194,12 +200,12 @@ func (ledger *SimpleLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		var vk LedgerKey
 		copy(vk[:], k[:])
 		if _, _, err := ledger.tree.Remove(vk[:]); err != nil {
-			return nil, -1, xerrors.NewFrom(err)
+			return nil, -1, xerrors.From(err)
 		}
 	}
 
 	if r1, r2, err := ledger.tree.SaveVersion(); err != nil {
-		return r1, r2, xerrors.NewFrom(err)
+		return r1, r2, xerrors.From(err)
 	} else {
 		ledger.cachedItems.reset()
 		return r1, r2, nil
@@ -217,7 +223,7 @@ func (ledger *SimpleLedger[T]) Clone() ILedger[T] {
 func (ledger *SimpleLedger[T]) Close() xerrors.XError {
 	if ledger.db != nil {
 		if err := ledger.db.Close(); err != nil {
-			return xerrors.NewFrom(err)
+			return xerrors.From(err)
 		}
 	}
 

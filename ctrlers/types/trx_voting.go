@@ -20,7 +20,7 @@ func (tx *TrxPayloadVoting) Type() int32 {
 func (tx *TrxPayloadVoting) Decode(bz []byte) xerrors.XError {
 	pm := &TrxPayloadVotingProto{}
 	if err := proto.Unmarshal(bz, pm); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 
 	tx.TxHash = pm.TxHash
@@ -35,5 +35,5 @@ func (tx *TrxPayloadVoting) Encode() ([]byte, xerrors.XError) {
 	}
 
 	bz, err := proto.Marshal(pm)
-	return bz, xerrors.NewFrom(err)
+	return bz, xerrors.From(err)
 }

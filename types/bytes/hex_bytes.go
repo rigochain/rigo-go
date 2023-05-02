@@ -48,7 +48,7 @@ func (hb *HexBytes) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Bytes fulfills various interfaces in light-client, etc...
+// Bytes fulfills various interfaces in light-web3, etc...
 func (hb HexBytes) Bytes() []byte {
 	return hb
 }

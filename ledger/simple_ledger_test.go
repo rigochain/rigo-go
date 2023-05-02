@@ -27,7 +27,7 @@ func (i *MyItem) Key() LedgerKey {
 
 func (i *MyItem) Encode() ([]byte, xerrors.XError) {
 	if bz, err := json.Marshal(i); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -35,7 +35,7 @@ func (i *MyItem) Encode() ([]byte, xerrors.XError) {
 
 func (i *MyItem) Decode(d []byte) xerrors.XError {
 	if err := json.Unmarshal(d, i); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	return nil
 }
@@ -66,6 +66,7 @@ func TestSimpleLedger(t *testing.T) {
 	require.NotNil(t, item)
 	require.Equal(t, i0, item)
 
+	// not committed yet
 	item, err = ledger.Get(i1.Key())
 	require.NoError(t, err)
 	require.NotNil(t, item)
@@ -81,6 +82,7 @@ func TestSimpleLedger(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, item)
 
+	// only commit i0
 	_, _, err = ledger.Commit()
 	require.NoError(t, err)
 
@@ -103,5 +105,4 @@ func TestSimpleLedger(t *testing.T) {
 	item, err = ledger.Del(i3.Key())
 	require.Error(t, err)
 	require.Nil(t, item)
-
 }

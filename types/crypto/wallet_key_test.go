@@ -125,7 +125,7 @@ func TestAddrFromPub(t *testing.T) {
 		if info.IsDir() == false {
 			wk, err := crypto.OpenWalletKey(libs.NewFileReader(path))
 			require.NoError(t, err)
-			require.NoError(t, wk.Unlock([]byte("1")))
+			require.NoError(t, wk.Unlock([]byte("1111")))
 			addr, err := crypto.PubBytes2Addr(wk.PubKey())
 			//t.Logf("prvKey: %x\n", wk.PrvKey())
 			//t.Logf("prvKey: %x\n", wk.PubKey())

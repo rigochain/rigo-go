@@ -1,6 +1,7 @@
 package gov
 
 import (
+	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
@@ -9,7 +10,7 @@ import (
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/big"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,20 +40,20 @@ func init() {
 	stakeHelper = &stakeHelperMock{
 		valCnt: 5,
 		delegatees: []*stake.Delegatee{
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: bytes.RandInt63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
+			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
 		},
 	}
 	sort.Sort(stake.PowerOrderDelegatees(stakeHelper.delegatees))
@@ -89,7 +90,7 @@ func (s *stakeHelperMock) IsValidator(addr types.Address) bool {
 	return false
 }
 
-func (s *stakeHelperMock) GetTotalAmount() *big.Int {
+func (s *stakeHelperMock) GetTotalAmount() *uint256.Int {
 	return govCtrler.PowerToAmount(s.GetTotalPower())
 }
 
@@ -130,7 +131,7 @@ func (a *acctHelperMock) FindAccount(addr types.Address, exec bool) *ctrlertypes
 		return acct
 	} else {
 		acct = ctrlertypes.NewAccount(addr)
-		acct.AddBalance(big.NewInt(100000))
+		acct.AddBalance(uint256.NewInt(100000))
 		a.acctMap[acctKey] = acct
 		return acct
 	}
@@ -146,7 +147,7 @@ func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxCo
 			return xerrors.ErrNotFoundAccount
 		}
 		_txctx.Sender = acct
-		_txctx.NeedAmt = new(big.Int).Add(_tx.Amount, _tx.Gas)
+		_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
 		_txctx.GovHelper = govCtrler
 		_txctx.StakeHelper = stakeHelper
 		return nil

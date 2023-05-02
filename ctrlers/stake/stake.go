@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/holiman/uint256"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/ledger"
 	"github.com/rigochain/rigo-go/types"
 	abytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
-	"math/big"
 	"sort"
 	"sync"
 )
@@ -17,14 +17,14 @@ import (
 type Stake struct {
 	From            types.Address `json:"owner"`
 	To              types.Address `json:"to"`
-	Amount          *big.Int      `json:"amount"`
-	Power           int64         `json:"power"`
-	BlockRewardUnit *big.Int      `json:"blockRewardUnit"`
-	ReceivedReward  *big.Int      `json:"ReceivedReward"`
+	Amount          *uint256.Int  `json:"amount"`
+	Power           int64         `json:"power,string"`
+	BlockRewardUnit *uint256.Int  `json:"blockRewardUnit"`
+	ReceivedReward  *uint256.Int  `json:"ReceivedReward"`
 
 	TxHash       abytes.HexBytes `json:"txhash"`
-	StartHeight  int64           `json:"startHeight"`
-	RefundHeight int64           `json:"refundHeight"`
+	StartHeight  int64           `json:"startHeight,string"`
+	RefundHeight int64           `json:"refundHeight,string"`
 
 	mtx sync.RWMutex
 }
@@ -41,7 +41,7 @@ func (s *Stake) Encode() ([]byte, xerrors.XError) {
 	defer s.mtx.RUnlock()
 
 	if bz, err := json.Marshal(s); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -52,14 +52,14 @@ func (s *Stake) Decode(d []byte) xerrors.XError {
 	defer s.mtx.Unlock()
 
 	if err := json.Unmarshal(d, s); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 	return nil
 }
 
 var _ ledger.ILedgerItem = (*Stake)(nil)
 
-func NewStakeWithAmount(from, to types.Address, amt *big.Int, height int64, txhash abytes.HexBytes, govHelper ctrlertypes.IGovHelper) *Stake {
+func NewStakeWithAmount(from, to types.Address, amt *uint256.Int, height int64, txhash abytes.HexBytes, govHelper ctrlertypes.IGovHelper) *Stake {
 	power := govHelper.AmountToPower(amt)
 	blockReward := govHelper.PowerToReward(power)
 	return &Stake{
@@ -68,7 +68,7 @@ func NewStakeWithAmount(from, to types.Address, amt *big.Int, height int64, txha
 		Amount:          amt,
 		Power:           power,
 		BlockRewardUnit: blockReward,
-		ReceivedReward:  big.NewInt(0),
+		ReceivedReward:  uint256.NewInt(0),
 		StartHeight:     height,
 		RefundHeight:    0,
 		TxHash:          txhash,
@@ -84,7 +84,7 @@ func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhas
 		Amount:          amt,
 		Power:           power,
 		BlockRewardUnit: blockReward,
-		ReceivedReward:  big.NewInt(0),
+		ReceivedReward:  uint256.NewInt(0),
 		StartHeight:     height,
 		RefundHeight:    0,
 		TxHash:          txhash,
@@ -109,24 +109,24 @@ func (s *Stake) Copy() *Stake {
 	return &Stake{
 		From:            append(s.From, nil...),
 		To:              append(s.To, nil...),
-		Amount:          new(big.Int).Set(s.Amount),
+		Amount:          new(uint256.Int).Set(s.Amount),
 		Power:           s.Power,
-		BlockRewardUnit: new(big.Int).Set(s.BlockRewardUnit),
-		ReceivedReward:  new(big.Int).Set(s.ReceivedReward),
+		BlockRewardUnit: new(uint256.Int).Set(s.BlockRewardUnit),
+		ReceivedReward:  new(uint256.Int).Set(s.ReceivedReward),
 		StartHeight:     s.StartHeight,
 		RefundHeight:    s.RefundHeight,
 	}
 }
 
-func (s *Stake) ApplyReward() *big.Int {
+func (s *Stake) ApplyReward() *uint256.Int {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
 	return s.applyReward()
 }
 
-func (s *Stake) applyReward() *big.Int {
-	s.ReceivedReward = new(big.Int).Add(s.ReceivedReward, s.BlockRewardUnit)
+func (s *Stake) applyReward() *uint256.Int {
+	s.ReceivedReward = new(uint256.Int).Add(s.ReceivedReward, s.BlockRewardUnit)
 	return s.BlockRewardUnit
 }
 

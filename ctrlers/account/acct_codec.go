@@ -1,9 +1,9 @@
 package account
 
 import (
+	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"google.golang.org/protobuf/proto"
-	"math/big"
 )
 
 func EncodeAccount(acct *types2.Account) ([]byte, error) {
@@ -33,7 +33,7 @@ func FromProto(pm *types2.AcctProto) *types2.Account {
 		Address: pm.Address,
 		Name:    pm.Name,
 		Nonce:   pm.Nonce,
-		Balance: new(big.Int).SetBytes(pm.XBalance),
+		Balance: new(uint256.Int).SetBytes(pm.XBalance),
 		Code:    pm.XCode,
 	}
 }

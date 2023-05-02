@@ -3,25 +3,22 @@ package types
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"fmt"
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ledger"
 	"github.com/rigochain/rigo-go/types"
 	abytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"google.golang.org/protobuf/proto"
-	"math/big"
 	"sort"
 	"sync"
 )
 
 type Account struct {
-	Address types.Address
-	Name    string
-	Nonce   uint64
-	Balance *big.Int
-	Code    []byte
+	Address types.Address `json:"address"`
+	Name    string        `json:"name,omitempty"`
+	Nonce   uint64        `json:"nonce,string"`
+	Balance *uint256.Int  `json:"balance"`
+	Code    []byte        `json:"code,omitempty"`
 
 	mtx sync.RWMutex
 }
@@ -30,17 +27,14 @@ func NewAccount(addr types.Address) *Account {
 	return &Account{
 		Address: addr,
 		Nonce:   0,
-		Balance: big.NewInt(0),
+		Balance: uint256.NewInt(0),
 	}
 }
 
 func NewAccountWithName(addr types.Address, name string) *Account {
-	return &Account{
-		Address: addr,
-		Name:    name,
-		Nonce:   0,
-		Balance: big.NewInt(0),
-	}
+	acct := NewAccount(addr)
+	acct.Name = name
+	return acct
 }
 
 func (acct *Account) GetAddress() types.Address {
@@ -83,12 +77,12 @@ func (acct *Account) CheckNonce(n uint64) xerrors.XError {
 	defer acct.mtx.RUnlock()
 
 	if acct.Nonce+1 != n {
-		return xerrors.ErrInvalidNonce.Wrap(errors.New(fmt.Sprintf("address: %v, expected: %v, actual:%v", acct.Address, acct.Nonce+1, n)))
+		return xerrors.ErrInvalidNonce
 	}
 	return nil
 }
 
-func (acct *Account) AddBalance(amt *big.Int) xerrors.XError {
+func (acct *Account) AddBalance(amt *uint256.Int) xerrors.XError {
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()
 
@@ -100,7 +94,7 @@ func (acct *Account) AddBalance(amt *big.Int) xerrors.XError {
 	return nil
 }
 
-func (acct *Account) SubBalance(amt *big.Int) xerrors.XError {
+func (acct *Account) SubBalance(amt *uint256.Int) xerrors.XError {
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()
 
@@ -115,14 +109,14 @@ func (acct *Account) SubBalance(amt *big.Int) xerrors.XError {
 	return nil
 }
 
-func (acct *Account) GetBalance() *big.Int {
+func (acct *Account) GetBalance() *uint256.Int {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
-	return new(big.Int).Set(acct.Balance)
+	return new(uint256.Int).Set(acct.Balance)
 }
 
-func (acct *Account) CheckBalance(amt *big.Int) xerrors.XError {
+func (acct *Account) CheckBalance(amt *uint256.Int) xerrors.XError {
 	if amt.Cmp(acct.Balance) > 0 {
 		return xerrors.ErrInsufficientFund
 	}
@@ -162,7 +156,7 @@ func (acct *Account) Encode() ([]byte, xerrors.XError) {
 		XBalance: acct.Balance.Bytes(),
 		XCode:    acct.Code,
 	}); err != nil {
-		return nil, xerrors.NewFrom(err)
+		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
@@ -171,73 +165,14 @@ func (acct *Account) Encode() ([]byte, xerrors.XError) {
 func (acct *Account) Decode(d []byte) xerrors.XError {
 	pm := &AcctProto{}
 	if err := proto.Unmarshal(d, pm); err != nil {
-		return xerrors.NewFrom(err)
+		return xerrors.From(err)
 	}
 
 	acct.Address = pm.Address
 	acct.Name = pm.Name
 	acct.Nonce = pm.Nonce
-	acct.Balance = new(big.Int).SetBytes(pm.XBalance)
+	acct.Balance = new(uint256.Int).SetBytes(pm.XBalance)
 	acct.Code = pm.XCode
-	return nil
-}
-
-//type Account struct {
-//	Address types.Address `json:"address"`
-//	Name    string        `json:"name,omitempty"`
-//	Nonce   uint64        `json:"nonce"`
-//	Balance *big.Int      `json:"balance"`
-//	Code    []byte        `json:"code,omitempty"`
-//
-//	mtx sync.RWMutex
-//}
-
-func (acct *Account) MarshalJSON() ([]byte, error) {
-	acct.mtx.RLock()
-	defer acct.mtx.RUnlock()
-
-	_acct := &struct {
-		Address types.Address `json:"address"`
-		Name    string        `json:"name,omitempty"`
-		Nonce   uint64        `json:"nonce"`
-		Balance string        `json:"balance"`
-		Code    []byte        `json:"code,omitempty"`
-	}{
-		Address: acct.Address,
-		Name:    acct.Name,
-		Nonce:   acct.Nonce,
-		Balance: acct.Balance.String(),
-		Code:    acct.Code,
-	}
-
-	return json.Marshal(_acct)
-}
-
-func (acct *Account) UnmarshalJSON(d []byte) error {
-	_acct := &struct {
-		Address types.Address `json:"address"`
-		Name    string        `json:"name,omitempty"`
-		Nonce   uint64        `json:"nonce"`
-		Balance string        `json:"balance"`
-		Code    []byte        `json:"code,omitempty"`
-	}{}
-	if err := json.Unmarshal(d, _acct); err != nil {
-		return err
-	}
-
-	acct.mtx.Lock()
-	defer acct.mtx.Unlock()
-
-	bal, ok := new(big.Int).SetString(_acct.Balance, 10)
-	if !ok {
-		return errors.New("error in converting string to big.Int")
-	}
-
-	acct.Address = _acct.Address
-	acct.Name = _acct.Name
-	acct.Nonce = _acct.Nonce
-	acct.Balance = bal
-	acct.Code = _acct.Code
 	return nil
 }
 

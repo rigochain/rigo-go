@@ -22,7 +22,8 @@ if [ "$DEPLOYMENT_GROUP_NAME" == "rigo-dev-init-dg" ]; then
 
 elif [ "$DEPLOYMENT_GROUP_NAME" == "rigo-dev-reset-dg" ]; then
   #
-  # Reset ~/.rigo. Remove blockchain data.
+  # Reset ~/.rigo
+  # Remove blockchain data.
   #
   echo "Reset data in ${RIGO_DATADIR}..."
   ${RIGO_BINFILE} unsafe-reset-all --priv_validator_secret '1' # 1>${RIGO_LOG} 2>&1
