@@ -179,29 +179,16 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 		return err
 	}
 
-	amtPower, err := uint256.FromHex(tm.AmountPerPower)
-	if err != nil {
-		return err
-	}
-	rwdPower, err := uint256.FromHex(tm.RewardPerPower)
-	if err != nil {
-		return err
-	}
-	minFee, err := uint256.FromHex(tm.MinTrxFee)
-	if err != nil {
-		return err
-	}
-
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
 
 	r.version = tm.Version
 	r.maxValidatorCnt = tm.MaxValidatorCnt
-	r.amountPerPower = amtPower
-	r.rewardPerPower = rwdPower
+	r.amountPerPower = uint256.MustFromHex(tm.AmountPerPower)
+	r.rewardPerPower = uint256.MustFromHex(tm.RewardPerPower)
 	r.lazyRewardBlocks = tm.LazyRewardBlocks
 	r.lazyApplyingBlocks = tm.LazyApplyingBlocks
-	r.minTrxFee = minFee
+	r.minTrxFee = uint256.MustFromHex(tm.MinTrxFee)
 	r.minVotingPeriodBlocks = tm.MinVotingBlocks
 	r.maxVotingPeriodBlocks = tm.MaxVotingBlocks
 	return nil

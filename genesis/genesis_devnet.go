@@ -126,11 +126,11 @@ var jsonBlobDevnetGenesis = []byte(`{
 	"govRule": {
       "version": "0",
       "maxValidatorCnt": "21",
-      "amountPerPower": "1000000000000000000",
-      "rewardPerPower": "1000000000",
+      "amountPerPower": "0xde0b6b3a7640000",
+      "rewardPerPower": "0x3b9aca00",
       "lazyRewardBlocks": "10",
       "lazyApplyingBlocks": "10",
-      "minTrxFee": "1000000000000000000",
+      "minTrxFee": "0xde0b6b3a7640000",
       "minVotingPeriodBlocks": "259200",
 	  "maxVotingPeriodBlocks": "2592000"
 	}
