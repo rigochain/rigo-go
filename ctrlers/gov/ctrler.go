@@ -257,11 +257,11 @@ func (ctrler *GovCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.XEr
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("GovCtrler::ExecuteBlock", "hegith", ctx.BlockInfo.Header.Height)
-	if xerr := ctrler.freezeProposals(ctx.BlockInfo.Header.Height); xerr != nil {
+	ctrler.logger.Debug("GovCtrler::ExecuteBlock", "hegith", ctx.Height())
+	if xerr := ctrler.freezeProposals(ctx.Height()); xerr != nil {
 		return xerr
 	}
-	if xerr := ctrler.applyProposals(ctx.BlockInfo.Header.Height); xerr != nil {
+	if xerr := ctrler.applyProposals(ctx.Height()); xerr != nil {
 		return xerr
 	}
 

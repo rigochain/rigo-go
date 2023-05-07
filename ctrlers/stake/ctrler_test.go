@@ -175,17 +175,14 @@ func TestUnfreezing(t *testing.T) {
 	lastHeight += govHelper.LazyRewardBlocks()
 
 	// execute block at lastHeight
-	err := stakeCtrler.ExecuteBlock(&types.BlockContext{
-		BlockInfo: abcitypes.RequestBeginBlock{
-			Header: types2.Header{
-				Height: lastHeight,
-			},
+	req := abcitypes.RequestBeginBlock{
+		Header: types2.Header{
+			Height: lastHeight,
 		},
-		Fee:        uint256.NewInt(10),
-		TxsCnt:     0,
-		GovHelper:  govHelper,
-		AcctHelper: acctHelper,
-	})
+	}
+	bctx := types.NewBlockContext(req, govHelper, acctHelper, nil)
+	bctx.AddGas(uint256.NewInt(10))
+	err := stakeCtrler.ExecuteBlock(bctx)
 	require.NoError(t, err)
 
 	_, _, err = stakeCtrler.Commit()

@@ -10,8 +10,6 @@ import (
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	"testing"
 )
 
@@ -183,11 +181,9 @@ func TestFreezingProposal(t *testing.T) {
 
 	//
 	// not changed
-	xerr = govCtrler.ExecuteBlock(&ctrlertypes.BlockContext{
-		BlockInfo: abcitypes.RequestBeginBlock{
-			Header: tmproto.Header{Height: prop.EndVotingHeight},
-		},
-	})
+	bctx := &ctrlertypes.BlockContext{}
+	bctx.SetHeight(prop.EndVotingHeight)
+	xerr = govCtrler.ExecuteBlock(bctx)
 	require.NoError(t, xerr)
 
 	_, _, xerr = govCtrler.Commit()
@@ -197,11 +193,9 @@ func TestFreezingProposal(t *testing.T) {
 
 	//
 	// freezing the proposal
-	xerr = govCtrler.ExecuteBlock(&ctrlertypes.BlockContext{
-		BlockInfo: abcitypes.RequestBeginBlock{
-			Header: tmproto.Header{Height: prop.EndVotingHeight + 1},
-		},
-	})
+	bctx = &ctrlertypes.BlockContext{}
+	bctx.SetHeight(prop.EndVotingHeight + 1)
+	xerr = govCtrler.ExecuteBlock(bctx)
 	require.NoError(t, xerr)
 
 	_, _, xerr = govCtrler.Commit()
@@ -235,11 +229,9 @@ func TestApplyingProposal(t *testing.T) {
 		require.NoError(t, xerr)
 
 		// freezing the proposal
-		xerr = govCtrler.ExecuteBlock(&ctrlertypes.BlockContext{
-			BlockInfo: abcitypes.RequestBeginBlock{
-				Header: tmproto.Header{Height: txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + 1},
-			},
-		})
+		bctx := &ctrlertypes.BlockContext{}
+		bctx.SetHeight(txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + 1)
+		xerr = govCtrler.ExecuteBlock(bctx)
 		require.NoError(t, xerr)
 		_, _, xerr = govCtrler.Commit()
 		require.NoError(t, xerr)
@@ -248,11 +240,9 @@ func TestApplyingProposal(t *testing.T) {
 	//
 	// not changed
 	runHeight := txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks() - 1
-	xerr := govCtrler.ExecuteBlock(&ctrlertypes.BlockContext{
-		BlockInfo: abcitypes.RequestBeginBlock{
-			Header: tmproto.Header{Height: runHeight},
-		},
-	})
+	bctx := &ctrlertypes.BlockContext{}
+	bctx.SetHeight(runHeight)
+	xerr := govCtrler.ExecuteBlock(bctx)
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
@@ -263,11 +253,9 @@ func TestApplyingProposal(t *testing.T) {
 	//
 	// apply new gov rule
 	runHeight = txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks()
-	xerr = govCtrler.ExecuteBlock(&ctrlertypes.BlockContext{
-		BlockInfo: abcitypes.RequestBeginBlock{
-			Header: tmproto.Header{Height: runHeight},
-		},
-	})
+	bctx = &ctrlertypes.BlockContext{}
+	bctx.SetHeight(runHeight)
+	xerr = govCtrler.ExecuteBlock(bctx)
 	require.NoError(t, xerr)
 	require.NotNil(t, govCtrler.newGovRule)
 

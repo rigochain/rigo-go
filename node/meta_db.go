@@ -10,31 +10,31 @@ import (
 
 const (
 	keyBlockHeight  = "bh"
+	keyBlockContext = "bc"
 	keyBlockAppHash = "ah"
-	keyBlockGasInfo = "bg"
 )
 
-type StateDB struct {
+type MetaDB struct {
 	db tmdb.DB
 
 	mtx   sync.RWMutex
 	cache map[string][]byte
 }
 
-func openStateDB(name, dir string) (*StateDB, error) {
+func openMetaDB(name, dir string) (*MetaDB, error) {
 	// The returned 'db' instance is safe in concurrent use.
 	db, err := tmdb.NewDB(name, "goleveldb", dir)
 	if err != nil {
 		return nil, err
 	}
 
-	return &StateDB{
+	return &MetaDB{
 		db:    db,
 		cache: make(map[string][]byte),
 	}, nil
 }
 
-func (stdb *StateDB) Close() error {
+func (stdb *MetaDB) Close() error {
 	stdb.mtx.Lock()
 	defer stdb.mtx.Unlock()
 
@@ -42,7 +42,7 @@ func (stdb *StateDB) Close() error {
 	return stdb.db.Close()
 }
 
-func (stdb *StateDB) LastBlockHeight() int64 {
+func (stdb *MetaDB) LastBlockHeight() int64 {
 	v := stdb.get(keyBlockHeight)
 	if v == nil {
 		return 0
@@ -50,22 +50,22 @@ func (stdb *StateDB) LastBlockHeight() int64 {
 	return int64(binary.BigEndian.Uint64(v))
 }
 
-func (stdb *StateDB) PutLastBlockHeight(bh int64) error {
+func (stdb *MetaDB) PutLastBlockHeight(bh int64) error {
 	v := make([]byte, 8)
 	binary.BigEndian.PutUint64(v, uint64(bh))
 	return stdb.put(keyBlockHeight, v)
 }
 
-func (stdb *StateDB) LastBlockAppHash() []byte {
+func (stdb *MetaDB) LastBlockAppHash() []byte {
 	return stdb.get(keyBlockAppHash)
 }
 
-func (stdb *StateDB) PutLastBlockAppHash(v []byte) error {
+func (stdb *MetaDB) PutLastBlockAppHash(v []byte) error {
 	return stdb.put(keyBlockAppHash, v)
 }
 
-func (stdb *StateDB) LastBlockGasInfo() *types.BlockContext {
-	bz := stdb.get(keyBlockGasInfo)
+func (stdb *MetaDB) LastBlockContext() *types.BlockContext {
+	bz := stdb.get(keyBlockContext)
 	if bz == nil {
 		return nil
 	}
@@ -76,22 +76,22 @@ func (stdb *StateDB) LastBlockGasInfo() *types.BlockContext {
 	return ret
 }
 
-func (stdb *StateDB) PutLastBlockContext(ctx *types.BlockContext) error {
+func (stdb *MetaDB) PutLastBlockContext(ctx *types.BlockContext) error {
 	bz, err := json.Marshal(ctx)
 	if err != nil {
 		return err
 	}
-	return stdb.put(keyBlockGasInfo, bz)
+	return stdb.put(keyBlockContext, bz)
 }
 
-func (stdb *StateDB) putCache(k string, v []byte) {
+func (stdb *MetaDB) putCache(k string, v []byte) {
 	stdb.mtx.Lock()
 	defer stdb.mtx.Unlock()
 
 	stdb.cache[k] = v
 }
 
-func (stdb *StateDB) getCache(k string) []byte {
+func (stdb *MetaDB) getCache(k string) []byte {
 	stdb.mtx.RLock()
 	defer stdb.mtx.RUnlock()
 
@@ -99,7 +99,7 @@ func (stdb *StateDB) getCache(k string) []byte {
 	return v
 }
 
-func (stdb *StateDB) get(k string) []byte {
+func (stdb *MetaDB) get(k string) []byte {
 	if v := stdb.getCache(k); v != nil {
 		return v
 	}
@@ -112,7 +112,7 @@ func (stdb *StateDB) get(k string) []byte {
 	return nil
 }
 
-func (stdb *StateDB) put(k string, v []byte) error {
+func (stdb *MetaDB) put(k string, v []byte) error {
 	if err := stdb.db.SetSync([]byte(k), v); err != nil {
 		return err
 	}

@@ -21,8 +21,8 @@ message TrxPayloadUnstakingProto {
   bytes tx_hash = 1;
 }
 
-message TrxPayloadExecContractProto {
-  bytes _code = 1;
+message TrxPayloadContractProto {
+  bytes _data = 1;
 }
 
 message TrxPayloadProposalProto {

@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 )
 
 var (
@@ -139,7 +140,7 @@ func (a *acctHelperMock) FindAccount(addr types.Address, exec bool) *ctrlertypes
 
 func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxContext {
 	txbz, _ := tx.Encode()
-	txctx, _ := ctrlertypes.NewTrxContext(txbz, height, exec, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
+	txctx, _ := ctrlertypes.NewTrxContext(txbz, height, time.Now().UnixNano(), exec, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
 		_tx := _txctx.Tx
 		// find sender account
 		acct := acctHelper.FindAccount(_tx.From, _txctx.Exec)

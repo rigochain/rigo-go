@@ -8,6 +8,8 @@ import (
 
 type TrxPayloadStaking struct{}
 
+var _ ITrxPayload = (*TrxPayloadStaking)(nil)
+
 func (tx *TrxPayloadStaking) Type() int32 {
 	return TRX_STAKING
 }

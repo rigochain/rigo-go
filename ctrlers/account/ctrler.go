@@ -57,19 +57,11 @@ func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
-	if len(ctx.Tx.From) != types.AddrSize {
-		return xerrors.ErrInvalidAddress
-	} else if acct := ctrler.FindAccount(ctx.Tx.From, ctx.Exec); acct == nil {
+	ctx.Sender = ctrler.FindAccount(ctx.Tx.From, ctx.Exec)
+	if ctx.Sender == nil {
 		return xerrors.ErrNotFoundAccount
-	} else {
-		ctx.Sender = acct
 	}
-
-	if len(ctx.Tx.To) != types.AddrSize {
-		return xerrors.ErrInvalidAddress
-	} else {
-		ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
-	}
+	ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
 
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
@@ -144,13 +136,14 @@ func (ctrler *AcctCtrler) ExecuteBlock(ctx *atypes.BlockContext) xerrors.XError 
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("AcctCtrler-ExecuteBlock", "height", ctx.BlockInfo.Header.Height)
+	ctrler.logger.Debug("AcctCtrler-ExecuteBlock", "height", ctx.Height())
 
-	if ctx.BlockInfo.Header.ProposerAddress != nil && ctx.Fee.Sign() > 0 {
+	header := ctx.BlockInfo().Header
+	if header.GetProposerAddress() != nil && ctx.GasSum().Sign() > 0 {
 		// give fee to block proposer
-		if acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(ctx.BlockInfo.Header.ProposerAddress)); xerr != nil {
+		if acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(header.GetProposerAddress())); xerr != nil {
 			return xerr
-		} else if xerr := acct.AddBalance(ctx.Fee); xerr != nil {
+		} else if xerr := acct.AddBalance(ctx.GasSum()); xerr != nil {
 			return xerr
 		} else {
 			return ctrler.setAccountCommittable(acct, true)

@@ -4,6 +4,8 @@ import "github.com/rigochain/rigo-go/types/xerrors"
 
 type TrxPayloadAssetTransfer struct{}
 
+var _ ITrxPayload = (*TrxPayloadAssetTransfer)(nil)
+
 func (tx *TrxPayloadAssetTransfer) Type() int32 {
 	return TRX_TRANSFER
 }

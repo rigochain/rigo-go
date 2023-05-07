@@ -16,7 +16,7 @@ const (
 	TRX_UNSTAKING
 	TRX_PROPOSAL
 	TRX_VOTING
-	TRX_EXECUTE
+	TRX_CONTRACT
 )
 
 const (
@@ -67,7 +67,15 @@ func (tx *Trx) TypeString() string {
 	switch tx.GetType() {
 	case TRX_TRANSFER:
 		return "transfer"
-	case TRX_EXECUTE:
+	case TRX_STAKING:
+		return "staking"
+	case TRX_UNSTAKING:
+		return "unstaking"
+	case TRX_PROPOSAL:
+		return "proposal"
+	case TRX_VOTING:
+		return "voting"
+	case TRX_CONTRACT:
 		return "execution"
 	}
 	return ""
@@ -113,7 +121,7 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 		if err := payload.Decode(txProto.XPayload); err != nil {
 			return err
 		}
-	case TRX_EXECUTE:
+	case TRX_CONTRACT:
 		return xerrors.NewOrdinary("not supported payload type")
 	default:
 		return xerrors.NewOrdinary("unknown payload type")

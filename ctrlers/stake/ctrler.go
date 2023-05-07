@@ -90,8 +90,8 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
@@ -218,17 +218,17 @@ func (ctrler *StakeCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.X
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("StakeCtrler-ExecuteBlock", "height", ctx.BlockInfo.Header.Height)
+	ctrler.logger.Debug("StakeCtrler-ExecuteBlock", "height", ctx.Height())
 
-	if ctx.Fee.Sign() > 0 {
+	if ctx.TxsCnt() > 0 {
 		if xerr := ctrler.doReward(); xerr != nil {
 			return xerr
 		}
 	}
-	if xerr := ctrler.unfreezingStakes(ctx.BlockInfo.Header.Height, ctx.AcctHelper); xerr != nil {
+	if xerr := ctrler.unfreezingStakes(ctx.Height(), ctx.AcctHelper); xerr != nil {
 		return xerr
 	}
-	ctx.ValUpdates = ctrler.updateValidators(int(ctx.GovHelper.MaxValidatorCnt()))
+	ctx.SetValUpdates(ctrler.updateValidators(int(ctx.GovHelper.MaxValidatorCnt())))
 
 	return nil
 }

@@ -2,7 +2,8 @@ package node
 
 import (
 	"fmt"
-	"github.com/rigochain/rigo-go/ctrlers/types"
+	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/log"
 	"runtime"
@@ -11,14 +12,14 @@ import (
 )
 
 type TrxExecutor struct {
-	txCtxChs []chan *types.TrxContext
+	txCtxChs []chan *ctrlertypes.TrxContext
 	logger   log.Logger
 }
 
 func NewTrxExecutor(n int, logger log.Logger) *TrxExecutor {
-	txCtxChs := make([]chan *types.TrxContext, n)
+	txCtxChs := make([]chan *ctrlertypes.TrxContext, n)
 	for i := 0; i < n; i++ {
-		txCtxChs[i] = make(chan *types.TrxContext, 128)
+		txCtxChs[i] = make(chan *ctrlertypes.TrxContext, 128)
 	}
 	return &TrxExecutor{
 		txCtxChs: txCtxChs,
@@ -39,11 +40,11 @@ func (txe *TrxExecutor) Stop() {
 	txe.txCtxChs = nil
 }
 
-func (txe *TrxExecutor) ExecuteSync(ctx *types.TrxContext) xerrors.XError {
+func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	return runTrx(ctx)
 }
 
-func (txe *TrxExecutor) ExecuteAsync(ctx *types.TrxContext) xerrors.XError {
+func (txe *TrxExecutor) ExecuteAsync(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	n := len(txe.txCtxChs)
 	i := int(ctx.Tx.From[0]) % n
 
@@ -69,25 +70,33 @@ func goid() int {
 	return id
 }
 
-func executionRoutine(name string, ch chan *types.TrxContext, logger log.Logger) {
+func executionRoutine(name string, ch chan *ctrlertypes.TrxContext, logger log.Logger) {
 	logger.Info("Start transaction execution routine", "goid", goid(), "name", name)
 
 	for ctx := range ch {
 		//if ctx.Exec {
 		//	logger.Info("[DEBUG] Begin of executionRoutine", "txhash", ctx.TxHash, "goid", goid(), "name", name)
 		//}
-
-		xerr := runTrx(ctx)
+		if xerr := validateTrx(ctx); xerr != nil {
+			ctx.Callback(ctx, xerr)
+		} else if xerr := runTrx(ctx); xerr != nil {
+			ctx.Callback(ctx, xerr)
+		}
 
 		//if ctx.Exec {
 		//	logger.Info("[DEBUG] End of executionRoutine", "txhash", ctx.TxHash, "goid", goid(), "name", name)
 		//}
-
-		ctx.Callback(ctx, xerr)
 	}
 }
 
-func runTrx(ctx *types.TrxContext) xerrors.XError {
+func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	if len(ctx.Tx.From) != types.AddrSize {
+		return xerrors.ErrInvalidAddress
+	}
+
+	if len(ctx.Tx.To) != types.AddrSize {
+		return xerrors.ErrInvalidAddress
+	}
 
 	//
 	// tx validation
@@ -100,19 +109,33 @@ func runTrx(ctx *types.TrxContext) xerrors.XError {
 	if xerr := ctx.StakeHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 		return xerr
 	}
+	if xerr := ctx.EVMHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+		return xerr
+	}
+
+	return nil
+}
+
+func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
 	// tx execution
-	if xerr := ctx.GovHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-		return xerr
-	}
-	if xerr := ctx.AcctHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-		// todo: rollback changes in GovHandler.ExecuteTrx
-		return xerr
-	}
-	if xerr := ctx.StakeHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-		// todo: rollback changes in GovHandler.ExecuteTrx and AcctHandler.ExecuteTrx
-		return xerr
+	if ctx.Tx.Payload.Type() == ctrlertypes.TRX_CONTRACT {
+		if xerr := ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+			return xerr
+		}
+	} else {
+		if xerr := ctx.GovHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+			return xerr
+		}
+		if xerr := ctx.AcctHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+			// todo: rollback changes in GovHandler.ExecuteTrx
+			return xerr
+		}
+		if xerr := ctx.StakeHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+			// todo: rollback changes in GovHandler.ExecuteTrx and AcctHandler.ExecuteTrx
+			return xerr
+		}
 	}
 
 	return nil
