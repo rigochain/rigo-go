@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	stopNode()
-
 	os.RemoveAll(testConfig.RootDir)
+
 	os.Exit(exitCode)
 }

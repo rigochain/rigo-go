@@ -41,7 +41,12 @@ func (txe *TrxExecutor) Stop() {
 }
 
 func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	return runTrx(ctx)
+	if xerr := validateTrx(ctx); xerr != nil {
+		return xerr
+	} else if xerr := runTrx(ctx); xerr != nil {
+		return xerr
+	}
+	return nil
 }
 
 func (txe *TrxExecutor) ExecuteAsync(ctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -77,15 +82,17 @@ func executionRoutine(name string, ch chan *ctrlertypes.TrxContext, logger log.L
 		//if ctx.Exec {
 		//	logger.Info("[DEBUG] Begin of executionRoutine", "txhash", ctx.TxHash, "goid", goid(), "name", name)
 		//}
-		if xerr := validateTrx(ctx); xerr != nil {
-			ctx.Callback(ctx, xerr)
-		} else if xerr := runTrx(ctx); xerr != nil {
-			ctx.Callback(ctx, xerr)
+		var xerr xerrors.XError
+
+		if xerr = validateTrx(ctx); xerr == nil {
+			xerr = runTrx(ctx)
 		}
 
 		//if ctx.Exec {
 		//	logger.Info("[DEBUG] End of executionRoutine", "txhash", ctx.TxHash, "goid", goid(), "name", name)
 		//}
+
+		ctx.Callback(ctx, xerr)
 	}
 }
 
@@ -100,16 +107,16 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
 	// tx validation
-	if xerr := ctx.GovHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	if xerr := ctx.TrxGovHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 		return xerr
 	}
-	if xerr := ctx.AcctHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	if xerr := ctx.TrxAcctHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 		return xerr
 	}
-	if xerr := ctx.StakeHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	if xerr := ctx.TrxStakeHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 		return xerr
 	}
-	if xerr := ctx.EVMHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	if xerr := ctx.TrxEVMHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 		return xerr
 	}
 
@@ -120,20 +127,20 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
 	// tx execution
-	if ctx.Tx.Payload.Type() == ctrlertypes.TRX_CONTRACT {
-		if xerr := ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	if ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT {
+		if xerr := ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 			return xerr
 		}
 	} else {
-		if xerr := ctx.GovHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+		if xerr := ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 			return xerr
 		}
-		if xerr := ctx.AcctHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-			// todo: rollback changes in GovHandler.ExecuteTrx
+		if xerr := ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+			// todo: rollback changes in TrxGovHandler.ExecuteTrx
 			return xerr
 		}
-		if xerr := ctx.StakeHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-			// todo: rollback changes in GovHandler.ExecuteTrx and AcctHandler.ExecuteTrx
+		if xerr := ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+			// todo: rollback changes in TrxGovHandler.ExecuteTrx and TrxAcctHandler.ExecuteTrx
 			return xerr
 		}
 	}

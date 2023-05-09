@@ -13,6 +13,7 @@ import (
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
+	"github.com/rigochain/rigo-go/x/evm"
 	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -37,6 +38,7 @@ type RigoApp struct {
 	acctCtrler  *account.AcctCtrler
 	stakeCtrler *stake.StakeCtrler
 	govCtrler   *gov.GovCtrler
+	vmCtrler    *evm.EVMCtrler
 	txExecutor  *TrxExecutor
 
 	localClient abcicli.Client
@@ -68,6 +70,8 @@ func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
 		panic(err)
 	}
 
+	vmCtrler := evm.NewEVMCtrler(config.DBDir(), acctCtrler, logger)
+
 	txExecutor := NewTrxExecutor(runtime.GOMAXPROCS(0), logger)
 
 	return &RigoApp{
@@ -75,6 +79,7 @@ func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
 		acctCtrler:  acctCtrler,
 		stakeCtrler: stakeCtrler,
 		govCtrler:   govCtrler,
+		vmCtrler:    vmCtrler,
 		txExecutor:  txExecutor,
 		logger:      logger,
 	}
@@ -192,11 +197,12 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 				_tx := _txctx.Tx
 
 				_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
+				_txctx.TrxGovHandler = ctrler.govCtrler
+				_txctx.TrxAcctHandler = ctrler.acctCtrler
+				_txctx.TrxStakeHandler = ctrler.stakeCtrler
+				_txctx.TrxEVMHandler = ctrler.vmCtrler
 				_txctx.GovHandler = ctrler.govCtrler
-				_txctx.AcctHandler = ctrler.acctCtrler
 				_txctx.StakeHandler = ctrler.stakeCtrler
-				_txctx.GovHelper = ctrler.govCtrler
-				_txctx.StakeHelper = ctrler.stakeCtrler
 				return nil
 			})
 		if xerr != nil {
@@ -255,11 +261,12 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 			ctrler.currBlockCtx.AddTxsCnt(1)
 
 			_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
+			_txctx.TrxGovHandler = ctrler.govCtrler
+			_txctx.TrxAcctHandler = ctrler.acctCtrler
+			_txctx.TrxStakeHandler = ctrler.stakeCtrler
+			_txctx.TrxEVMHandler = ctrler.vmCtrler
 			_txctx.GovHandler = ctrler.govCtrler
-			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
-			_txctx.GovHelper = ctrler.govCtrler
-			_txctx.StakeHelper = ctrler.stakeCtrler
 			return nil
 		})
 	if xerr != nil {
@@ -313,11 +320,12 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 			_txctx.TxIdx = txIdx
 
 			_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
+			_txctx.TrxGovHandler = ctrler.govCtrler
+			_txctx.TrxAcctHandler = ctrler.acctCtrler
+			_txctx.TrxStakeHandler = ctrler.stakeCtrler
+			_txctx.TrxEVMHandler = ctrler.vmCtrler
 			_txctx.GovHandler = ctrler.govCtrler
-			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
-			_txctx.GovHelper = ctrler.govCtrler
-			_txctx.StakeHelper = ctrler.stakeCtrler
 			// when the 'tx' is finished, it's called
 			_txctx.Callback = func(ctx *types2.TrxContext, xerr xerrors.XError) {
 				// it is called from executionRoutine goroutine

@@ -41,6 +41,7 @@ func TestTransfer_Bulk(t *testing.T) {
 			senderCnt++
 		}
 	}
+	require.Greater(t, senderCnt, 1)
 
 	// 최대 100 개 까지 계정 생성하여 리시버로 사용.
 	// 100 개 이상이면 이미 있는 계정 사용.
@@ -147,7 +148,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *acctHelpe
 
 		racctState.addExpectedBalance(randAmt)
 
-		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce()+1, randAmt)
+		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce(), randAmt)
 
 		w.AddNonce()
 	}

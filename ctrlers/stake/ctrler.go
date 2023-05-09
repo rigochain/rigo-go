@@ -20,12 +20,12 @@ type StakeCtrler struct {
 	delegateeLedger ledger.IFinalityLedger[*Delegatee]
 	frozenLedger    ledger.IFinalityLedger[*Stake]
 
-	govHelper ctrlertypes.IGovHelper
-	logger    tmlog.Logger
-	mtx       sync.RWMutex
+	govHandler ctrlertypes.IGovHandler
+	logger     tmlog.Logger
+	mtx        sync.RWMutex
 }
 
-func NewStakeCtrler(config *cfg.Config, govHelper ctrlertypes.IGovHelper, logger tmlog.Logger) (*StakeCtrler, error) {
+func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovHandler, logger tmlog.Logger) (*StakeCtrler, error) {
 	//totalPowerOfDelegatees, totalPowerOfStakes := int64(0), int64(0)
 	newDelegateeProvider := func() *Delegatee { return &Delegatee{} }
 	newStakeProvider := func() *Stake { return &Stake{} }
@@ -45,7 +45,7 @@ func NewStakeCtrler(config *cfg.Config, govHelper ctrlertypes.IGovHelper, logger
 		delegateeLedger: delegateeLedger,
 		//stakeLedger:     stakeLedger,
 		frozenLedger: frozenLedger,
-		govHelper:    govHelper,
+		govHandler:   govHandler,
 		logger:       logger,
 	}
 	return ret, nil
@@ -72,7 +72,7 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 			val.Power,
 			0,
 			bytes.ZeroBytes(32), // 0x00... txhash
-			ctrler.govHelper)
+			ctrler.govHandler)
 
 		d := NewDelegatee(addr, pubBytes)
 		if xerr := d.AddStake(s0); xerr != nil {
@@ -144,7 +144,7 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	}
 
 	// create stake and delegate it to delegatee
-	s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovHelper)
+	s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height, ctx.TxHash, ctx.GovHandler)
 	if xerr := delegatee.addStake(s0); xerr != nil {
 		return xerr
 	}
@@ -183,13 +183,13 @@ func (ctrler *StakeCtrler) execUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XE
 		return xerrors.ErrNotFoundStake
 	}
 
-	s0.RefundHeight = ctx.Height + ctx.GovHelper.LazyRewardBlocks()
+	s0.RefundHeight = ctx.Height + ctx.GovHandler.LazyRewardBlocks()
 	_ = setUpdateFrozen(s0) // add s0 to frozen ledger
 
 	if delegatee.SelfPower == 0 {
 		stakes := delegatee.DelAllStakes()
 		for _, s0 := range stakes {
-			s0.RefundHeight = ctx.Height + ctx.GovHelper.LazyRewardBlocks()
+			s0.RefundHeight = ctx.Height + ctx.GovHandler.LazyRewardBlocks()
 			_ = setUpdateFrozen(s0) // add s0 to frozen ledger
 		}
 	}
@@ -225,10 +225,10 @@ func (ctrler *StakeCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.X
 			return xerr
 		}
 	}
-	if xerr := ctrler.unfreezingStakes(ctx.Height(), ctx.AcctHelper); xerr != nil {
+	if xerr := ctrler.unfreezingStakes(ctx.Height(), ctx.AcctHandler); xerr != nil {
 		return xerr
 	}
-	ctx.SetValUpdates(ctrler.updateValidators(int(ctx.GovHelper.MaxValidatorCnt())))
+	ctx.SetValUpdates(ctrler.updateValidators(int(ctx.GovHandler.MaxValidatorCnt())))
 
 	return nil
 }
@@ -254,11 +254,11 @@ func (ctrler *StakeCtrler) doReward() xerrors.XError {
 	return nil
 }
 
-func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHelper ctrlertypes.IAccountHelper) xerrors.XError {
+func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertypes.IAccountHandler) xerrors.XError {
 	return ctrler.frozenLedger.IterateAllFinalityItems(func(s0 *Stake) xerrors.XError {
 		if s0.RefundHeight <= height {
 			// un-freezing s0
-			if xerr := acctHelper.Reward(s0.From, s0.ReceivedReward, true); xerr != nil {
+			if xerr := acctHandler.Reward(s0.From, s0.ReceivedReward, true); xerr != nil {
 				return xerr
 			}
 
@@ -383,7 +383,7 @@ func (ctrler *StakeCtrler) Close() xerrors.XError {
 	return nil
 }
 
-// IStakeHelper's methods
+// IStakeHandler's methods
 func (ctrler *StakeCtrler) Validators() ([]*abcitypes.Validator, int64) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
@@ -453,4 +453,4 @@ func (ctrler *StakeCtrler) GetFrozenStakes() []*Stake {
 var _ ctrlertypes.ILedgerHandler = (*StakeCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*StakeCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*StakeCtrler)(nil)
-var _ ctrlertypes.IStakeHelper = (*StakeCtrler)(nil)
+var _ ctrlertypes.IStakeHandler = (*StakeCtrler)(nil)

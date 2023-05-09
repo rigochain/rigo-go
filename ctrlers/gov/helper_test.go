@@ -20,7 +20,7 @@ import (
 var (
 	config      = cfg.DefaultConfig()
 	govCtrler   *GovCtrler
-	stakeHelper *stakeHelperMock
+	stakeHelper *stakeHandlerMock
 	acctHelper  *acctHelperMock
 	govRule0    = ctrlertypes.DefaultGovRule()
 	govRule1    = ctrlertypes.Test1GovRule()
@@ -38,7 +38,7 @@ func init() {
 	}
 	govCtrler.GovRule = *govRule0
 
-	stakeHelper = &stakeHelperMock{
+	stakeHelper = &stakeHandlerMock{
 		valCnt: 5,
 		delegatees: []*stake.Delegatee{
 			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
@@ -64,12 +64,12 @@ func init() {
 	}
 }
 
-type stakeHelperMock struct {
+type stakeHandlerMock struct {
 	valCnt     int
 	delegatees []*stake.Delegatee
 }
 
-func (s *stakeHelperMock) Validators() ([]*abcitypes.Validator, int64) {
+func (s *stakeHandlerMock) Validators() ([]*abcitypes.Validator, int64) {
 	totalPower := int64(0)
 	vals := make([]*abcitypes.Validator, s.valCnt)
 	for i := 0; i < s.valCnt; i++ {
@@ -82,7 +82,7 @@ func (s *stakeHelperMock) Validators() ([]*abcitypes.Validator, int64) {
 	return vals, totalPower
 }
 
-func (s *stakeHelperMock) IsValidator(addr types.Address) bool {
+func (s *stakeHandlerMock) IsValidator(addr types.Address) bool {
 	for i := 0; i < s.valCnt; i++ {
 		if bytes.Compare(addr, s.delegatees[i].Addr) == 0 {
 			return true
@@ -91,11 +91,11 @@ func (s *stakeHelperMock) IsValidator(addr types.Address) bool {
 	return false
 }
 
-func (s *stakeHelperMock) GetTotalAmount() *uint256.Int {
+func (s *stakeHandlerMock) GetTotalAmount() *uint256.Int {
 	return govCtrler.PowerToAmount(s.GetTotalPower())
 }
 
-func (s *stakeHelperMock) GetTotalPower() int64 {
+func (s *stakeHandlerMock) GetTotalPower() int64 {
 	sum := int64(0)
 	for _, v := range s.delegatees {
 		sum += v.TotalPower
@@ -103,7 +103,7 @@ func (s *stakeHelperMock) GetTotalPower() int64 {
 	return sum
 }
 
-func (s *stakeHelperMock) GetTotalPowerOf(addr types.Address) int64 {
+func (s *stakeHandlerMock) GetTotalPowerOf(addr types.Address) int64 {
 	for _, v := range s.delegatees {
 		if bytes.Compare(addr, v.Addr) == 0 {
 			return v.TotalPower
@@ -112,15 +112,15 @@ func (s *stakeHelperMock) GetTotalPowerOf(addr types.Address) int64 {
 	return int64(0)
 }
 
-func (s *stakeHelperMock) PowerOf(addr types.Address) int64 {
+func (s *stakeHandlerMock) PowerOf(addr types.Address) int64 {
 	return s.GetTotalPowerOf(addr)
 }
 
-func (s *stakeHelperMock) PickAddress(i int) types.Address {
+func (s *stakeHandlerMock) PickAddress(i int) types.Address {
 	return s.delegatees[i].Addr
 }
 
-var _ ctrlertypes.IStakeHelper = (*stakeHelperMock)(nil)
+var _ ctrlertypes.IStakeHandler = (*stakeHandlerMock)(nil)
 
 type acctHelperMock struct {
 	acctMap map[ctrlertypes.AcctKey]*ctrlertypes.Account
@@ -149,8 +149,8 @@ func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxCo
 		}
 		_txctx.Sender = acct
 		_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
-		_txctx.GovHelper = govCtrler
-		_txctx.StakeHelper = stakeHelper
+		_txctx.GovHandler = govCtrler
+		_txctx.StakeHandler = stakeHelper
 		return nil
 	})
 

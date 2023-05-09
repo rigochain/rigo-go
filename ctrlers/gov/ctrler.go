@@ -117,7 +117,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 
 		// check right
-		if ctx.StakeHelper.IsValidator(ctx.Tx.From) == false {
+		if ctx.StakeHandler.IsValidator(ctx.Tx.From) == false {
 			return xerrors.ErrNoRight
 		}
 
@@ -203,7 +203,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	txpayload, _ := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 
 	voters := make(map[string]*proposal.Voter)
-	vals, totalVotingPower := ctx.StakeHelper.Validators()
+	vals, totalVotingPower := ctx.StakeHandler.Validators()
 	for _, v := range vals {
 		voters[types.Address(v.Address).String()] = &proposal.Voter{
 			Addr:   v.Address,
@@ -417,4 +417,4 @@ func (ctrler *GovCtrler) ReadProposals(txhash abytes.HexBytes) (*proposal.GovPro
 var _ ctrlertypes.ILedgerHandler = (*GovCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*GovCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*GovCtrler)(nil)
-var _ ctrlertypes.IGovHelper = (*GovCtrler)(nil)
+var _ ctrlertypes.IGovHandler = (*GovCtrler)(nil)

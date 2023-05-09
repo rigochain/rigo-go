@@ -11,30 +11,71 @@ import (
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
+	tmdb "github.com/tendermint/tm-db"
 	"math"
+	"strconv"
 	"sync"
 )
+
+var (
+	lastBlockHeightKey = []byte("lbh")
+)
+
+func blockKey(h int64) []byte {
+	return []byte(fmt.Sprintf("bn%v", h))
+}
 
 type EVMCtrler struct {
 	stateDBWrapper *StateDBWrapper
 	ethChainConfig *params.ChainConfig
 
+	metadb          tmdb.DB
+	lastRootHash    []byte
+	lastBlockHeight int64
+
 	logger tmlog.Logger
 	mtx    sync.RWMutex
 }
 
-func NewEVMCtrler(path string, acctHelper ctrlertypes.IAccountHelper, logger tmlog.Logger) *EVMCtrler {
-	stdb, err := NewStateDBWrapper(path, acctHelper)
+func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) *EVMCtrler {
+	metadb, err := tmdb.NewDB("heightRootHash", "goleveldb", path)
+	if err != nil {
+		panic(err)
+	}
+	val, err := metadb.Get(lastBlockHeightKey)
+	if err != nil {
+		panic(err)
+	}
+	bn := int64(0)
+	if val != nil {
+		bn, err = strconv.ParseInt(string(val), 10, 64)
+		if err != nil {
+			panic(err)
+		}
+	}
+	hash, err := metadb.Get(blockKey(bn))
+	if err != nil {
+		panic(err)
+	}
+
+	stdb, err := NewStateDBWrapper(path, hash, acctHandler)
 	if err != nil {
 		panic(err)
 	}
 	return &EVMCtrler{
-		stateDBWrapper: stdb,
-		ethChainConfig: params.TestChainConfig,
-		logger:         logger,
+		stateDBWrapper:  stdb,
+		ethChainConfig:  params.TestChainConfig,
+		metadb:          metadb,
+		lastRootHash:    hash,
+		lastBlockHeight: bn,
+		logger:          logger,
 	}
+}
+
+func (ctrler *EVMCtrler) SetStateDB(state *StateDBWrapper) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
 }
 
 func (ctrler *EVMCtrler) InitLedger(req interface{}) xerrors.XError {
@@ -50,17 +91,26 @@ func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	if err := ctrler.stateDBWrapper.Database().TrieDB().Commit(rootHash, true, nil); err != nil {
 		return nil, 0, xerrors.From(err)
 	}
+	ctrler.lastBlockHeight++
+	ctrler.lastRootHash = rootHash[:]
 
-	return rootHash[:], 0, nil
-}
+	batch := ctrler.metadb.NewBatch()
+	batch.Set(lastBlockHeightKey, []byte(strconv.FormatInt(ctrler.lastBlockHeight, 10)))
+	batch.Set(blockKey(ctrler.lastBlockHeight), ctrler.lastRootHash)
+	batch.WriteSync()
+	batch.Close()
 
-func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
-	//TODO implement me
-	panic("implement me")
+	return rootHash[:], ctrler.lastBlockHeight, nil
 }
 
 func (ctrler *EVMCtrler) Close() xerrors.XError {
-	return xerrors.From(ctrler.stateDBWrapper.StateDB.Database().TrieDB().DiskDB().Close())
+	if ctrler.metadb != nil {
+		if err := ctrler.metadb.Close(); err != nil {
+			return xerrors.From(err)
+		}
+		ctrler.metadb = nil
+	}
+	return xerrors.From(ctrler.stateDBWrapper.Close())
 }
 
 func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -78,14 +128,14 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 }
 
 func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	ret, xerr := ctrler.callEVM(
+	ret, xerr := ctrler.execVM(
 		ctx.Tx.From,
 		ctx.Tx.To,
 		ctx.Tx.Nonce,
 		ctx.Tx.Amount,
+		ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data,
 		ctx.Height,
 		ctx.BlockTime,
-		ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data,
 	)
 	if xerr != nil {
 		return xerr
@@ -99,7 +149,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *EVMCtrler) callEVM(from, to types.Address, nonce uint64, amt *uint256.Int, height, blockTime int64, data []byte) (*core.ExecutionResult, xerrors.XError) {
+func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, amt *uint256.Int, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
 	var sender common.Address
 	var toAddr *common.Address
 	copy(sender[:], from)
@@ -113,8 +163,7 @@ func (ctrler *EVMCtrler) callEVM(from, to types.Address, nonce uint64, amt *uint
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)
-	vmevm := vm.NewEVM(blockContext, vm.TxContext{}, ctrler.stateDBWrapper, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
-	vmevm.Reset(txContext, ctrler.stateDBWrapper)
+	vmevm := vm.NewEVM(blockContext, txContext, ctrler.stateDBWrapper, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
 	result, err := core.ApplyMessage(vmevm, vmmsg, gp)

@@ -14,7 +14,7 @@ type ILedgerHandler interface {
 	Close() xerrors.XError
 }
 
-type IGovHelper interface {
+type IGovHandler interface {
 	Version() int64
 	MaxValidatorCnt() int64
 	AmountPerPower() *uint256.Int
@@ -33,14 +33,15 @@ type IGovHelper interface {
 	PowerToReward(int64) *uint256.Int
 }
 
-type IAccountHelper interface {
+type IAccountHandler interface {
 	FindOrNewAccount(types.Address, bool) *Account
 	FindAccount(types.Address, bool) *Account
 	Transfer(types.Address, types.Address, *uint256.Int, bool) xerrors.XError
 	Reward(types.Address, *uint256.Int, bool) xerrors.XError
+	ImmutableAcctCtrlerAt(int64) (IAccountHandler, xerrors.XError)
 }
 
-type IStakeHelper interface {
+type IStakeHandler interface {
 	Validators() ([]*abcitypes.Validator, int64)
 	IsValidator(types.Address) bool
 	PowerOf(types.Address) int64

@@ -321,4 +321,4 @@ func (r *GovRule) String() string {
 }
 
 var _ ledger.ILedgerItem = (*GovRule)(nil)
-var _ IGovHelper = (*GovRule)(nil)
+var _ IGovHandler = (*GovRule)(nil)

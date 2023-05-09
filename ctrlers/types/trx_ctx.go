@@ -22,13 +22,13 @@ type TrxContext struct {
 	GasUsed      *uint256.Int
 	RetData      []byte
 
-	GovHandler   ITrxHandler
-	AcctHandler  ITrxHandler
-	StakeHandler ITrxHandler
-	EVMHandler   ITrxHandler
+	TrxGovHandler   ITrxHandler
+	TrxAcctHandler  ITrxHandler
+	TrxStakeHandler ITrxHandler
+	TrxEVMHandler   ITrxHandler
 
-	GovHelper   IGovHelper
-	StakeHelper IStakeHelper
+	GovHandler   IGovHandler
+	StakeHandler IStakeHandler
 
 	Callback func(*TrxContext, xerrors.XError)
 }

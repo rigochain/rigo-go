@@ -15,25 +15,25 @@ type BlockContext struct {
 	txsCnt    int
 	appHash   bytes.HexBytes
 
-	GovHelper   IGovHelper
-	AcctHelper  IAccountHelper
-	StakeHelper IStakeHelper
+	GovHandler   IGovHandler
+	AcctHandler  IAccountHandler
+	StakeHandler IStakeHandler
 
 	ValUpdates abcitypes.ValidatorUpdates
 
 	mtx sync.RWMutex
 }
 
-func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHelper, a IAccountHelper, s IStakeHelper) *BlockContext {
+func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, s IStakeHandler) *BlockContext {
 	return &BlockContext{
-		blockInfo:   bi,
-		gasSum:      uint256.NewInt(0),
-		txsCnt:      0,
-		appHash:     nil,
-		GovHelper:   g,
-		AcctHelper:  a,
-		StakeHelper: s,
-		ValUpdates:  nil,
+		blockInfo:    bi,
+		gasSum:       uint256.NewInt(0),
+		txsCnt:       0,
+		appHash:      nil,
+		GovHandler:   g,
+		AcctHandler:  a,
+		StakeHandler: s,
+		ValUpdates:   nil,
 	}
 }
 

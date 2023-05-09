@@ -37,6 +37,19 @@ func NewFinalityLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func
 	}
 }
 
+func (ledger *FinalityLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (IFinalityLedger[T], xerrors.XError) {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+	simledger, xerr := ledger.SimpleLedger.ImmutableLedgerAt(n, cacheSize)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return &FinalityLedger[T]{
+		SimpleLedger:  *simledger,
+		finalityItems: newMemItems[T](),
+	}, nil
+}
+
 func (ledger *FinalityLedger[T]) SetFinality(item T) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()

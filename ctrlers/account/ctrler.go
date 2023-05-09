@@ -34,6 +34,18 @@ func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error)
 	}
 }
 
+func (ctrler *AcctCtrler) ImmutableAcctCtrlerAt(height int64) (atypes.IAccountHandler, xerrors.XError) {
+	ledger, xerr := ctrler.acctLedger.ImmutableLedgerAt(height, 128)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &AcctCtrler{
+		acctLedger: ledger,
+		logger:     ctrler.logger,
+	}, nil
+}
+
 func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -92,7 +104,7 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 	if xerr := ctx.Sender.CheckBalance(ctx.NeedAmt); xerr != nil {
 		return xerr
 	} else if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
-		return xerr.Wrap(fmt.Errorf("txhash: %X, address: %v, expected: %v, actual:%v", ctx.TxHash, ctx.Sender.Address, ctx.Sender.Nonce+1, ctx.Tx.Nonce))
+		return xerr.Wrap(fmt.Errorf("invalid nonce - expected: %v, actual:%v, address: %v, txhash: %X", ctx.Sender.Nonce, ctx.Tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
 
 	return nil
@@ -300,4 +312,4 @@ func (ctrler *AcctCtrler) setAccountCommittable(acct *atypes.Account, exec bool)
 var _ atypes.ILedgerHandler = (*AcctCtrler)(nil)
 var _ atypes.ITrxHandler = (*AcctCtrler)(nil)
 var _ atypes.IBlockHandler = (*AcctCtrler)(nil)
-var _ atypes.IAccountHelper = (*AcctCtrler)(nil)
+var _ atypes.IAccountHandler = (*AcctCtrler)(nil)

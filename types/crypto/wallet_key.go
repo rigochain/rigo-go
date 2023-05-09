@@ -103,7 +103,7 @@ func NewWalletKey(keyBytes, pass []byte) *WalletKey {
 	} else {
 		_cipherTextParams = &cipherTextParams{
 			Algo: SymmAlgo,
-			Text: keyBytes,
+			Text: keyBytes, // plaintext
 		}
 		_prvKey = append(keyBytes, []byte(nil)...)
 		// todo: print WARNING LOG

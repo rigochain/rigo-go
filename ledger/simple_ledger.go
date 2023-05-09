@@ -37,6 +37,27 @@ func NewSimpleLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func()
 	}
 }
 
+func (ledger *SimpleLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (*SimpleLedger[T], xerrors.XError) {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	tree, err := iavl.NewMutableTree(ledger.db, cacheSize)
+	if err != nil {
+		return nil, xerrors.From(err)
+	}
+
+	_, err = tree.LazyLoadVersion(n)
+	if err != nil {
+		return nil, xerrors.From(err)
+	}
+
+	return &SimpleLedger[T]{
+		tree:        tree,
+		cachedItems: newMemItems[T](),
+		getNewItem:  ledger.getNewItem,
+	}, nil
+}
+
 func (ledger *SimpleLedger[T]) Set(item T) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()

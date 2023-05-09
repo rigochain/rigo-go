@@ -68,4 +68,5 @@ type IFinalityLedger[T ILedgerItem] interface {
 	IterateAllFinalityItems(func(T) xerrors.XError) xerrors.XError
 	IterateFinalityGotItems(func(T) xerrors.XError) xerrors.XError
 	IterateFinalityUpdatedItems(func(T) xerrors.XError) xerrors.XError
+	ImmutableLedgerAt(int64, int) (IFinalityLedger[T], xerrors.XError)
 }

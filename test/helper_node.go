@@ -16,16 +16,17 @@ var (
 	testChainID = "rigo_unit_test_net"
 	testConfig  *cfg.Config
 	nd          *tmnode.Node
-	rpcURL      string
-	wsEndpoint  string
+	rpcURL      = "http://localhost:26657"
+	wsEndpoint  = "ws://localhost:26657/websocket"
 
 	TESTPASS = []byte("1111")
 )
 
 func init() {
 	testConfig = cfg.DefaultConfig()
-	testConfig.SetRoot(filepath.Join(os.TempDir(), ".rigo_test"))
+	testConfig.SetRoot(filepath.Join(os.TempDir(), "rigo_test"))
 	tmcfg.EnsureRoot(testConfig.RootDir)
+	fmt.Println("root directory", testConfig.RootDir)
 	testConfig.RPC.ListenAddress = "tcp://localhost:36657"
 	if err := testConfig.ValidateBasic(); err != nil {
 		panic(fmt.Errorf("error in rootConfig file: %v", err))

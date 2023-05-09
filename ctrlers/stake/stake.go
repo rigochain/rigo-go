@@ -59,9 +59,9 @@ func (s *Stake) Decode(d []byte) xerrors.XError {
 
 var _ ledger.ILedgerItem = (*Stake)(nil)
 
-func NewStakeWithAmount(from, to types.Address, amt *uint256.Int, height int64, txhash abytes.HexBytes, govHelper ctrlertypes.IGovHelper) *Stake {
-	power := govHelper.AmountToPower(amt)
-	blockReward := govHelper.PowerToReward(power)
+func NewStakeWithAmount(from, to types.Address, amt *uint256.Int, height int64, txhash abytes.HexBytes, govHandler ctrlertypes.IGovHandler) *Stake {
+	power := govHandler.AmountToPower(amt)
+	blockReward := govHandler.PowerToReward(power)
 	return &Stake{
 		From:            from,
 		To:              to,
@@ -75,9 +75,9 @@ func NewStakeWithAmount(from, to types.Address, amt *uint256.Int, height int64, 
 	}
 }
 
-func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhash abytes.HexBytes, govHelper ctrlertypes.IGovHelper) *Stake {
-	amt := govHelper.PowerToAmount(power)
-	blockReward := govHelper.PowerToReward(power)
+func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhash abytes.HexBytes, govHandler ctrlertypes.IGovHandler) *Stake {
+	amt := govHandler.PowerToAmount(power)
+	blockReward := govHandler.PowerToReward(power)
 	return &Stake{
 		From:            owner,
 		To:              to,

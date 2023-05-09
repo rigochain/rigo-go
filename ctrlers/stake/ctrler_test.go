@@ -20,8 +20,8 @@ import (
 var (
 	config      = cfg.DefaultConfig()
 	DBDIR       = filepath.Join(os.TempDir(), "stake-ctrler-unstaking-test")
-	acctHelper  = &accountHandler{}
-	govHelper   = &govHelperMock{}
+	acctHelper  = &acctHandlerMock{}
+	govHelper   = &govHandlerMock{}
 	stakeCtrler *stake.StakeCtrler
 
 	Wallets              []*web3.Wallet
@@ -104,7 +104,7 @@ func TestStakingToSelfByTx(t *testing.T) {
 		require.NoError(t, err)
 
 		_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += txctx.GovHelper.AmountToPower(txctx.Tx.Amount)
+		sumPower += txctx.GovHandler.AmountToPower(txctx.Tx.Amount)
 	}
 
 	_, _, err := stakeCtrler.Commit()
@@ -123,7 +123,7 @@ func TestStakingByTx(t *testing.T) {
 		require.NoError(t, err)
 
 		_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += txctx.GovHelper.AmountToPower(txctx.Tx.Amount)
+		sumPower += txctx.GovHandler.AmountToPower(txctx.Tx.Amount)
 	}
 
 	_, _, err := stakeCtrler.Commit()
@@ -148,7 +148,7 @@ func TestUnstakingByTx(t *testing.T) {
 		stakingTxCtx := findStakingTxCtx(stakingTxHash)
 
 		sumUnstakingAmt.Add(sumUnstakingAmt, stakingTxCtx.Tx.Amount)
-		sumUnstakingPower += txctx.GovHelper.AmountToPower(stakingTxCtx.Tx.Amount)
+		sumUnstakingPower += txctx.GovHandler.AmountToPower(stakingTxCtx.Tx.Amount)
 	}
 
 	_, _, err := stakeCtrler.Commit()

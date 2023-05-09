@@ -6,57 +6,114 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/holiman/uint256"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/xerrors"
 	"math/big"
-)
-
-var (
-	lastRoot common.Hash
+	"sync"
 )
 
 type StateDBWrapper struct {
 	*state.StateDB
-	acctHelper ctrlertypes.IAccountHelper
+	acctHandler ctrlertypes.IAccountHandler
+	immutable   bool
+	mtx         sync.RWMutex
 }
 
-func NewStateDBWrapper(path string, acctHelper ctrlertypes.IAccountHelper) (*StateDBWrapper, error) {
+func NewStateDBWrapper(path string, lastRootHash []byte, acctHandler ctrlertypes.IAccountHandler) (*StateDBWrapper, error) {
 	//rawDB, err := rawdb.NewLevelDBDatabaseWithFreezer(path, 0, 0, path, "", false)
 	rawDB, err := rawdb.NewLevelDBDatabase(path, 0, 0, "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	stateDB, err := state.New(lastRoot, state.NewDatabase(rawDB), nil)
+	var hash common.Hash
+	copy(hash[:], lastRootHash)
+
+	stateDB, err := state.New(hash, state.NewDatabase(rawDB), nil)
 	if err != nil {
 		_ = rawDB.Close()
 		return nil, err
 	}
 
-	return &StateDBWrapper{stateDB, acctHelper}, nil
+	return &StateDBWrapper{
+		StateDB:     stateDB,
+		acctHandler: acctHandler,
+	}, nil
+}
+
+func (s *StateDBWrapper) ImmutableStateAt(n int64, hash []byte) (*StateDBWrapper, xerrors.XError) {
+	s.mtx.RLock()
+	defer s.mtx.RUnlock()
+
+	rootHash := bytes.HexBytes(hash).Array32()
+	rawDB, _ := (s.StateDB.Database().TrieDB().DiskDB()).(ethdb.Database)
+	stateDB, err := state.New(rootHash, state.NewDatabase(rawDB), nil)
+	if err != nil {
+		return nil, xerrors.From(err)
+	}
+
+	acctCtrler, xerr := s.acctHandler.ImmutableAcctCtrlerAt(n)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return &StateDBWrapper{
+		StateDB:     stateDB,
+		acctHandler: acctCtrler,
+		immutable:   true,
+	}, nil
+}
+
+func (s *StateDBWrapper) Close() error {
+	err := s.StateDB.Database().TrieDB().DiskDB().Close()
+	s.StateDB = nil
+	return err
 }
 
 func (s *StateDBWrapper) CreateAccount(addr common.Address) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	_ = s.acctHandler.FindOrNewAccount(addr[:], true)
 	s.StateDB.CreateAccount(addr)
 }
 
 func (s *StateDBWrapper) SubBalance(addr common.Address, amt *big.Int) {
-	s.StateDB.SubBalance(addr, amt)
+	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+		if err := acct.SubBalance(uint256.MustFromBig(amt)); err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (s *StateDBWrapper) AddBalance(addr common.Address, amt *big.Int) {
-	s.StateDB.AddBalance(addr, amt)
+	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+		if err := acct.AddBalance(uint256.MustFromBig(amt)); err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (s *StateDBWrapper) GetBalance(addr common.Address) *big.Int {
-	return s.StateDB.GetBalance(addr)
+	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+		return acct.GetBalance().ToBig()
+	}
+	return big.NewInt(0)
 }
 
 func (s *StateDBWrapper) GetNonce(addr common.Address) uint64 {
-	return s.StateDB.GetNonce(addr)
+	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+		return acct.GetNonce()
+	}
+	return 0
 }
 
 func (s *StateDBWrapper) SetNonce(addr common.Address, n uint64) {
-	s.StateDB.SetNonce(addr, n)
+	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+		acct.SetNonce(n)
+	}
 }
 
 func (s *StateDBWrapper) GetCodeHash(addr common.Address) common.Hash {
