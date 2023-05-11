@@ -6,6 +6,7 @@ import (
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/node"
 	tmcfg "github.com/tendermint/tendermint/config"
+	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmnode "github.com/tendermint/tendermint/node"
 	"os"
@@ -24,6 +25,7 @@ var (
 
 func init() {
 	testConfig = cfg.DefaultConfig()
+	testConfig.LogLevel = ""
 	testConfig.SetRoot(filepath.Join(os.TempDir(), "rigo_test"))
 	tmcfg.EnsureRoot(testConfig.RootDir)
 	fmt.Println("root directory", testConfig.RootDir)
@@ -42,7 +44,17 @@ func initNode() error {
 
 func runNode() error {
 	var err error
-	nd, err = node.NewRigoNode(testConfig, TESTPASS, tmlog.NewNopLogger())
+
+	logger := tmlog.NewNopLogger()
+	if testConfig.LogLevel != "" {
+		logger = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
+		if testConfig.LogFormat == "json" {
+			logger = tmlog.NewTMJSONLogger(tmlog.NewSyncWriter(os.Stdout))
+		}
+		logger, err = tmflags.ParseLogLevel(testConfig.LogLevel, logger, tmcfg.DefaultLogLevel)
+	}
+
+	nd, err = node.NewRigoNode(testConfig, TESTPASS, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create rigo: %w", err)
 	}

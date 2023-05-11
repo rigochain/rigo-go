@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 	}()
 	wg.Wait()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 3)
 
 	prepareTest()
 

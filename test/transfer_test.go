@@ -34,7 +34,7 @@ func TestTransfer_Bulk(t *testing.T) {
 		acctTestObj := newAcctHelper(w)
 		allAcctHelpers = append(allAcctHelpers, acctTestObj)
 
-		fmt.Println("TestBulkTransfer - used accounts:", w.Address(), w.GetNonce(), w.GetBalance())
+		//fmt.Println("TestBulkTransfer - used accounts:", w.Address(), w.GetNonce(), w.GetBalance())
 
 		if senderCnt < 90 && w.GetBalance().Cmp(uint256.NewInt(1000000)) >= 0 {
 			addSenderAcctHelper(w.Address().String(), acctTestObj)

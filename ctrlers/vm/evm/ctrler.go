@@ -143,9 +143,9 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	if ret.Err != nil {
 		return xerrors.From(ret.Err)
 	}
-
-	_ = ctx.GasUsed.Add(ctx.GasUsed, uint256.NewInt(ret.UsedGas))
+	ctx.GasUsed = ctx.Tx.Gas //new(uint256.Int).Add(ctx.GasUsed, uint256.NewInt(ret.UsedGas))
 	ctx.RetData = ret.ReturnData
+
 	return nil
 }
 
@@ -182,6 +182,8 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, amt *uint2
 	if vmmsg.To() == nil {
 		contractAddr := crypto.CreateAddress(vmevm.TxContext.Origin, vmmsg.Nonce())
 		result.ReturnData = contractAddr[:]
+
+		ctrler.logger.Info("EVMCtrler - create contract", "address", contractAddr)
 	}
 
 	return result, nil

@@ -173,7 +173,7 @@ var (
 	rigoEVM     *EVMCtrler
 	buildInfo   TruffleBuild
 	abiContract abi.ABI
-	abiFile     = "./erc20_test_contract.json"
+	abiFile     = "../../../test/erc20_test_contract.json"
 	acctHandler acctHandlerMock
 	dbPath      = filepath.Join(os.TempDir(), "rigo-evm-test")
 )

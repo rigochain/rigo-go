@@ -9,11 +9,11 @@ import (
 	"github.com/rigochain/rigo-go/ctrlers/gov"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/ctrlers/vm/evm"
 	"github.com/rigochain/rigo-go/genesis"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
-	"github.com/rigochain/rigo-go/x/evm"
 	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -411,19 +411,25 @@ func (ctrler *RigoApp) Commit() abcitypes.ResponseCommit {
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "appHash1", bytes.HexBytes(appHash1))
+	ctrler.logger.Debug("RigoApp-Commit", "height", ver1, "appHash1", bytes.HexBytes(appHash1))
 
 	appHash2, ver2, err := ctrler.stakeCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "appHash2", bytes.HexBytes(appHash2))
+	ctrler.logger.Debug("RigoApp-Commit", "height", ver2, "appHash2", bytes.HexBytes(appHash2))
 
-	if ver0 != ver1 || ver1 != ver2 {
+	appHash3, ver3, err := ctrler.vmCtrler.Commit()
+	if err != nil {
+		panic(err)
+	}
+	ctrler.logger.Debug("RigoApp-Commit", "height", ver3, "appHash3", bytes.HexBytes(appHash3))
+
+	if ver0 != ver1 || ver1 != ver2 || ver2 != ver3 {
 		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v", ver0, ver1, ver2))
 	}
 
-	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2)
+	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
 	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "final hash", bytes.HexBytes(appHash))
 
 	ctrler.currBlockCtx.SetAppHash(appHash)

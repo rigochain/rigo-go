@@ -6,15 +6,51 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	"math"
 	"math/big"
 )
 
 func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
-	return nil, nil
+	from := req.Data[:types.AddrSize]
+	to := req.Data[types.AddrSize : types.AddrSize*2]
+	data := req.Data[types.AddrSize*2:]
+	height := req.Height
+
+	if height <= 0 {
+		height = ctrler.lastBlockHeight
+	}
+
+	block, err := tmrpccore.Block(nil, &height)
+	if err != nil {
+		return nil, xerrors.From(err)
+	}
+	btm := block.Block.Time.UnixNano()
+
+	execRet, xerr := ctrler.queryVM(from, to, data, height, btm)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if execRet.Err != nil {
+		return execRet.Revert(), xerrors.From(execRet.Err)
+	}
+	//fmt.Printf("return: %x", execRet.Return())
+	returnData := &ctrlertypes.VMCallResult{
+		execRet.UsedGas,
+		execRet.Err,
+		execRet.ReturnData,
+	}
+
+	retbz, err := tmjson.Marshal(returnData)
+	if err != nil {
+		return nil, xerrors.From(err)
+	}
+	return retbz, nil
 }
 
 func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
@@ -63,6 +99,9 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 	}
 
 	if vmmsg.To() == nil {
+		// contract 생성.
+		// EVM은 ReturnData 에 deployed code 를 리턴한다.
+		// deployed code 를 contract 주소로 대치 한다.
 		contractAddr := crypto.CreateAddress(vmevm.TxContext.Origin, vmmsg.Nonce())
 		result.ReturnData = contractAddr[:]
 	}

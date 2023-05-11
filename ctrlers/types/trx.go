@@ -122,7 +122,10 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 			return err
 		}
 	case TRX_CONTRACT:
-		return xerrors.NewOrdinary("not supported payload type")
+		payload = &TrxPayloadContract{}
+		if err := payload.Decode(txProto.XPayload); err != nil {
+			return err
+		}
 	default:
 		return xerrors.NewOrdinary("unknown payload type")
 	}

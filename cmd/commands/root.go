@@ -12,12 +12,12 @@ import (
 	tmcfg "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/libs/cli"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
-	"github.com/tendermint/tendermint/libs/log"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 )
 
 var (
 	rootConfig = cfg.DefaultConfig()
-	logger     = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+	logger     = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
 )
 
 func init() {
@@ -59,7 +59,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		if rootConfig.LogFormat == tmcfg.LogFormatJSON {
-			logger = log.NewTMJSONLogger(log.NewSyncWriter(os.Stdout))
+			logger = tmlog.NewTMJSONLogger(tmlog.NewSyncWriter(os.Stdout))
 		}
 
 		logger, err = tmflags.ParseLogLevel(rootConfig.LogLevel, logger, tmcfg.DefaultLogLevel)
@@ -68,7 +68,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		if viper.GetBool(cli.TraceFlag) {
-			logger = log.NewTracingLogger(logger)
+			logger = tmlog.NewTracingLogger(logger)
 		}
 
 		logger = logger.With("module", "main")
