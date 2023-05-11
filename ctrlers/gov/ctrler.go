@@ -257,7 +257,6 @@ func (ctrler *GovCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.XEr
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("GovCtrler::ExecuteBlock", "hegith", ctx.Height())
 	if xerr := ctrler.freezeProposals(ctx.Height()); xerr != nil {
 		return xerr
 	}
@@ -330,8 +329,6 @@ func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("GovCtrler::Commit")
-
 	h0, v0, xerr := ctrler.ruleLedger.Commit()
 	if xerr != nil {
 		return nil, -1, xerr
@@ -364,13 +361,13 @@ func (ctrler *GovCtrler) Close() xerrors.XError {
 
 	if ctrler.ruleLedger != nil {
 		if xerr := ctrler.ruleLedger.Close(); xerr != nil {
-			ctrler.logger.Error("GovCtrler::Close", "ruleLedger.Close() returns error", xerr.Error())
+			ctrler.logger.Error("GovCtrler::Close - ruleLedger.Close()", "error", xerr.Error())
 		}
 		ctrler.ruleLedger = nil
 	}
 	if ctrler.proposalLedger != nil {
 		if xerr := ctrler.proposalLedger.Close(); xerr != nil {
-			ctrler.logger.Error("GovCtrler::Close", "proposalLedger.Close() returns error", xerr.Error())
+			ctrler.logger.Error("GovCtrler::Close - proposalLedger.Close()", "error", xerr.Error())
 		}
 		ctrler.proposalLedger = nil
 	}

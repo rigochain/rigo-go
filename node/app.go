@@ -239,6 +239,10 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 	if req.Header.Height != ctrler.currBlockCtx.Height()+1 {
 		panic(fmt.Errorf("error block height: expected(%v), actural(%v)", ctrler.currBlockCtx.Height()+1, req.Header.Height))
 	}
+	ctrler.logger.Debug("RigoApp::BeginBlock",
+		"height", req.Header.Height,
+		"hash", req.Hash,
+		"prev.hash", req.Header.LastBlockId.Hash)
 
 	// save the block fee info. - it will be used for rewarding
 	ctrler.currBlockCtx = types2.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
@@ -405,37 +409,36 @@ func (ctrler *RigoApp) Commit() abcitypes.ResponseCommit {
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "appHash0", bytes.HexBytes(appHash0))
+	//ctrler.logger.Debug("RigoApp::Commit", "height", ver0, "appHash0", bytes.HexBytes(appHash0))
 
 	appHash1, ver1, err := ctrler.acctCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver1, "appHash1", bytes.HexBytes(appHash1))
+	//ctrler.logger.Debug("RigoApp::Commit", "height", ver1, "appHash1", bytes.HexBytes(appHash1))
 
 	appHash2, ver2, err := ctrler.stakeCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver2, "appHash2", bytes.HexBytes(appHash2))
+	//ctrler.logger.Debug("RigoApp::Commit", "height", ver2, "appHash2", bytes.HexBytes(appHash2))
 
 	appHash3, ver3, err := ctrler.vmCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver3, "appHash3", bytes.HexBytes(appHash3))
+	//ctrler.logger.Debug("RigoApp::Commit", "height", ver3, "appHash3", bytes.HexBytes(appHash3))
 
 	if ver0 != ver1 || ver1 != ver2 || ver2 != ver3 {
-		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v", ver0, ver1, ver2))
+		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v, vm:%v", ver0, ver1, ver2, ver3))
 	}
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "final hash", bytes.HexBytes(appHash))
+	ctrler.logger.Debug("RigoApp::Commit", "height", ver0, "app hash", bytes.HexBytes(appHash))
 
 	ctrler.currBlockCtx.SetAppHash(appHash)
 	ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
 	ctrler.metaDB.PutLastBlockHeight(ver0)
-	//ctrler.currBlockCtx = nil
 
 	return abcitypes.ResponseCommit{
 		Data: appHash[:],

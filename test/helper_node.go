@@ -25,7 +25,7 @@ var (
 
 func init() {
 	testConfig = cfg.DefaultConfig()
-	testConfig.LogLevel = ""
+	testConfig.LogLevel = "none"
 	testConfig.SetRoot(filepath.Join(os.TempDir(), "rigo_test"))
 	tmcfg.EnsureRoot(testConfig.RootDir)
 	fmt.Println("root directory", testConfig.RootDir)
@@ -46,13 +46,12 @@ func runNode() error {
 	var err error
 
 	logger := tmlog.NewNopLogger()
-	if testConfig.LogLevel != "" {
-		logger = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
-		if testConfig.LogFormat == "json" {
-			logger = tmlog.NewTMJSONLogger(tmlog.NewSyncWriter(os.Stdout))
-		}
-		logger, err = tmflags.ParseLogLevel(testConfig.LogLevel, logger, tmcfg.DefaultLogLevel)
+
+	logger = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
+	if testConfig.LogFormat == "json" {
+		logger = tmlog.NewTMJSONLogger(tmlog.NewSyncWriter(os.Stdout))
 	}
+	logger, err = tmflags.ParseLogLevel(testConfig.LogLevel, logger, tmcfg.DefaultLogLevel)
 
 	nd, err = node.NewRigoNode(testConfig, TESTPASS, logger)
 	if err != nil {

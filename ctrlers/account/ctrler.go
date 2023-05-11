@@ -111,10 +111,10 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 }
 
 func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
-	// todo: Remove Lock()/Unlock() or Use RLock()/RUlock() to improve performance
+	// Remove Lock()/Unlock() or Use RLock()/RUlock() to improve performance
 	// Lock()/Unlock() make txs to be processed serially
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
+	//ctrler.mtx.Lock()
+	//defer ctrler.mtx.Unlock()
 
 	// amount + fee
 	if xerr := ctx.Sender.SubBalance(ctx.NeedAmt); xerr != nil {
@@ -148,8 +148,6 @@ func (ctrler *AcctCtrler) ExecuteBlock(ctx *atypes.BlockContext) xerrors.XError 
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("AcctCtrler-ExecuteBlock", "height", ctx.Height())
-
 	header := ctx.BlockInfo().Header
 	if header.GetProposerAddress() != nil && ctx.GasSum().Sign() > 0 {
 		// give fee to block proposer
@@ -167,8 +165,6 @@ func (ctrler *AcctCtrler) ExecuteBlock(ctx *atypes.BlockContext) xerrors.XError 
 func (ctrler *AcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
-
-	ctrler.logger.Debug("AcctCtrler-Commit")
 
 	return ctrler.acctLedger.Commit()
 }
@@ -202,10 +198,7 @@ func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *atypes.Acc
 	}
 }
 
-func (ctrler *AcctCtrler) findOrNewAccount(addr types.Address, exec bool) *atypes.Account {
-	if acct := ctrler.findAccount(addr, exec); acct != nil {
-		return acct
-	}
+func (ctrler *AcctCtrler) newAccount(addr types.Address, exec bool) *atypes.Account {
 	acct := atypes.NewAccountWithName(addr, "")
 	fn := ctrler.acctLedger.Set
 	if exec {
@@ -216,14 +209,16 @@ func (ctrler *AcctCtrler) findOrNewAccount(addr types.Address, exec bool) *atype
 }
 
 func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atypes.Account {
-	// Use Lock instead of RLock,
-	// because new account is set to `ctrler.acctLedger`
-	// in findOrNewAccount()
-
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.findOrNewAccount(addr, exec)
+	// `AcctCtrler` MUST be locked until new account is set to acctLedger (issue #32)
+
+	if acct := ctrler.findAccount(addr, exec); acct != nil {
+		return acct
+	}
+
+	return ctrler.newAccount(addr, exec)
 }
 
 func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *atypes.Account {
@@ -253,16 +248,23 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exe
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if acct0 := ctrler.findAccount(from, exec); acct0 == nil {
+	acct0 := ctrler.findAccount(from, exec)
+	if acct0 == nil {
 		return xerrors.ErrNotFoundAccount
-	} else if acct1 := ctrler.findOrNewAccount(to, exec); acct1 == nil {
-		// not reachable
-		return xerrors.ErrNotFoundAccount
-	} else if xerr := ctrler.transfer(acct0, acct1, amt); xerr != nil {
+	}
+	acct1 := ctrler.findAccount(to, exec)
+	if acct1 == nil {
+		acct1 = ctrler.newAccount(to, exec)
+	}
+	xerr := ctrler.transfer(acct0, acct1, amt)
+	if xerr != nil {
 		return xerr
-	} else if xerr := ctrler.setAccountCommittable(acct0, exec); xerr != nil {
+	}
+
+	if xerr := ctrler.setAccountCommittable(acct0, exec); xerr != nil {
 		return xerr
-	} else if xerr := ctrler.setAccountCommittable(acct1, exec); xerr != nil {
+	}
+	if xerr := ctrler.setAccountCommittable(acct1, exec); xerr != nil {
 		return xerr
 	}
 	return nil

@@ -218,10 +218,8 @@ func (ctrler *StakeCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.X
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("StakeCtrler-ExecuteBlock", "height", ctx.Height())
-
 	if ctx.TxsCnt() > 0 {
-		if xerr := ctrler.doReward(); xerr != nil {
+		if xerr := ctrler.doReward(ctx.BlockInfo().LastCommitInfo.Votes); xerr != nil {
 			return xerr
 		}
 	}
@@ -236,20 +234,27 @@ func (ctrler *StakeCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.X
 // the following functions are called in ExecuteBlock()
 //
 
-func (ctrler *StakeCtrler) doReward() xerrors.XError {
-
-	// todo: implement completely: issue #29
-	// GetFinality() returns delegatee which is updated in execStaking / execUnstaking.
-	// So, the stakes, that is staked or un-staked at this block, is rewarded. is it right?
-	for _, val := range ctrler.lastValidators {
-		if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(val.Addr)); xerr != nil {
+func (ctrler *StakeCtrler) doReward(votes []abcitypes.VoteInfo) xerrors.XError {
+	// doReward() rewards to NOT ctrler.lastValidators BUT `votes`.
+	// `votes` is from `RequestBeginBlock.LastCommitInfo` which is set of validators of previous block.
+	for _, vote := range votes {
+		if vote.SignedLastBlock == false {
+			ctrler.logger.Debug("StakeCtrler::doReward - Validator didn't sign the last block", "validator", bytes.HexBytes(vote.Validator.Address))
+			continue
+		}
+		// issue #29
+		// GetFinality() returns delegatee which is updated in execStaking / execUnstaking.
+		// So, the stakes, that is staked or un-staked at this block, is rewarded.
+		// Use Read() instead of GetFinality() to resolve this problem.
+		delegatee, xerr := ctrler.delegateeLedger.Read(ledger.ToLedgerKey(vote.Validator.Address))
+		if xerr != nil {
 			return xerr
 		} else if delegatee == nil {
 			return xerrors.ErrNotFoundDelegatee
-		} else {
-			_ = delegatee.DoReward()
-			_ = ctrler.delegateeLedger.SetFinality(delegatee)
 		}
+
+		_ = delegatee.DoReward()
+		_ = ctrler.delegateeLedger.SetFinality(delegatee)
 	}
 	return nil
 }

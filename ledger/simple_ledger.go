@@ -175,7 +175,8 @@ func (ledger *SimpleLedger[T]) Read(key LedgerKey) (T, xerrors.XError) {
 	if item, xerr := ledger.read(key); xerr != nil {
 		return emptyNil, xerr
 	} else {
-		ledger.cachedItems.setGotItem(item) // ledger.gotItems[item.Key()] = item
+		// Do not call ledger.cachedItems.setGotItem(...)
+		// Read() only reads a item from tree
 		return item, nil
 	}
 }
