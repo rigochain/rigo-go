@@ -69,7 +69,7 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 		metadb:          metadb,
 		lastRootHash:    hash,
 		lastBlockHeight: bn,
-		logger:          logger,
+		logger:          logger.With("module", "rigo_EVMCtrler"),
 	}
 }
 
@@ -183,7 +183,7 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, amt *uint2
 		contractAddr := crypto.CreateAddress(vmevm.TxContext.Origin, vmmsg.Nonce())
 		result.ReturnData = contractAddr[:]
 
-		ctrler.logger.Info("EVMCtrler - create contract", "address", contractAddr)
+		ctrler.logger.Info("Create contract", "address", contractAddr)
 	}
 
 	return result, nil

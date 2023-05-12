@@ -53,8 +53,8 @@ func TestApplyRewardByStake(t *testing.T) {
 	for n := 0; n < blocks; n++ {
 		i := rand.Int() % len(stakeTestObjs)
 		stake := stakeTestObjs[i].s
-		_ = stake.ApplyReward()
-		_ = stakeTestObjs[i].expectedReward.Add(stakeTestObjs[i].expectedReward, stake.BlockRewardUnit)
+		stake.ApplyReward(int64(n + 1))
+		stakeTestObjs[i].expectedReward.Add(stakeTestObjs[i].expectedReward, stake.BlockRewardUnit)
 	}
 
 	for i := 0; i < len(stakeTestObjs); i++ {

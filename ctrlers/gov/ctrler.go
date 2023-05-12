@@ -65,7 +65,7 @@ func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
 		ruleLedger:     ruleLedger,
 		proposalLedger: proposalLedger,
 		frozenLedger:   frozenLedger,
-		logger:         logger,
+		logger:         logger.With("module", "rigo_GovCtrler"),
 	}, nil
 }
 
@@ -243,7 +243,7 @@ func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		return xerr
 	}
 	if prop.MajorOption != nil {
-		ctrler.logger.Debug("GovCtrler::execVoting", "major option votes", prop.MajorOption.Votes())
+		ctrler.logger.Debug("Voting to proposal", "key", prop.TxHash, "voter", ctx.Tx.From, "choice", txpayload.Choice)
 	}
 	return nil
 }
@@ -286,7 +286,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
 				}
 			} else {
 				// do nothing. the proposal will be just removed.
-				ctrler.logger.Debug("GovCtrler::freezeProposals", "warning", "not found major option")
+				ctrler.logger.Debug("Freeze proposal", "warning", "not found major option")
 			}
 		}
 		return nil
@@ -313,10 +313,10 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 					ctrler.newGovRule = newGovRule
 				default:
 					key := prop.Key()
-					ctrler.logger.Debug("GovCtrler::applyProposals", "propsal_key", abytes.HexBytes(key[:]), "type", prop.OptType)
+					ctrler.logger.Debug("Apply proposal", "key(txHash)", abytes.HexBytes(key[:]), "type", prop.OptType)
 				}
 			} else {
-				ctrler.logger.Error("GovCtrler::applyProposals", "error", "major option is nil")
+				ctrler.logger.Error("Apply proposal", "error", "major option is nil")
 			}
 		}
 		return nil
@@ -349,7 +349,7 @@ func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	if ctrler.newGovRule != nil {
 		ctrler.GovRule = *ctrler.newGovRule
 		ctrler.newGovRule = nil
-		ctrler.logger.Debug("GovCtrler::applyProposals", "new GovRule", ctrler.GovRule.String())
+		ctrler.logger.Debug("New governance rule is committed", "rule", ctrler.GovRule.String())
 	}
 	return crypto.DefaultHash(h0, h1, h2), v0, nil
 
@@ -361,13 +361,13 @@ func (ctrler *GovCtrler) Close() xerrors.XError {
 
 	if ctrler.ruleLedger != nil {
 		if xerr := ctrler.ruleLedger.Close(); xerr != nil {
-			ctrler.logger.Error("GovCtrler::Close - ruleLedger.Close()", "error", xerr.Error())
+			ctrler.logger.Error("ruleLedger.Close()", "error", xerr.Error())
 		}
 		ctrler.ruleLedger = nil
 	}
 	if ctrler.proposalLedger != nil {
 		if xerr := ctrler.proposalLedger.Close(); xerr != nil {
-			ctrler.logger.Error("GovCtrler::Close - proposalLedger.Close()", "error", xerr.Error())
+			ctrler.logger.Error("proposalLedger.Close()", "error", xerr.Error())
 		}
 		ctrler.proposalLedger = nil
 	}

@@ -29,7 +29,7 @@ func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error)
 	} else {
 		return &AcctCtrler{
 			acctLedger: execLedger,
-			logger:     logger,
+			logger:     logger.With("module", "rigo_AcctCtrler"),
 		}, nil
 	}
 }

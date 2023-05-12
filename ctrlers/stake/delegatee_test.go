@@ -62,26 +62,33 @@ func TestApplyReward(t *testing.T) {
 	delegatee := stake.NewDelegatee(Wallets[1].Address(), Wallets[1].GetPubKey())
 
 	// staking
+	height0 := rand.Int63n(1_000_000)
 	amt0 := bytes.RandU256IntN(govHelper.MaxStakeAmount())
 	delegatee.AddStake(
 		stake.NewStakeWithAmount(
 			delegatee.Addr,
 			delegatee.Addr,
 			amt0,                   // amount
-			rand.Int63n(1_000_000), // height
+			height0+1,              // height
 			bytes.RandHexBytes(32), //txhash
 			govHelper,
 		),
 	)
-	// first reward
-	reward0 := delegatee.DoReward()
-	require.Equal(t, reward0, delegatee.GetRewardAmount())
+	// not rewarded - height0 is not enough
+	reward0 := delegatee.DoReward(height0)
+	require.Equal(t, 0, delegatee.GetRewardAmount().Sign())
 	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetRewardAmount())
 
-	// second reward
-	reward1 := delegatee.DoReward()
-	require.Equal(t, reward0, reward1)
+	// first reward
+	reward1 := delegatee.DoReward(height0 + 1)
 	require.Equal(t, new(uint256.Int).Add(reward0, reward1), delegatee.GetRewardAmount())
+	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetRewardAmount())
+	require.True(t, delegatee.GetRewardAmount().Sign() > 0)
+
+	// first reward
+	reward2 := delegatee.DoReward(height0 + 2)
+	require.Equal(t, reward1, reward2)
+	require.Equal(t, new(uint256.Int).Add(reward1, reward2), delegatee.GetRewardAmount())
 	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetRewardAmount())
 	require.True(t, delegatee.GetRewardAmount().Sign() > 0)
 }
@@ -96,7 +103,7 @@ func BenchmarkApplyReward(b *testing.B) {
 				types.RandAddress(),
 				delegatee.Addr,
 				power,                  // power
-				rand.Int63n(1_000_000), // height
+				rand.Int63n(1),         // height
 				bytes.RandHexBytes(32), //txhash
 				govHelper,
 			),
@@ -105,7 +112,7 @@ func BenchmarkApplyReward(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rewarded := delegatee.DoReward()
+		rewarded := delegatee.DoReward(int64(i + 1))
 		require.True(b, rewarded.Sign() > 0)
 	}
 }

@@ -328,17 +328,24 @@ func (delegatee *Delegatee) sumBlockRewardOf(addr types.Address) *uint256.Int {
 	return reward
 }
 
-func (delegatee *Delegatee) DoReward() *uint256.Int {
+func (delegatee *Delegatee) DoReward(height int64) *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return delegatee.doBlockReward()
+	return delegatee.doBlockReward(height)
 }
 
-func (delegatee *Delegatee) doBlockReward() *uint256.Int {
+func (delegatee *Delegatee) doBlockReward(height int64) *uint256.Int {
 	reward := uint256.NewInt(0)
 	for _, s := range delegatee.Stakes {
-		_ = reward.Add(reward, s.applyReward())
+
+		// issue #29
+		// `doBlockReward` is called after running `execStaking/execUnstaking`.
+		// So the `delegatee` has new stakes at now.
+		// Rewarding should be given only to old stakes.
+		if s.StartHeight <= height {
+			_ = reward.Add(reward, s.applyReward(height))
+		}
 	}
 	_ = delegatee.RewardAmount.Add(delegatee.RewardAmount, reward)
 	return reward
