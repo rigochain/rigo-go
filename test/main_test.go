@@ -8,8 +8,8 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	//test_on_internal_node(m)
-	test_on_external_node(m)
+	test_on_internal_node(m)
+	//test_on_external_node(m)
 }
 
 func test_on_internal_node(m *testing.M) {

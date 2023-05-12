@@ -148,7 +148,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctTestObj *acctHelpe
 
 		racctState.addExpectedBalance(randAmt)
 
-		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce(), randAmt)
+		//fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce(), randAmt)
 
 		w.AddNonce()
 	}

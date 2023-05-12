@@ -175,7 +175,7 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 	if r1, r2, err := ledger.tree.SaveVersion(); err != nil {
 		return r1, r2, xerrors.From(err)
 	} else {
-		ledger.SimpleLedger.cachedItems.refresh()
+		ledger.SimpleLedger.cachedItems.reset()
 		ledger.finalityItems.refresh()
 		return r1, r2, nil
 	}
