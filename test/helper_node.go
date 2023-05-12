@@ -25,7 +25,7 @@ var (
 
 func init() {
 	testConfig = cfg.DefaultConfig()
-	testConfig.LogLevel = "none"
+	testConfig.LogLevel = "rigo_EVMCtrler:debug,*:error"
 	testConfig.SetRoot(filepath.Join(os.TempDir(), "rigo_test"))
 	tmcfg.EnsureRoot(testConfig.RootDir)
 	fmt.Println("root directory", testConfig.RootDir)

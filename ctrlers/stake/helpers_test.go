@@ -52,6 +52,10 @@ func (a *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (types2.IAccountHandler
 	return &acctHandlerMock{}, nil
 }
 
+func (a *acctHandlerMock) SetAccountCommittable(account *types2.Account, b bool) xerrors.XError {
+	return nil
+}
+
 var _ types2.IAccountHandler = (*acctHandlerMock)(nil)
 
 func FindWallet(addr types.Address) *web3.Wallet {

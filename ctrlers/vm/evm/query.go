@@ -78,7 +78,7 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 
 	nonce := state.GetNonce(from.Array20())
 
-	vmmsg := evmMessage(sender, toAddr, nonce, big.NewInt(0), data)
+	vmmsg := evmMessage(sender, toAddr, nonce, big.NewInt(0), big.NewInt(0), data)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)

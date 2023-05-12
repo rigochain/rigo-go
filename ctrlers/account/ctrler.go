@@ -35,13 +35,13 @@ func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error)
 }
 
 func (ctrler *AcctCtrler) ImmutableAcctCtrlerAt(height int64) (atypes.IAccountHandler, xerrors.XError) {
-	ledger, xerr := ctrler.acctLedger.ImmutableLedgerAt(height, 128)
+	ledger0, xerr := ctrler.acctLedger.ImmutableLedgerAt(height, 128)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	return &AcctCtrler{
-		acctLedger: ledger,
+		acctLedger: ledger0,
 		logger:     ctrler.logger,
 	}, nil
 }
@@ -103,7 +103,8 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 
 	if xerr := ctx.Sender.CheckBalance(ctx.NeedAmt); xerr != nil {
 		return xerr
-	} else if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
+	}
+	if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
 		return xerr.Wrap(fmt.Errorf("invalid nonce - expected: %v, actual:%v, address: %v, txhash: %X", ctx.Sender.Nonce, ctx.Tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
 
@@ -198,14 +199,8 @@ func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *atypes.Acc
 	}
 }
 
-func (ctrler *AcctCtrler) newAccount(addr types.Address, exec bool) *atypes.Account {
-	acct := atypes.NewAccountWithName(addr, "")
-	fn := ctrler.acctLedger.Set
-	if exec {
-		fn = ctrler.acctLedger.SetFinality
-	}
-	_ = fn(acct)
-	return acct
+func (ctrler *AcctCtrler) newAccount(addr types.Address) *atypes.Account {
+	return atypes.NewAccountWithName(addr, "")
 }
 
 func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atypes.Account {
@@ -218,7 +213,11 @@ func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atype
 		return acct
 	}
 
-	return ctrler.newAccount(addr, exec)
+	newAcct := ctrler.newAccount(addr)
+	if newAcct != nil {
+		ctrler.setAccountCommittable(newAcct, exec)
+	}
+	return newAcct
 }
 
 func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *atypes.Account {
@@ -254,7 +253,7 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exe
 	}
 	acct1 := ctrler.findAccount(to, exec)
 	if acct1 == nil {
-		acct1 = ctrler.newAccount(to, exec)
+		acct1 = ctrler.newAccount(to)
 	}
 	xerr := ctrler.transfer(acct0, acct1, amt)
 	if xerr != nil {
@@ -295,11 +294,11 @@ func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) 
 	return nil
 }
 
-func (ctrler *AcctCtrler) SetAccountCommittable(acct *atypes.Account) xerrors.XError {
+func (ctrler *AcctCtrler) SetAccountCommittable(acct *atypes.Account, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.setAccountCommittable(acct, true)
+	return ctrler.setAccountCommittable(acct, exec)
 }
 
 func (ctrler *AcctCtrler) setAccountCommittable(acct *atypes.Account, exec bool) xerrors.XError {

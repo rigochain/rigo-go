@@ -11,18 +11,21 @@ import (
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/big"
 	"sync"
 )
 
 type StateDBWrapper struct {
 	*state.StateDB
-	acctHandler ctrlertypes.IAccountHandler
-	immutable   bool
-	mtx         sync.RWMutex
+	acctLedger ctrlertypes.IAccountHandler
+	immutable  bool
+
+	logger tmlog.Logger
+	mtx    sync.RWMutex
 }
 
-func NewStateDBWrapper(path string, lastRootHash []byte, acctHandler ctrlertypes.IAccountHandler) (*StateDBWrapper, error) {
+func NewStateDBWrapper(path string, lastRootHash []byte, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) (*StateDBWrapper, error) {
 	//rawDB, err := rawdb.NewLevelDBDatabaseWithFreezer(path, 0, 0, path, "", false)
 	rawDB, err := rawdb.NewLevelDBDatabase(path, 0, 0, "", false)
 	if err != nil {
@@ -39,8 +42,9 @@ func NewStateDBWrapper(path string, lastRootHash []byte, acctHandler ctrlertypes
 	}
 
 	return &StateDBWrapper{
-		StateDB:     stateDB,
-		acctHandler: acctHandler,
+		StateDB:    stateDB,
+		acctLedger: acctHandler,
+		logger:     logger,
 	}, nil
 }
 
@@ -55,14 +59,15 @@ func (s *StateDBWrapper) ImmutableStateAt(n int64, hash []byte) (*StateDBWrapper
 		return nil, xerrors.From(err)
 	}
 
-	acctCtrler, xerr := s.acctHandler.ImmutableAcctCtrlerAt(n)
+	acctLedger, xerr := s.acctLedger.ImmutableAcctCtrlerAt(n)
 	if xerr != nil {
 		return nil, xerr
 	}
 	return &StateDBWrapper{
-		StateDB:     stateDB,
-		acctHandler: acctCtrler,
-		immutable:   true,
+		StateDB:    stateDB,
+		acctLedger: acctLedger,
+		immutable:  true,
+		logger:     s.logger,
 	}, nil
 }
 
@@ -76,43 +81,50 @@ func (s *StateDBWrapper) CreateAccount(addr common.Address) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	_ = s.acctHandler.FindOrNewAccount(addr[:], true)
+	_ = s.acctLedger.FindOrNewAccount(addr[:], true)
 	s.StateDB.CreateAccount(addr)
+	s.logger.Debug("Create account", "address", addr)
 }
 
 func (s *StateDBWrapper) SubBalance(addr common.Address, amt *big.Int) {
-	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+	s.logger.Debug("SubBalance", "address", addr, "amount", amt)
+	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
 		if err := acct.SubBalance(uint256.MustFromBig(amt)); err != nil {
 			panic(err)
 		}
+		s.acctLedger.SetAccountCommittable(acct, true)
 	}
 }
 
 func (s *StateDBWrapper) AddBalance(addr common.Address, amt *big.Int) {
-	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+	s.logger.Debug("AddBalance", "address", addr, "amount", amt)
+	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
 		if err := acct.AddBalance(uint256.MustFromBig(amt)); err != nil {
 			panic(err)
 		}
+		s.acctLedger.SetAccountCommittable(acct, true)
 	}
 }
 
 func (s *StateDBWrapper) GetBalance(addr common.Address) *big.Int {
-	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
 		return acct.GetBalance().ToBig()
 	}
 	return big.NewInt(0)
 }
 
 func (s *StateDBWrapper) GetNonce(addr common.Address) uint64 {
-	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
 		return acct.GetNonce()
 	}
 	return 0
 }
 
 func (s *StateDBWrapper) SetNonce(addr common.Address, n uint64) {
-	if acct := s.acctHandler.FindAccount(addr[:], true); acct != nil {
+	s.logger.Debug("SetNonce", "address", addr, "nonce", n)
+	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
 		acct.SetNonce(n)
+		s.acctLedger.SetAccountCommittable(acct, true)
 	}
 }
 

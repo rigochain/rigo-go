@@ -14,6 +14,7 @@ import (
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmdb "github.com/tendermint/tm-db"
 	"math"
+	"math/big"
 	"strconv"
 	"sync"
 )
@@ -59,7 +60,9 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 		panic(err)
 	}
 
-	stdb, err := NewStateDBWrapper(path, hash, acctHandler)
+	logger = logger.With("module", "rigo_EVMCtrler")
+
+	stdb, err := NewStateDBWrapper(path, hash, acctHandler, logger)
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +72,7 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 		metadb:          metadb,
 		lastRootHash:    hash,
 		lastBlockHeight: bn,
-		logger:          logger.With("module", "rigo_EVMCtrler"),
+		logger:          logger,
 	}
 }
 
@@ -128,6 +131,15 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 }
 
 func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
+		return xerrors.ErrUnknownTrxType
+	}
+
+	if ctx.Exec == false {
+		ctx.GasUsed = ctx.Tx.Gas
+		ctrler.logger.Debug("EVMCtrler is not execute a tx at CheckTx")
+		return nil
+	}
 	ret, xerr := ctrler.execVM(
 		ctx.Tx.From,
 		ctx.Tx.To,
@@ -143,8 +155,11 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	if ret.Err != nil {
 		return xerrors.From(ret.Err)
 	}
-	ctx.GasUsed = ctx.Tx.Gas //new(uint256.Int).Add(ctx.GasUsed, uint256.NewInt(ret.UsedGas))
 	ctx.RetData = ret.ReturnData
+
+	// `EVM` handles nonce and amount, but not gas.
+	ctx.GasUsed = ctx.Tx.Gas //new(uint256.Int).Add(ctx.GasUsed, uint256.NewInt(ret.UsedGas))
+	ctrler.stateDBWrapper.SubBalance(ctx.Tx.From.Array20(), ctx.GasUsed.ToBig())
 
 	return nil
 }
@@ -159,7 +174,7 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, amt *uint2
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, nonce, amt.ToBig(), data)
+	vmmsg := evmMessage(sender, toAddr, nonce, big.NewInt(0), amt.ToBig(), data)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)

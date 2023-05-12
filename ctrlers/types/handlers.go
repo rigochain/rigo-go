@@ -39,6 +39,7 @@ type IAccountHandler interface {
 	Transfer(types.Address, types.Address, *uint256.Int, bool) xerrors.XError
 	Reward(types.Address, *uint256.Int, bool) xerrors.XError
 	ImmutableAcctCtrlerAt(int64) (IAccountHandler, xerrors.XError)
+	SetAccountCommittable(*Account, bool) xerrors.XError
 }
 
 type IStakeHandler interface {

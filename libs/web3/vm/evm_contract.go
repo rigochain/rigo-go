@@ -90,11 +90,14 @@ func (ec *EVMContract) Exec(name string, args []interface{}, from *web3.Wallet, 
 	}
 
 	ret, err := rweb3.SendTransactionSync(tx)
+	if err != nil {
+		return nil, err
+	}
 	if ret.Code == xerrors.ErrCodeSuccess && len(ret.Data) == types.AddrSize {
 		ec.addr = types.Address(ret.Data)
 	}
 
-	return ret, err
+	return ret, nil
 }
 
 func (ec *EVMContract) pack(name string, args ...interface{}) ([]byte, error) {

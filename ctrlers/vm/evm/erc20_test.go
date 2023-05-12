@@ -281,4 +281,8 @@ func (handler *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAcc
 	}, nil
 }
 
+func (handler *acctHandlerMock) SetAccountCommittable(acct *ctrlertypes.Account, exec bool) xerrors.XError {
+	return nil
+}
+
 var _ ctrlertypes.IAccountHandler = (*acctHandlerMock)(nil)
