@@ -169,6 +169,6 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 }
 
 type IBlockHandler interface {
-	ValidateBlock(*BlockContext) xerrors.XError
-	ExecuteBlock(*BlockContext) xerrors.XError
+	BeginBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
+	EndBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
 }

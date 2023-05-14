@@ -14,4 +14,5 @@ message GovRuleProto {
   int64 max_voting_period_blocks = 9;
   int64 min_self_stake_ratio = 10;
   int64 max_updatable_stake_ratio = 11;
+  int64 slash_ratio = 12;
 }

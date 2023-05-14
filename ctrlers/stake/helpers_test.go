@@ -125,6 +125,10 @@ func (g *govHandlerMock) MaxUpdatableStakeRatio() int64 {
 	return 30
 }
 
+func (g *govHandlerMock) SlashRatio() int64 {
+	return 27
+}
+
 func (g *govHandlerMock) AmountToPower(amt *uint256.Int) int64 {
 	// 1 VotingPower == 1_000_000_000_000_000_000 (10^18)
 	_vp := new(uint256.Int).Div(amt, g.AmountPerPower())

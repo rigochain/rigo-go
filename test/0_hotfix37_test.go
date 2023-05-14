@@ -19,7 +19,7 @@ func TestStaking2GenesisValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
-	txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
+	txRet, err := waitTrxResult(ret.Hash, 30, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 

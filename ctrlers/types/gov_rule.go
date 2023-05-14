@@ -24,8 +24,9 @@ type GovRule struct {
 	minVotingPeriodBlocks int64
 	maxVotingPeriodBlocks int64
 
-	minSelfStakeRatio      int64 // todo: add min equity stake: issue #33
+	minSelfStakeRatio      int64
 	maxUpdatableStakeRatio int64 // todo: add max updatable stake: issue #34
+	slashRatio             int64
 
 	mtx sync.RWMutex
 }
@@ -43,6 +44,7 @@ func DefaultGovRule() *GovRule {
 		maxVotingPeriodBlocks:  2592000, // = 60 * 60 * 24 * 30,    // 30 days
 		minSelfStakeRatio:      50,      // 50%
 		maxUpdatableStakeRatio: 30,      // 30%
+		slashRatio:             50,      // 50%
 	}
 }
 
@@ -59,6 +61,7 @@ func Test1GovRule() *GovRule {
 		maxVotingPeriodBlocks:  60,
 		minSelfStakeRatio:      50, // 50%
 		maxUpdatableStakeRatio: 30, // 30%
+		slashRatio:             50, // 50%
 	}
 }
 
@@ -75,6 +78,7 @@ func Test2GovRule() *GovRule {
 		maxVotingPeriodBlocks:  60,
 		minSelfStakeRatio:      50, // 50%
 		maxUpdatableStakeRatio: 30, // 30%
+		slashRatio:             50, // 50%
 	}
 }
 
@@ -122,6 +126,7 @@ func (r *GovRule) fromProto(pm *GovRuleProto) {
 	r.maxVotingPeriodBlocks = pm.MaxVotingPeriodBlocks
 	r.minSelfStakeRatio = pm.MinSelfStakeRatio
 	r.maxUpdatableStakeRatio = pm.MaxUpdatableStakeRatio
+	r.slashRatio = pm.SlashRatio
 }
 
 func (r *GovRule) toProto() *GovRuleProto {
@@ -140,6 +145,7 @@ func (r *GovRule) toProto() *GovRuleProto {
 		MaxVotingPeriodBlocks:  r.maxVotingPeriodBlocks,
 		MinSelfStakeRatio:      r.minSelfStakeRatio,
 		MaxUpdatableStakeRatio: r.maxUpdatableStakeRatio,
+		SlashRatio:             r.slashRatio,
 	}
 	return a
 }
@@ -160,6 +166,7 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
 		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
 		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
+		SlashRatio             int64  `json:"SlashRatio"`
 	}{
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
@@ -172,6 +179,7 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 		MaxVotingBlocks:        r.maxVotingPeriodBlocks,
 		MinSelfStakeRatio:      r.minSelfStakeRatio,
 		MaxUpdatableStakeRatio: r.maxUpdatableStakeRatio,
+		SlashRatio:             r.slashRatio,
 	}
 	return tmjson.Marshal(tm)
 }
@@ -189,6 +197,7 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
 		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
 		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
+		SlashRatio             int64  `json:"SlashRatio"`
 	}{}
 
 	if err := tmjson.Unmarshal(bz, tm); err != nil {
@@ -209,6 +218,7 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 	r.maxVotingPeriodBlocks = tm.MaxVotingBlocks
 	r.minSelfStakeRatio = tm.MinSelfStakeRatio
 	r.maxUpdatableStakeRatio = tm.MaxUpdatableStakeRatio
+	r.slashRatio = tm.SlashRatio
 	return nil
 }
 
@@ -285,6 +295,12 @@ func (r *GovRule) MaxUpdatableStakeRatio() int64 {
 	defer r.mtx.RUnlock()
 
 	return r.maxUpdatableStakeRatio
+}
+func (r *GovRule) SlashRatio() int64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.slashRatio
 }
 
 //

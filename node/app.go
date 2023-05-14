@@ -243,9 +243,11 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 	// save the block fee info. - it will be used for rewarding
 	ctrler.currBlockCtx = types2.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
 
-	// todo: implement processing for the evidences (req.ByzantineValidators)
+	ev, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
 
-	return abcitypes.ResponseBeginBlock{}
+	return abcitypes.ResponseBeginBlock{
+		Events: ev,
+	}
 }
 
 func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
@@ -382,12 +384,18 @@ func (ctrler *RigoApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Respo
 }
 
 func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	_ = ctrler.govCtrler.ExecuteBlock(ctrler.currBlockCtx)
-	_ = ctrler.acctCtrler.ExecuteBlock(ctrler.currBlockCtx)
-	_ = ctrler.stakeCtrler.ExecuteBlock(ctrler.currBlockCtx)
+	ev0, _ := ctrler.govCtrler.EndBlock(ctrler.currBlockCtx)
+	ev1, _ := ctrler.acctCtrler.EndBlock(ctrler.currBlockCtx)
+	ev2, _ := ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
+
+	var ev []abcitypes.Event
+	ev = append(ev, ev0...)
+	ev = append(ev, ev1...)
+	ev = append(ev, ev2...)
 
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates: ctrler.currBlockCtx.ValUpdates,
+		Events:           ev,
 	}
 }
 

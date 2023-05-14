@@ -9,6 +9,7 @@ import (
 	"github.com/rigochain/rigo-go/ledger"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sync"
 )
@@ -111,27 +112,29 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 	return nil
 }
 
-func (ctrler *AcctCtrler) ValidateBlock(ctx *atypes.BlockContext) xerrors.XError {
+func (ctrler *AcctCtrler) BeginBlock(ctx *atypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	// do nothing
-	return nil
+	return nil, nil
 }
 
-func (ctrler *AcctCtrler) ExecuteBlock(ctx *atypes.BlockContext) xerrors.XError {
+func (ctrler *AcctCtrler) EndBlock(ctx *atypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	header := ctx.BlockInfo().Header
 	if header.GetProposerAddress() != nil && ctx.GasSum().Sign() > 0 {
 		// give fee to block proposer
-		if acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(header.GetProposerAddress())); xerr != nil {
-			return xerr
-		} else if xerr := acct.AddBalance(ctx.GasSum()); xerr != nil {
-			return xerr
-		} else {
-			return ctrler.setAccountCommittable(acct, true)
+		acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(header.GetProposerAddress()))
+		if xerr != nil {
+			return nil, xerr
 		}
+		xerr = acct.AddBalance(ctx.GasSum())
+		if xerr != nil {
+			return nil, xerr
+		}
+		return nil, ctrler.setAccountCommittable(acct, true)
 	}
-	return nil
+	return nil, nil
 }
 
 func (ctrler *AcctCtrler) Commit() ([]byte, int64, xerrors.XError) {

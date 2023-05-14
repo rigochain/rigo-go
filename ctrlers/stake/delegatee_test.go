@@ -10,12 +10,36 @@ import (
 	"testing"
 )
 
-var (
-	delegatee *stake.Delegatee
-)
+func TestSlash(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		delegatee := stake.NewDelegatee(Wallets[0].Address(), Wallets[0].GetPubKey())
+
+		amt0 := bytes.RandU256IntN(govHelper.MaxStakeAmount())
+		power0 := govHelper.AmountToPower(amt0)
+		delegatee.AddStake(
+			stake.NewStakeWithAmount(
+				delegatee.Addr,
+				delegatee.Addr,
+				amt0,                   // amount
+				rand.Int63n(1_000_000), // height
+				bytes.RandHexBytes(32), //txhash
+				govHelper,
+			),
+		)
+
+		delegatee.DoSlash(govHelper.SlashRatio())
+
+		_slashed := uint256.NewInt(uint64(power0))
+		_ = _slashed.Mul(_slashed, uint256.NewInt(uint64(govHelper.SlashRatio())))
+		_ = _slashed.Div(_slashed, uint256.NewInt(uint64(100)))
+		slashedPower := int64(_slashed.Uint64())
+
+		require.Equal(t, power0-slashedPower, delegatee.SelfPower)
+	}
+}
 
 func TestAppendStake(t *testing.T) {
-	delegatee = stake.NewDelegatee(Wallets[0].Address(), Wallets[0].GetPubKey())
+	delegatee := stake.NewDelegatee(Wallets[0].Address(), Wallets[0].GetPubKey())
 
 	amt0 := bytes.RandU256IntN(govHelper.MaxStakeAmount())
 	power0 := govHelper.AmountToPower(amt0)
@@ -76,21 +100,21 @@ func TestApplyReward(t *testing.T) {
 	)
 	// not rewarded - height0 is not enough
 	reward0 := delegatee.DoReward(height0)
-	require.Equal(t, 0, delegatee.GetRewardAmount().Sign())
-	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetRewardAmount())
+	require.Equal(t, 0, delegatee.GetTotalRewardAmount().Sign())
+	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalRewardAmount())
 
 	// first reward
 	reward1 := delegatee.DoReward(height0 + 1)
-	require.Equal(t, new(uint256.Int).Add(reward0, reward1), delegatee.GetRewardAmount())
-	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetRewardAmount())
-	require.True(t, delegatee.GetRewardAmount().Sign() > 0)
+	require.Equal(t, new(uint256.Int).Add(reward0, reward1), delegatee.GetTotalRewardAmount())
+	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalRewardAmount())
+	require.True(t, delegatee.GetTotalRewardAmount().Sign() > 0)
 
 	// first reward
 	reward2 := delegatee.DoReward(height0 + 2)
 	require.Equal(t, reward1, reward2)
-	require.Equal(t, new(uint256.Int).Add(reward1, reward2), delegatee.GetRewardAmount())
-	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetRewardAmount())
-	require.True(t, delegatee.GetRewardAmount().Sign() > 0)
+	require.Equal(t, new(uint256.Int).Add(reward1, reward2), delegatee.GetTotalRewardAmount())
+	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalRewardAmount())
+	require.True(t, delegatee.GetTotalRewardAmount().Sign() > 0)
 }
 
 func BenchmarkApplyReward(b *testing.B) {

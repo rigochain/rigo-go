@@ -17,7 +17,7 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 	case "stakes":
 		addr := types.Address(req.Data)
 		var stakes []*Stake
-		if err := ctrler.delegateeLedger.IterateAllItems(func(d *Delegatee) xerrors.XError {
+		if err := ctrler.delegateeLedger.IterateReadAllItems(func(d *Delegatee) xerrors.XError {
 			for _, s0 := range d.Stakes {
 				if bytes.Compare(s0.From, addr) == 0 {
 					stakes = append(stakes, s0)

@@ -14,6 +14,7 @@ import (
 	abytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	"sync"
@@ -248,30 +249,30 @@ func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *GovCtrler) ValidateBlock(ctx *ctrlertypes.BlockContext) xerrors.XError {
+func (ctrler *GovCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	// do nothing
-	return nil
+	return nil, nil
 }
 
-func (ctrler *GovCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.XError {
+func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	if xerr := ctrler.freezeProposals(ctx.Height()); xerr != nil {
-		return xerr
+		return nil, xerr
 	}
 	if xerr := ctrler.applyProposals(ctx.Height()); xerr != nil {
-		return xerr
+		return nil, xerr
 	}
 
-	return nil
+	return nil, nil
 }
 
 // The following function is called by the Block Executor
 //
 
 func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
-	xerr := ctrler.proposalLedger.IterateAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+	xerr := ctrler.proposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		if prop.EndVotingHeight < height {
 
 			// freezing
@@ -295,7 +296,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
 }
 
 func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
-	xerr := ctrler.frozenLedger.IterateAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+	xerr := ctrler.frozenLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		if prop.ApplyingHeight <= height {
 			if _, xerr := ctrler.frozenLedger.DelFinality(prop.Key()); xerr != nil {
 				return xerr
@@ -387,7 +388,7 @@ func (ctrler *GovCtrler) GetProposals() ([]*proposal.GovProposal, xerrors.XError
 
 	var proposals []*proposal.GovProposal
 
-	if xerr := ctrler.proposalLedger.IterateAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+	if xerr := ctrler.proposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		proposals = append(proposals, prop)
 		return nil
 	}); xerr != nil {

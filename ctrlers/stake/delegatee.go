@@ -22,8 +22,8 @@ type Delegatee struct {
 	TotalAmount *uint256.Int `json:"totalAmount"`
 	TotalPower  int64        `json:"totalPower,string"`
 
-	RewardAmount *uint256.Int `json:"rewardAmount"`
-	Stakes       []*Stake     `json:"stakes"`
+	TotalRewardAmount *uint256.Int `json:"rewardAmount"`
+	Stakes            []*Stake     `json:"stakes"`
 
 	mtx sync.RWMutex
 }
@@ -60,13 +60,13 @@ var _ ledger.ILedgerItem = (*Delegatee)(nil)
 
 func NewDelegatee(addr types.Address, pubKey bytes2.HexBytes) *Delegatee {
 	return &Delegatee{
-		Addr:         addr,
-		PubKey:       pubKey,
-		SelfAmount:   uint256.NewInt(0),
-		SelfPower:    0,
-		TotalPower:   0,
-		TotalAmount:  uint256.NewInt(0),
-		RewardAmount: uint256.NewInt(0),
+		Addr:              addr,
+		PubKey:            pubKey,
+		SelfAmount:        uint256.NewInt(0),
+		SelfPower:         0,
+		TotalPower:        0,
+		TotalAmount:       uint256.NewInt(0),
+		TotalRewardAmount: uint256.NewInt(0),
 	}
 }
 
@@ -88,7 +88,7 @@ func (delegatee *Delegatee) addStake(stakes ...*Stake) xerrors.XError {
 		}
 		delegatee.TotalPower += s.Power
 		_ = delegatee.TotalAmount.Add(delegatee.TotalAmount, s.Amount)
-		_ = delegatee.RewardAmount.Add(delegatee.RewardAmount, s.ReceivedReward)
+		_ = delegatee.TotalRewardAmount.Add(delegatee.TotalRewardAmount, s.ReceivedReward)
 	}
 	return nil
 }
@@ -97,6 +97,10 @@ func (delegatee *Delegatee) DelStake(txhash bytes2.HexBytes) *Stake {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
+	return delegatee.delStakeByHash(txhash)
+}
+
+func (delegatee *Delegatee) delStakeByHash(txhash bytes2.HexBytes) *Stake {
 	i, s0 := delegatee.findStake(txhash)
 	if i < 0 || s0 == nil {
 		return nil
@@ -109,7 +113,7 @@ func (delegatee *Delegatee) DelStake(txhash bytes2.HexBytes) *Stake {
 		}
 		delegatee.TotalPower -= s.Power
 		_ = delegatee.TotalAmount.Sub(delegatee.TotalAmount, s.Amount)
-		_ = delegatee.RewardAmount.Sub(delegatee.RewardAmount, s.ReceivedReward)
+		_ = delegatee.TotalRewardAmount.Sub(delegatee.TotalRewardAmount, s.ReceivedReward)
 		return s
 	}
 	return nil
@@ -135,7 +139,7 @@ func (delegatee *Delegatee) DelAllStakes() []*Stake {
 	for _, s := range stakes {
 		delegatee.TotalPower -= s.Power
 		_ = delegatee.TotalAmount.Sub(delegatee.TotalAmount, s.Amount)
-		_ = delegatee.RewardAmount.Sub(delegatee.RewardAmount, s.ReceivedReward)
+		_ = delegatee.TotalRewardAmount.Sub(delegatee.TotalRewardAmount, s.ReceivedReward)
 	}
 
 	return stakes
@@ -163,21 +167,6 @@ func (delegatee *Delegatee) getStake(idx int) *Stake {
 	}
 	return delegatee.Stakes[idx]
 }
-
-//	func (delegatee *Delegatee) NextStake() *Stake {
-//		delegatee.mtx.RLock()
-//		defer delegatee.mtx.RUnlock()
-//
-//		return delegatee.getStake(0)
-//	}
-//
-//	func (delegatee *Delegatee) LastStake() *Stake {
-//		delegatee.mtx.RLock()
-//		defer delegatee.mtx.RUnlock()
-//
-//		idx := len(delegatee.Stakes) - 1
-//		return delegatee.getStake(idx)
-//	}
 
 func (delegatee *Delegatee) FindStake(txhash bytes2.HexBytes) (int, *Stake) {
 	delegatee.mtx.RLock()
@@ -267,6 +256,103 @@ func (delegatee *Delegatee) GetTotalPower() int64 {
 	return delegatee.TotalPower
 }
 
+func (delegatee *Delegatee) SelfStakeRatio(added int64) int64 {
+	delegatee.mtx.RLock()
+	defer delegatee.mtx.RUnlock()
+
+	return (delegatee.SelfPower * int64(100)) / (delegatee.TotalPower + added)
+}
+
+func (delegatee *Delegatee) GetTotalRewardAmount() *uint256.Int {
+	delegatee.mtx.RLock()
+	defer delegatee.mtx.RUnlock()
+
+	return delegatee.TotalRewardAmount.Clone()
+}
+
+func (delegatee *Delegatee) DoReward(height int64) *uint256.Int {
+	delegatee.mtx.RLock()
+	defer delegatee.mtx.RUnlock()
+
+	return delegatee.doBlockReward(height)
+}
+
+func (delegatee *Delegatee) doBlockReward(height int64) *uint256.Int {
+	reward := uint256.NewInt(0)
+	for _, s := range delegatee.Stakes {
+
+		// issue #29
+		// `doBlockReward` is called after running `execStaking/execUnstaking`.
+		// So the `delegatee` has new stakes at now.
+		// Rewarding should be given only to old stakes.
+		if s.StartHeight <= height {
+			_ = reward.Add(reward, s.applyReward(height))
+		}
+	}
+	_ = delegatee.TotalRewardAmount.Add(delegatee.TotalRewardAmount, reward)
+	return reward
+}
+
+func (delegatee *Delegatee) DoSlash(ratio int64) int64 {
+	delegatee.mtx.Lock()
+	defer delegatee.mtx.Unlock()
+
+	_p0 := uint256.NewInt(uint64(delegatee.SelfPower))
+	_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
+	_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
+	slashingPower := int64(_p0.Uint64())
+	slashedPower := int64(0)
+
+	var removingStakes []*Stake
+	for _, s0 := range delegatee.Stakes {
+		if s0.From.Compare(delegatee.Addr) == 0 && s0.IsSelfStake() {
+			if s0.Power <= slashingPower {
+				slashingPower -= s0.Power
+				slashedPower += s0.Power
+
+				// power, amount is processed at out of loop
+				removingStakes = append(removingStakes, s0)
+			} else {
+				s0.Power -= slashingPower
+				slashedPower += slashingPower
+
+				_ = s0.Amount.Mul(s0.Amount, uint256.NewInt(uint64(ratio)))
+				_ = s0.Amount.Div(s0.Amount, uint256.NewInt(100))
+
+				_ = s0.ReceivedReward.Mul(s0.ReceivedReward, uint256.NewInt(uint64(ratio)))
+				_ = s0.ReceivedReward.Div(s0.ReceivedReward, uint256.NewInt(100))
+
+				slashingPower = 0
+			}
+			if slashingPower == 0 {
+				break
+			}
+		}
+	}
+
+	if removingStakes != nil {
+		for _, s1 := range removingStakes {
+			_ = delegatee.delStakeByHash(s1.TxHash)
+		}
+	}
+
+	delegatee.SelfAmount = delegatee.sumAmountOf(delegatee.Addr)
+	delegatee.SelfPower = delegatee.sumPowerOf(delegatee.Addr)
+	delegatee.TotalAmount = delegatee.sumAmountOf(nil)
+	delegatee.TotalPower = delegatee.sumPowerOf(nil)
+	delegatee.TotalRewardAmount = delegatee.sumBlockRewardOf(nil)
+
+	return slashedPower
+}
+
+func (delegatee *Delegatee) String() string {
+	bz, err := json.MarshalIndent(delegatee, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("{error: %v}", err)
+	}
+	return string(bz)
+}
+
 func (delegatee *Delegatee) SumPower() int64 {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
@@ -278,13 +364,7 @@ func (delegatee *Delegatee) SumPowerOf(addr types.Address) int64 {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	ret := int64(0)
-	for _, s0 := range delegatee.Stakes {
-		if bytes.Compare(s0.From, addr) == 0 {
-			ret += s0.Power
-		}
-	}
-	return ret
+	return delegatee.sumPowerOf(addr)
 }
 
 func (delegatee *Delegatee) sumPowerOf(addr types.Address) int64 {
@@ -295,20 +375,6 @@ func (delegatee *Delegatee) sumPowerOf(addr types.Address) int64 {
 		}
 	}
 	return power
-}
-
-func (delegatee *Delegatee) SelfStakeRatio(added int64) int64 {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return (delegatee.SelfPower * int64(100)) / (delegatee.TotalPower + added)
-}
-
-func (delegatee *Delegatee) GetRewardAmount() *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.RewardAmount.Clone()
 }
 
 func (delegatee *Delegatee) SumBlockReward() *uint256.Int {
@@ -335,37 +401,6 @@ func (delegatee *Delegatee) sumBlockRewardOf(addr types.Address) *uint256.Int {
 	return reward
 }
 
-func (delegatee *Delegatee) DoReward(height int64) *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.doBlockReward(height)
-}
-
-func (delegatee *Delegatee) doBlockReward(height int64) *uint256.Int {
-	reward := uint256.NewInt(0)
-	for _, s := range delegatee.Stakes {
-
-		// issue #29
-		// `doBlockReward` is called after running `execStaking/execUnstaking`.
-		// So the `delegatee` has new stakes at now.
-		// Rewarding should be given only to old stakes.
-		if s.StartHeight <= height {
-			_ = reward.Add(reward, s.applyReward(height))
-		}
-	}
-	_ = delegatee.RewardAmount.Add(delegatee.RewardAmount, reward)
-	return reward
-}
-
-func (delegatee *Delegatee) String() string {
-	bz, err := json.MarshalIndent(delegatee, "", "  ")
-	if err != nil {
-		return fmt.Sprintf("{error: %v}", err)
-	}
-	return string(bz)
-}
-
 //
 // DelegateeArray
 
@@ -390,7 +425,7 @@ func (vs DelegateeArray) SumTotalPower() int64 {
 func (vs DelegateeArray) SumTotalReward() *uint256.Int {
 	reward := uint256.NewInt(0)
 	for _, val := range vs {
-		_ = reward.Add(reward, val.GetRewardAmount())
+		_ = reward.Add(reward, val.GetTotalRewardAmount())
 	}
 	return reward
 }
@@ -398,7 +433,7 @@ func (vs DelegateeArray) SumTotalReward() *uint256.Int {
 func (vs DelegateeArray) SumBlockReward() *uint256.Int {
 	reward := uint256.NewInt(0)
 	for _, val := range vs {
-		_ = reward.Add(reward, val.RewardAmount)
+		_ = reward.Add(reward, val.TotalRewardAmount)
 	}
 	return reward
 }

@@ -13,6 +13,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sort"
+	"strconv"
 	"sync"
 )
 
@@ -81,13 +82,58 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 		} else if xerr := ctrler.delegateeLedger.SetFinality(d); xerr != nil {
 			return xerr
 		}
-
-		// To give the first block reward to genesis validators,
-		// run the following code
-		// ctrler.lastValidators = append(ctrler.lastValidators, d)
 	}
 
 	return nil
+}
+
+// BeginBlock are called in RigoApp::BeginBlock
+func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	var evts []abcitypes.Event
+
+	byzantines := blockCtx.BlockInfo().ByzantineValidators
+	if byzantines != nil {
+		ctrler.logger.Debug("Byzantine validators is found", "count", len(byzantines))
+		for _, evi := range byzantines {
+			if slashed, xerr := ctrler.doPunish(&evi); xerr != nil {
+				ctrler.logger.Error("Error when punishing",
+					"byzantine", types.Address(evi.Validator.Address),
+					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
+			} else {
+				_addr := types.Address(evi.Validator.Address).String()
+				_type := abcitypes.EvidenceType_name[int32(evi.Type)]
+				_power0 := strconv.FormatInt(evi.Validator.Power, 10)
+				_slashed := strconv.FormatInt(slashed, 10)
+				evts = append(evts, abcitypes.Event{
+					Type: "punishment",
+					Attributes: []abcitypes.EventAttribute{
+						{Key: []byte("byzantine"), Value: []byte(_addr), Index: true},
+						{Key: []byte("type"), Value: []byte(_type), Index: false},
+						{Key: []byte("power"), Value: []byte(_power0), Index: false},
+						{Key: []byte("slashed"), Value: []byte(_slashed), Index: false},
+					},
+				})
+			}
+		}
+	}
+
+	return evts, nil
+}
+
+func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
+	return ctrler.doPunish(evi)
+}
+
+func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
+	delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(evi.Validator.Address))
+	if xerr != nil {
+		return 0, xerr
+	}
+
+	slashed := delegatee.DoSlash(ctrler.govHandler.SlashRatio())
+	_ = ctrler.delegateeLedger.SetFinality(delegatee)
+
+	return slashed, nil
 }
 
 func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -154,9 +200,7 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		}
 	}
 
-	ctrler.GetTotalPower()
-
-	if xerr := delegatee.addStake(s0); xerr != nil {
+	if xerr := delegatee.AddStake(s0); xerr != nil {
 		return xerr
 	}
 	if xerr := setUpdateDelegatee(delegatee); xerr != nil {
@@ -220,29 +264,24 @@ func (ctrler *StakeCtrler) execUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XE
 	return nil
 }
 
-func (ctrler *StakeCtrler) ValidateBlock(ctx *ctrlertypes.BlockContext) xerrors.XError {
-	// do nothing
-	return nil
-}
-
-func (ctrler *StakeCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.XError {
+func (ctrler *StakeCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	if ctx.TxsCnt() > 0 {
 		if xerr := ctrler.doReward(ctx.BlockInfo().Header.Height, ctx.BlockInfo().LastCommitInfo.Votes); xerr != nil {
-			return xerr
+			return nil, xerr
 		}
 	}
 	if xerr := ctrler.unfreezingStakes(ctx.Height(), ctx.AcctHandler); xerr != nil {
-		return xerr
+		return nil, xerr
 	}
 	ctx.SetValUpdates(ctrler.updateValidators(int(ctx.GovHandler.MaxValidatorCnt())))
 
-	return nil
+	return nil, nil
 }
 
-// the following functions are called in ExecuteBlock()
+// the following functions are called in EndBlock()
 //
 
 func (ctrler *StakeCtrler) doReward(height int64, votes []abcitypes.VoteInfo) xerrors.XError {
@@ -263,14 +302,19 @@ func (ctrler *StakeCtrler) doReward(height int64, votes []abcitypes.VoteInfo) xe
 			continue
 		}
 
-		_ = delegatee.DoReward(height)
-		_ = ctrler.delegateeLedger.SetFinality(delegatee)
+		rwd := delegatee.DoReward(height)
+		ctrler.logger.Debug("Block Reward", "address", delegatee.Addr, "reward", rwd.Dec())
+
+		xerr = ctrler.delegateeLedger.SetFinality(delegatee)
+		if xerr != nil {
+			ctrler.logger.Error("Fail to finalize delegatee", "address", delegatee.Addr)
+		}
 	}
 	return nil
 }
 
 func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertypes.IAccountHandler) xerrors.XError {
-	return ctrler.frozenLedger.IterateAllFinalityItems(func(s0 *Stake) xerrors.XError {
+	return ctrler.frozenLedger.IterateReadAllFinalityItems(func(s0 *Stake) xerrors.XError {
 		if s0.RefundHeight <= height {
 			// un-freezing s0
 			if xerr := acctHandler.Reward(s0.From, s0.ReceivedReward, true); xerr != nil {
@@ -285,18 +329,18 @@ func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertype
 
 // UpdateValidators is called after executing staking/unstaking txs, before committing the result of the txs executing
 // This means that the updated values of ledger is not committed yet.
-// So ledger.IterateAllItems/IterateAllFinalityItems returns not updated values.
+// So ledger.IterateReadAllItems/IterateReadAllFinalityItems returns not updated values.
 func (ctrler *StakeCtrler) updateValidators(maxVals int) []abcitypes.ValidatorUpdate {
 	var allDelegatees DelegateeArray
 	// NOTE:
-	// IterateAllFinalityItems() returns delegatees, which are committed at previous block.
+	// IterateReadAllFinalityItems() returns delegatees, which are committed at previous block.
 	// So, if staking tx is executed at block N,
 	//     stake is saved(committed) at block N,
 	//     it(updated validators) is notified to consensus engine at block N+1,
 	//	   consensus add this account to validator set at block (N+1)+1+1.
 	//	   (Refer to the comments in updateState(...) at github.com/tendermint/tendermint@v0.34.20/state/execution.go)
 	// So, the account can sign a block from block N+3 in consensus engine
-	if xerr := ctrler.delegateeLedger.IterateAllFinalityItems(func(d *Delegatee) xerrors.XError {
+	if xerr := ctrler.delegateeLedger.IterateReadAllFinalityItems(func(d *Delegatee) xerrors.XError {
 		allDelegatees = append(allDelegatees, d)
 		return nil
 	}); xerr != nil {
@@ -415,12 +459,26 @@ func (ctrler *StakeCtrler) Validators() ([]*abcitypes.Validator, int64) {
 }
 
 func (ctrler *StakeCtrler) IsValidator(addr types.Address) bool {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
 	for _, v := range ctrler.lastValidators {
 		if bytes.Compare(v.Addr, addr) == 0 {
 			return true
 		}
 	}
 	return false
+}
+
+func (ctrler *StakeCtrler) Delegatee(addr types.Address) *Delegatee {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(addr)); xerr != nil {
+		return nil
+	} else {
+		return delegatee
+	}
 }
 
 func (ctrler *StakeCtrler) PowerOf(addr types.Address) int64 {
@@ -462,27 +520,27 @@ func (ctrler *StakeCtrler) DelegatedPowerOf(addr types.Address) int64 {
 	}
 }
 
-func (ctrler *StakeCtrler) GetTotalAmount() *uint256.Int {
+func (ctrler *StakeCtrler) ReadTotalAmount() *uint256.Int {
 	ret := uint256.NewInt(0)
-	_ = ctrler.delegateeLedger.IterateAllFinalityItems(func(delegatee *Delegatee) xerrors.XError {
+	_ = ctrler.delegateeLedger.IterateReadAllFinalityItems(func(delegatee *Delegatee) xerrors.XError {
 		_ = ret.Add(ret, delegatee.TotalAmount)
 		return nil
 	})
 	return ret
 }
 
-func (ctrler *StakeCtrler) GetTotalPower() int64 {
+func (ctrler *StakeCtrler) ReadTotalPower() int64 {
 	ret := int64(0)
-	_ = ctrler.delegateeLedger.IterateAllFinalityItems(func(delegatee *Delegatee) xerrors.XError {
+	_ = ctrler.delegateeLedger.IterateReadAllFinalityItems(func(delegatee *Delegatee) xerrors.XError {
 		ret += delegatee.GetTotalPower()
 		return nil
 	})
 	return ret
 }
 
-func (ctrler *StakeCtrler) GetFrozenStakes() []*Stake {
+func (ctrler *StakeCtrler) ReadFrozenStakes() []*Stake {
 	var ret []*Stake
-	_ = ctrler.frozenLedger.IterateAllFinalityItems(func(s0 *Stake) xerrors.XError {
+	_ = ctrler.frozenLedger.IterateReadAllFinalityItems(func(s0 *Stake) xerrors.XError {
 		ret = append(ret, s0)
 		return nil
 	})

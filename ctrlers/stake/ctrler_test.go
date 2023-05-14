@@ -110,13 +110,13 @@ func TestStakingToSelfByTx(t *testing.T) {
 	_, _, err := stakeCtrler.Commit()
 	require.NoError(t, err)
 
-	require.Equal(t, sumAmt.String(), stakeCtrler.GetTotalAmount().String())
-	require.Equal(t, sumPower, stakeCtrler.GetTotalPower())
+	require.Equal(t, sumAmt.String(), stakeCtrler.ReadTotalAmount().String())
+	require.Equal(t, sumPower, stakeCtrler.ReadTotalPower())
 }
 
 func TestStakingByTx(t *testing.T) {
-	sumAmt := stakeCtrler.GetTotalAmount()
-	sumPower := stakeCtrler.GetTotalPower()
+	sumAmt := stakeCtrler.ReadTotalAmount()
+	sumPower := stakeCtrler.ReadTotalPower()
 
 	for _, txctx := range stakingTrxCtxs {
 		power0 := stakeCtrler.SelfPowerOf(txctx.Tx.To)
@@ -126,6 +126,7 @@ func TestStakingByTx(t *testing.T) {
 		err := stakeCtrler.ExecuteTrx(txctx)
 
 		if txctx.Tx.Amount.Cmp(maxAmt) > 0 {
+			// try staking over self stakes
 			require.Error(t, err)
 			for i, ctx := range unstakingTrxCtxs {
 				if bytes.Compare(ctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash, txctx.TxHash) == 0 {
@@ -143,13 +144,56 @@ func TestStakingByTx(t *testing.T) {
 	_, _, err := stakeCtrler.Commit()
 	require.NoError(t, err)
 
-	require.Equal(t, sumAmt.String(), stakeCtrler.GetTotalAmount().String())
-	require.Equal(t, sumPower, stakeCtrler.GetTotalPower())
+	require.Equal(t, sumAmt.String(), stakeCtrler.ReadTotalAmount().String())
+	require.Equal(t, sumPower, stakeCtrler.ReadTotalPower())
+}
+
+func TestPunish(t *testing.T) {
+	allTotalPower0 := stakeCtrler.ReadTotalPower()
+	for _, byzantine := range DelegateeWallets {
+		totalPower0 := stakeCtrler.PowerOf(byzantine.Address())
+		selfPower0 := stakeCtrler.SelfPowerOf(byzantine.Address())
+		require.Greater(t, selfPower0, int64(0))
+
+		_slashed := uint256.NewInt(uint64(selfPower0))
+		_ = _slashed.Mul(_slashed, uint256.NewInt(uint64(govHelper.SlashRatio())))
+		_ = _slashed.Div(_slashed, uint256.NewInt(uint64(100)))
+		expectedSlashed := int64(_slashed.Uint64())
+		require.Greater(t, expectedSlashed, int64(0))
+		require.Greater(t, selfPower0, expectedSlashed)
+
+		_, _ = stakeCtrler.BeginBlock(types.NewBlockContext(
+			abcitypes.RequestBeginBlock{
+				ByzantineValidators: []abcitypes.Evidence{
+					{
+						Validator: abcitypes.Validator{
+							Address: byzantine.Address(),
+							Power:   totalPower0,
+						},
+					},
+				},
+			}, nil, nil, nil),
+		)
+
+		delegatee := stakeCtrler.Delegatee(byzantine.Address())
+
+		require.Equal(t, selfPower0-expectedSlashed, delegatee.GetSelfPower())
+		require.Equal(t, totalPower0-expectedSlashed, delegatee.GetTotalPower())
+
+		_, _, xerr := stakeCtrler.Commit()
+		require.NoError(t, xerr)
+
+		require.Equal(t, selfPower0-expectedSlashed, stakeCtrler.SelfPowerOf(delegatee.Addr))
+		require.Equal(t, totalPower0-expectedSlashed, stakeCtrler.PowerOf(delegatee.Addr))
+		require.Equal(t, allTotalPower0-expectedSlashed, stakeCtrler.ReadTotalPower())
+
+		break
+	}
 }
 
 func TestUnstakingByTx(t *testing.T) {
-	sumAmt0 := stakeCtrler.GetTotalAmount()
-	sumPower0 := stakeCtrler.GetTotalPower()
+	sumAmt0 := stakeCtrler.ReadTotalAmount()
+	sumPower0 := stakeCtrler.ReadTotalPower()
 	sumUnstakingAmt := uint256.NewInt(0)
 	sumUnstakingPower := int64(0)
 
@@ -168,11 +212,11 @@ func TestUnstakingByTx(t *testing.T) {
 	_, _, err := stakeCtrler.Commit()
 	require.NoError(t, err)
 
-	require.Equal(t, new(uint256.Int).Sub(sumAmt0, sumUnstakingAmt).String(), stakeCtrler.GetTotalAmount().String())
-	require.Equal(t, sumPower0-sumUnstakingPower, stakeCtrler.GetTotalPower())
+	require.Equal(t, new(uint256.Int).Sub(sumAmt0, sumUnstakingAmt).String(), stakeCtrler.ReadTotalAmount().String())
+	require.Equal(t, sumPower0-sumUnstakingPower, stakeCtrler.ReadTotalPower())
 
 	// test freezing reward
-	frozenStakes := stakeCtrler.GetFrozenStakes()
+	frozenStakes := stakeCtrler.ReadFrozenStakes()
 	require.Equal(t, len(unstakingTrxCtxs), len(frozenStakes))
 
 	sumFrozenAmount := uint256.NewInt(0)
@@ -196,13 +240,13 @@ func TestUnfreezing(t *testing.T) {
 	}
 	bctx := types.NewBlockContext(req, govHelper, acctHelper, nil)
 	bctx.AddGas(uint256.NewInt(10))
-	err := stakeCtrler.ExecuteBlock(bctx)
+	_, err := stakeCtrler.EndBlock(bctx)
 	require.NoError(t, err)
 
 	_, _, err = stakeCtrler.Commit()
 	require.NoError(t, err)
 
-	frozenStakes := stakeCtrler.GetFrozenStakes()
+	frozenStakes := stakeCtrler.ReadFrozenStakes()
 	require.Equal(t, 0, len(frozenStakes))
 
 	// todo: check received reward and fee

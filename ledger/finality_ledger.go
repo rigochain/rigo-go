@@ -118,8 +118,8 @@ func (ledger *FinalityLedger[T]) CancelDelFinality(key LedgerKey) xerrors.XError
 	return nil
 }
 
-func (ledger *FinalityLedger[T]) IterateAllFinalityItems(cb func(T) xerrors.XError) xerrors.XError {
-	return ledger.SimpleLedger.IterateAllItems(cb)
+func (ledger *FinalityLedger[T]) IterateReadAllFinalityItems(cb func(T) xerrors.XError) xerrors.XError {
+	return ledger.SimpleLedger.IterateReadAllItems(cb)
 }
 
 func (ledger *FinalityLedger[T]) IterateFinalityGotItems(cb func(T) xerrors.XError) xerrors.XError {

@@ -183,7 +183,7 @@ func TestFreezingProposal(t *testing.T) {
 	// not changed
 	bctx := &ctrlertypes.BlockContext{}
 	bctx.SetHeight(prop.EndVotingHeight)
-	xerr = govCtrler.ExecuteBlock(bctx)
+	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 
 	_, _, xerr = govCtrler.Commit()
@@ -195,7 +195,7 @@ func TestFreezingProposal(t *testing.T) {
 	// freezing the proposal
 	bctx = &ctrlertypes.BlockContext{}
 	bctx.SetHeight(prop.EndVotingHeight + 1)
-	xerr = govCtrler.ExecuteBlock(bctx)
+	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 
 	_, _, xerr = govCtrler.Commit()
@@ -231,7 +231,7 @@ func TestApplyingProposal(t *testing.T) {
 		// freezing the proposal
 		bctx := &ctrlertypes.BlockContext{}
 		bctx.SetHeight(txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + 1)
-		xerr = govCtrler.ExecuteBlock(bctx)
+		_, xerr = govCtrler.EndBlock(bctx)
 		require.NoError(t, xerr)
 		_, _, xerr = govCtrler.Commit()
 		require.NoError(t, xerr)
@@ -242,7 +242,7 @@ func TestApplyingProposal(t *testing.T) {
 	runHeight := txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks() - 1
 	bctx := &ctrlertypes.BlockContext{}
 	bctx.SetHeight(runHeight)
-	xerr := govCtrler.ExecuteBlock(bctx)
+	_, xerr := govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
@@ -255,7 +255,7 @@ func TestApplyingProposal(t *testing.T) {
 	runHeight = txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks()
 	bctx = &ctrlertypes.BlockContext{}
 	bctx.SetHeight(runHeight)
-	xerr = govCtrler.ExecuteBlock(bctx)
+	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 	require.NotNil(t, govCtrler.newGovRule)
 
