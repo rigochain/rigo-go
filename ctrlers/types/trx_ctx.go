@@ -56,6 +56,8 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 		Height:    height,
 		BlockTime: btime,
 		Exec:      exec,
+		NeedAmt:   new(uint256.Int).Add(tx.Amount, tx.Gas),
+		GasUsed:   uint256.NewInt(0),
 	}
 
 	for _, fn := range cbfns {

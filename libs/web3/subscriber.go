@@ -4,6 +4,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rigochain/rigo-go/libs/web3/types"
 	"github.com/tendermint/tendermint/libs/json"
+	"sync"
 )
 
 type Subscriber struct {
@@ -11,6 +12,7 @@ type Subscriber struct {
 	conn *websocket.Conn
 
 	query string
+	mtx   sync.Mutex
 }
 
 func NewSubscriber(url string) (*Subscriber, error) {
@@ -55,6 +57,7 @@ func (sub *Subscriber) Start(query string, callback func(*Subscriber, []byte)) e
 
 				if resp.Error != nil {
 					panic(string(resp.Error))
+					break
 				}
 
 				if len(resp.Result) > 2 {
@@ -64,6 +67,7 @@ func (sub *Subscriber) Start(query string, callback func(*Subscriber, []byte)) e
 				//fmt.Println("ReadMessage", "other type", ty, msg)
 			}
 		}
+		sub.Stop()
 	}()
 
 	sub.conn = conn
@@ -73,6 +77,13 @@ func (sub *Subscriber) Start(query string, callback func(*Subscriber, []byte)) e
 }
 
 func (sub *Subscriber) Stop() {
+	sub.mtx.Lock()
+	defer sub.mtx.Unlock()
+
+	if sub.conn == nil {
+		return
+	}
+
 	req, err := types.NewRequest(1, "unsubscribe", sub.query)
 	if err != nil {
 		panic(err)

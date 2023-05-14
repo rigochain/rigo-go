@@ -11,7 +11,7 @@ import (
 func TestStaking2GenesisValidator(t *testing.T) {
 	valWal := validatorWallets[0]
 	require.NoError(t, valWal.SyncAccount(rweb3))
-	require.NoError(t, valWal.Unlock(TESTPASS))
+	require.NoError(t, valWal.Unlock(rpcNode.Pass))
 
 	ret, err := valWal.StakingSync(valWal.Address(), gas, uint256.NewInt(1000000000000000000), rweb3)
 	require.NoError(t, err)

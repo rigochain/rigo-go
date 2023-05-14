@@ -297,6 +297,13 @@ func (delegatee *Delegatee) sumPowerOf(addr types.Address) int64 {
 	return power
 }
 
+func (delegatee *Delegatee) SelfStakeRatio(added int64) int64 {
+	delegatee.mtx.RLock()
+	defer delegatee.mtx.RUnlock()
+
+	return (delegatee.SelfPower * int64(100)) / (delegatee.TotalPower + added)
+}
+
 func (delegatee *Delegatee) GetRewardAmount() *uint256.Int {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()

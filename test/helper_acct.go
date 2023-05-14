@@ -4,14 +4,18 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
+	"github.com/tendermint/tendermint/libs/bytes"
 	"sync"
 )
 
-type acctHelper struct {
+type acctObj struct {
 	w *web3.Wallet
 
 	originBalance *uint256.Int
 	originNonce   uint64
+
+	sentTxsCnt int
+	retTxsCnt  int
 
 	txHashes        map[string]types.Address
 	spentGas        *uint256.Int
@@ -21,8 +25,8 @@ type acctHelper struct {
 	mtx sync.RWMutex
 }
 
-func newAcctHelper(w *web3.Wallet) *acctHelper {
-	return &acctHelper{
+func newAcctObj(w *web3.Wallet) *acctObj {
+	return &acctObj{
 		w:               w,
 		originBalance:   w.GetBalance(),
 		originNonce:     w.GetNonce(),
@@ -33,54 +37,67 @@ func newAcctHelper(w *web3.Wallet) *acctHelper {
 	}
 }
 
-func (obj *acctHelper) addTxHashOfAddr(txhash string, addr types.Address) {
+func (obj *acctObj) addTxHashOfAddr(txhash bytes.HexBytes, addr types.Address) {
 	obj.mtx.Lock()
 	defer obj.mtx.Unlock()
 
-	obj.txHashes[txhash] = addr
+	obj.txHashes[txhash.String()] = addr
+}
+func (obj *acctObj) delTxHashOfAddr(txhash bytes.HexBytes) {
+	obj.mtx.Lock()
+	defer obj.mtx.Unlock()
+
+	delete(obj.txHashes, txhash.String())
 }
 
-func (obj *acctHelper) addSpentGas(d *uint256.Int) {
+func (obj *acctObj) getAddrOfTxHash(txHash bytes.HexBytes) types.Address {
+	obj.mtx.RLock()
+	defer obj.mtx.RUnlock()
+
+	return obj.txHashes[txHash.String()]
+}
+
+func (obj *acctObj) addSpentGas(d *uint256.Int) {
 	obj.mtx.Lock()
 	defer obj.mtx.Unlock()
 
 	_ = obj.spentGas.Add(obj.spentGas, d)
 }
 
-func (obj *acctHelper) addExpectedBalance(d *uint256.Int) {
+func (obj *acctObj) addExpectedBalance(d *uint256.Int) {
 	obj.mtx.Lock()
 	defer obj.mtx.Unlock()
 
 	_ = obj.expectedBalance.Add(obj.expectedBalance, d)
 }
 
-func (obj *acctHelper) subExpectedBalance(d *uint256.Int) {
+func (obj *acctObj) subExpectedBalance(d *uint256.Int) {
 	obj.mtx.Lock()
 	defer obj.mtx.Unlock()
 
 	_ = obj.expectedBalance.Sub(obj.expectedBalance, d)
 }
 
-func (obj *acctHelper) addExpectedNonce() {
+func (obj *acctObj) addExpectedNonce() {
 	obj.mtx.Lock()
 	defer obj.mtx.Unlock()
 
 	obj.expectedNonce++
 }
 
-var senderAcctHelpers = make(map[string]*acctHelper)
+var senderAcctObjs = make(map[string]*acctObj)
 var gmtx = &sync.Mutex{}
 
-func addSenderAcctHelper(k string, v *acctHelper) {
+func addSenderAcctHelper(k string, v *acctObj) {
 	gmtx.Lock()
 	defer gmtx.Unlock()
 
-	senderAcctHelpers[k] = v
+	senderAcctObjs[k] = v
 }
 
 func clearSenderAcctHelper() {
 	gmtx.Lock()
 	defer gmtx.Unlock()
 
-	senderAcctHelpers = make(map[string]*acctHelper)
+	senderAcctObjs = make(map[string]*acctObj)
 }

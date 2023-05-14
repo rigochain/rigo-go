@@ -32,43 +32,49 @@ type GovRule struct {
 
 func DefaultGovRule() *GovRule {
 	return &GovRule{
-		version:               0,
-		maxValidatorCnt:       21,
-		amountPerPower:        uint256.NewInt(1_000000000_000000000),
-		rewardPerPower:        uint256.NewInt(1_000000000),
-		lazyRewardBlocks:      20,
-		lazyApplyingBlocks:    10,
-		minTrxFee:             uint256.NewInt(10),
-		minVotingPeriodBlocks: 259200,  // = 60 * 60 * 24 * 3, // 3 days
-		maxVotingPeriodBlocks: 2592000, // = 60 * 60 * 24 * 30,    // 30 days
+		version:                0,
+		maxValidatorCnt:        21,
+		amountPerPower:         uint256.NewInt(1_000000000_000000000),
+		rewardPerPower:         uint256.NewInt(1_000000000),
+		lazyRewardBlocks:       20,
+		lazyApplyingBlocks:     10,
+		minTrxFee:              uint256.NewInt(10),
+		minVotingPeriodBlocks:  259200,  // = 60 * 60 * 24 * 3, // 3 days
+		maxVotingPeriodBlocks:  2592000, // = 60 * 60 * 24 * 30,    // 30 days
+		minSelfStakeRatio:      50,      // 50%
+		maxUpdatableStakeRatio: 30,      // 30%
 	}
 }
 
 func Test1GovRule() *GovRule {
 	return &GovRule{
-		version:               1,
-		maxValidatorCnt:       10,
-		amountPerPower:        uint256.NewInt(1_000000000),
-		rewardPerPower:        uint256.NewInt(2_000000000),
-		lazyRewardBlocks:      30,
-		lazyApplyingBlocks:    40,
-		minTrxFee:             uint256.NewInt(20),
-		minVotingPeriodBlocks: 50,
-		maxVotingPeriodBlocks: 60,
+		version:                1,
+		maxValidatorCnt:        10,
+		amountPerPower:         uint256.NewInt(1_000000000),
+		rewardPerPower:         uint256.NewInt(2_000000000),
+		lazyRewardBlocks:       30,
+		lazyApplyingBlocks:     40,
+		minTrxFee:              uint256.NewInt(20),
+		minVotingPeriodBlocks:  50,
+		maxVotingPeriodBlocks:  60,
+		minSelfStakeRatio:      50, // 50%
+		maxUpdatableStakeRatio: 30, // 30%
 	}
 }
 
 func Test2GovRule() *GovRule {
 	return &GovRule{
-		version:               2,
-		maxValidatorCnt:       10,
-		amountPerPower:        uint256.NewInt(1_000000000),
-		rewardPerPower:        uint256.NewInt(2_000000000),
-		lazyRewardBlocks:      30,
-		lazyApplyingBlocks:    40,
-		minTrxFee:             uint256.NewInt(20),
-		minVotingPeriodBlocks: 50,
-		maxVotingPeriodBlocks: 60,
+		version:                2,
+		maxValidatorCnt:        10,
+		amountPerPower:         uint256.NewInt(1_000000000),
+		rewardPerPower:         uint256.NewInt(2_000000000),
+		lazyRewardBlocks:       30,
+		lazyApplyingBlocks:     40,
+		minTrxFee:              uint256.NewInt(20),
+		minVotingPeriodBlocks:  50,
+		maxVotingPeriodBlocks:  60,
+		minSelfStakeRatio:      50, // 50%
+		maxUpdatableStakeRatio: 30, // 30%
 	}
 }
 
@@ -114,6 +120,8 @@ func (r *GovRule) fromProto(pm *GovRuleProto) {
 	r.minTrxFee = new(uint256.Int).SetBytes(pm.XMinTrxFee)
 	r.minVotingPeriodBlocks = pm.MinVotingPeriodBlocks
 	r.maxVotingPeriodBlocks = pm.MaxVotingPeriodBlocks
+	r.minSelfStakeRatio = pm.MinSelfStakeRatio
+	r.maxUpdatableStakeRatio = pm.MaxUpdatableStakeRatio
 }
 
 func (r *GovRule) toProto() *GovRuleProto {
@@ -121,15 +129,17 @@ func (r *GovRule) toProto() *GovRuleProto {
 	defer r.mtx.RUnlock()
 
 	a := &GovRuleProto{
-		Version:               r.version,
-		MaxValidatorCnt:       r.maxValidatorCnt,
-		XAmountPerPower:       r.amountPerPower.Bytes(),
-		XRewardPerPower:       r.rewardPerPower.Bytes(),
-		LazyRewardBlocks:      r.lazyRewardBlocks,
-		LazyApplyingBlocks:    r.lazyApplyingBlocks,
-		XMinTrxFee:            r.minTrxFee.Bytes(),
-		MinVotingPeriodBlocks: r.minVotingPeriodBlocks,
-		MaxVotingPeriodBlocks: r.maxVotingPeriodBlocks,
+		Version:                r.version,
+		MaxValidatorCnt:        r.maxValidatorCnt,
+		XAmountPerPower:        r.amountPerPower.Bytes(),
+		XRewardPerPower:        r.rewardPerPower.Bytes(),
+		LazyRewardBlocks:       r.lazyRewardBlocks,
+		LazyApplyingBlocks:     r.lazyApplyingBlocks,
+		XMinTrxFee:             r.minTrxFee.Bytes(),
+		MinVotingPeriodBlocks:  r.minVotingPeriodBlocks,
+		MaxVotingPeriodBlocks:  r.maxVotingPeriodBlocks,
+		MinSelfStakeRatio:      r.minSelfStakeRatio,
+		MaxUpdatableStakeRatio: r.maxUpdatableStakeRatio,
 	}
 	return a
 }
@@ -139,40 +149,46 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 	defer r.mtx.RUnlock()
 
 	tm := &struct {
-		Version            int64  `json:"version"`
-		MaxValidatorCnt    int64  `json:"maxValidatorCnt"`
-		AmountPerPower     string `json:"amountPerPower"`
-		RewardPerPower     string `json:"rewardPerPower"`
-		LazyRewardBlocks   int64  `json:"lazyRewardBlocks"`
-		LazyApplyingBlocks int64  `json:"lazyApplyingBlocks"`
-		MinTrxFee          string `json:"minTrxFee"`
-		MinVotingBlocks    int64  `json:"minVotingPeriodBlocks"`
-		MaxVotingBlocks    int64  `json:"maxVotingPeriodBlocks"`
+		Version                int64  `json:"version"`
+		MaxValidatorCnt        int64  `json:"maxValidatorCnt"`
+		AmountPerPower         string `json:"amountPerPower"`
+		RewardPerPower         string `json:"rewardPerPower"`
+		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
+		LazyApplyingBlocks     int64  `json:"lazyApplyingBlocks"`
+		MinTrxFee              string `json:"minTrxFee"`
+		MinVotingBlocks        int64  `json:"minVotingPeriodBlocks"`
+		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
+		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
+		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
 	}{
-		Version:            r.version,
-		MaxValidatorCnt:    r.maxValidatorCnt,
-		AmountPerPower:     r.amountPerPower.String(), // hex-string
-		RewardPerPower:     r.rewardPerPower.String(), // hex-string
-		LazyRewardBlocks:   r.lazyRewardBlocks,
-		LazyApplyingBlocks: r.lazyApplyingBlocks,
-		MinTrxFee:          r.minTrxFee.String(),
-		MinVotingBlocks:    r.minVotingPeriodBlocks,
-		MaxVotingBlocks:    r.maxVotingPeriodBlocks,
+		Version:                r.version,
+		MaxValidatorCnt:        r.maxValidatorCnt,
+		AmountPerPower:         r.amountPerPower.String(), // hex-string
+		RewardPerPower:         r.rewardPerPower.String(), // hex-string
+		LazyRewardBlocks:       r.lazyRewardBlocks,
+		LazyApplyingBlocks:     r.lazyApplyingBlocks,
+		MinTrxFee:              r.minTrxFee.String(),
+		MinVotingBlocks:        r.minVotingPeriodBlocks,
+		MaxVotingBlocks:        r.maxVotingPeriodBlocks,
+		MinSelfStakeRatio:      r.minSelfStakeRatio,
+		MaxUpdatableStakeRatio: r.maxUpdatableStakeRatio,
 	}
 	return tmjson.Marshal(tm)
 }
 
 func (r *GovRule) UnmarshalJSON(bz []byte) error {
 	tm := &struct {
-		Version            int64  `json:"version"`
-		MaxValidatorCnt    int64  `json:"maxValidatorCnt"`
-		AmountPerPower     string `json:"amountPerPower"`
-		RewardPerPower     string `json:"rewardPerPower"`
-		LazyRewardBlocks   int64  `json:"lazyRewardBlocks"`
-		LazyApplyingBlocks int64  `json:"lazyApplyingBlocks"`
-		MinTrxFee          string `json:"minTrxFee"`
-		MinVotingBlocks    int64  `json:"minVotingPeriodBlocks"`
-		MaxVotingBlocks    int64  `json:"maxVotingPeriodBlocks"`
+		Version                int64  `json:"version"`
+		MaxValidatorCnt        int64  `json:"maxValidatorCnt"`
+		AmountPerPower         string `json:"amountPerPower"`
+		RewardPerPower         string `json:"rewardPerPower"`
+		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
+		LazyApplyingBlocks     int64  `json:"lazyApplyingBlocks"`
+		MinTrxFee              string `json:"minTrxFee"`
+		MinVotingBlocks        int64  `json:"minVotingPeriodBlocks"`
+		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
+		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
+		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
 	}{}
 
 	if err := tmjson.Unmarshal(bz, tm); err != nil {
@@ -191,6 +207,8 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 	r.minTrxFee = uint256.MustFromHex(tm.MinTrxFee)
 	r.minVotingPeriodBlocks = tm.MinVotingBlocks
 	r.maxVotingPeriodBlocks = tm.MaxVotingBlocks
+	r.minSelfStakeRatio = tm.MinSelfStakeRatio
+	r.maxUpdatableStakeRatio = tm.MaxUpdatableStakeRatio
 	return nil
 }
 
@@ -255,6 +273,18 @@ func (r *GovRule) MaxVotingPeriodBlocks() int64 {
 	defer r.mtx.RUnlock()
 
 	return r.maxVotingPeriodBlocks
+}
+func (r *GovRule) MinSelfStakeRatio() int64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.minSelfStakeRatio
+}
+func (r *GovRule) MaxUpdatableStakeRatio() int64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.maxUpdatableStakeRatio
 }
 
 //

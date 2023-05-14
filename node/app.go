@@ -2,7 +2,6 @@ package node
 
 import (
 	"fmt"
-	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/cmd/version"
 	"github.com/rigochain/rigo-go/ctrlers/account"
@@ -194,9 +193,6 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 			0,
 			false,
 			func(_txctx *types2.TrxContext) xerrors.XError {
-				_tx := _txctx.Tx
-
-				_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
 				_txctx.TrxGovHandler = ctrler.govCtrler
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -259,12 +255,9 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 		ctrler.currBlockCtx.TimeNano(),
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
-			_tx := _txctx.Tx
-
 			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt()
 			ctrler.currBlockCtx.AddTxsCnt(1)
 
-			_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -319,11 +312,7 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 		ctrler.currBlockCtx.TimeNano(),
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
-			_tx := _txctx.Tx
-
 			_txctx.TxIdx = txIdx
-
-			_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -434,7 +423,7 @@ func (ctrler *RigoApp) Commit() abcitypes.ResponseCommit {
 	}
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
-	ctrler.logger.Debug("RigoApp::Commit", "height", ver0, "app hash", bytes.HexBytes(appHash))
+	ctrler.logger.Debug("RigoApp::Commit", "height", ver0, "txs", ctrler.currBlockCtx.TxsCnt(), "app hash", bytes.HexBytes(appHash))
 
 	ctrler.currBlockCtx.SetAppHash(appHash)
 	ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)

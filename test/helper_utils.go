@@ -29,19 +29,20 @@ var (
 	W1               *rigoweb3.Wallet
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
 	gas              = uint256.NewInt(10)
+	rpcNode          *PeerMock
 )
 
-func prepareTest() {
-	rweb3 = rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(rpcURL))
+func prepareTest(peer *PeerMock) {
+	rweb3 = rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(peer.RPCURL))
 
-	files, err := os.ReadDir(walletPath())
+	files, err := os.ReadDir(peer.WalletPath())
 	if err != nil {
 		panic(err)
 	}
 
 	walletsMap = make(map[rtypes1.AcctKey]*rigoweb3.Wallet)
 
-	if w, err := rigoweb3.OpenWallet(libs.NewFileReader(privValKeyPath())); err != nil {
+	if w, err := rigoweb3.OpenWallet(libs.NewFileReader(peer.PrivValKeyPath())); err != nil {
 		panic(err)
 	} else {
 		addValidatorWallet(w)
@@ -50,13 +51,18 @@ func prepareTest() {
 	for _, file := range files {
 		if !file.IsDir() {
 			if w, err := rigoweb3.OpenWallet(
-				libs.NewFileReader(filepath.Join(walletPath(), file.Name()))); err != nil {
+				libs.NewFileReader(filepath.Join(peer.WalletPath(), file.Name()))); err != nil {
 				panic(err)
 			} else {
 				wallets = append(wallets, w)
 
 				acctKey := rtypes1.ToAcctKey(w.Address())
 				walletsMap[acctKey] = w
+
+				//if err := w.SyncAccount(rweb3); err != nil {
+				//	panic(err)
+				//}
+				//fmt.Println(w.Address(), w.GetBalance())
 			}
 		}
 	}
@@ -119,20 +125,18 @@ func randCommonWallet() *rigoweb3.Wallet {
 }
 
 func saveRandWallet(w *rigoweb3.Wallet) error {
-	path := filepath.Join(walletPath(), fmt.Sprintf("wk%X.json", w.Address()))
+	path := filepath.Join(rpcNode.WalletPath(), fmt.Sprintf("wk%X.json", w.Address()))
 	return w.Save(libs.NewFileWriter(path))
 }
 
 func waitEvent(query string, cb func(*coretypes.ResultEvent, error) bool) (*sync.WaitGroup, error) {
 	subWg := sync.WaitGroup{}
-	sub, err := rigoweb3.NewSubscriber(wsEndpoint)
+	sub, err := rigoweb3.NewSubscriber(rpcNode.WSEnd)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		sub.Stop()
-	}()
 
+	subWg.Add(1)
 	err = sub.Start(query, func(sub *rigoweb3.Subscriber, result []byte) {
 
 		event := &coretypes.ResultEvent{}

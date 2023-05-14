@@ -1,7 +1,6 @@
 package account
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
@@ -9,8 +8,6 @@ import (
 	"github.com/rigochain/rigo-go/genesis"
 	"github.com/rigochain/rigo-go/ledger"
 	"github.com/rigochain/rigo-go/types"
-	abytes "github.com/rigochain/rigo-go/types/bytes"
-	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sync"
@@ -75,37 +72,11 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 	}
 	ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
 
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	// check signature
-	var fromAddr types.Address
-	var pubBytes abytes.HexBytes
-
-	if ctx.Exec {
-		tx := ctx.Tx
-		sig := tx.Sig
-		tx.Sig = nil
-		_txbz, xerr := tx.Encode()
-		if xerr != nil {
-			return xerr
-		}
-		if fromAddr, pubBytes, xerr = crypto.Sig2Addr(_txbz, sig); xerr != nil {
-			return xerr
-		}
-		if bytes.Compare(fromAddr, tx.From) != 0 {
-			return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
-		}
-		ctx.SenderPubKey = pubBytes
-	} else {
-		fromAddr = ctx.Tx.From
-	}
-
 	if xerr := ctx.Sender.CheckBalance(ctx.NeedAmt); xerr != nil {
 		return xerr
 	}
 	if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
-		return xerr.Wrap(fmt.Errorf("invalid nonce - expected: %v, actual:%v, address: %v, txhash: %X", ctx.Sender.Nonce, ctx.Tx.Nonce, ctx.Sender.Address, ctx.TxHash))
+		return xerr.Wrap(fmt.Errorf("invalid nonce - ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), ctx.Tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
 
 	return nil

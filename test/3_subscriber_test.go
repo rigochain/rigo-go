@@ -11,7 +11,7 @@ import (
 )
 
 func TestSubscriber(t *testing.T) {
-	sub, err := web3.NewSubscriber(wsEndpoint)
+	sub, err := web3.NewSubscriber(rpcNode.WSEnd)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}

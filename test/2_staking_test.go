@@ -1,37 +1,72 @@
 package test
 
+import (
+	"github.com/holiman/uint256"
+	rtypes0 "github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/xerrors"
+	"github.com/stretchr/testify/require"
+	"strings"
+	"testing"
+)
+
 //
 // DO NOT RUN this test code yet.
 
-//func TestQueryValidators(t *testing.T) {
-//	ret, err := validators(1)
-//
-//	require.NoError(t, err)
-//	require.Equal(t, len(validatorWallets), len(ret.Validators))
-//	for _, val := range ret.Validators {
-//		require.True(t, isValidator(rtypes0.Address(val.Address)))
-//	}
-//}
-//
-//func TestInvalidStakeAmount(t *testing.T) {
-//	w := randCommonWallet()
-//	require.NoError(t, w.SyncAccount(rweb3))
-//	require.NoError(t, w.Unlock(TESTPASS))
-//
-//	// too small
-//	stakeAmt := uint256.MustFromDecimal("1111")
-//
-//	ret, err := w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
-//	require.NoError(t, err)
-//	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
-//
-//	// not multiple
-//	stakeAmt = uint256.MustFromDecimal("1000000000000000001")
-//
-//	ret, err = w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
-//	require.NoError(t, err)
-//	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
-//}
+func TestQueryValidators(t *testing.T) {
+	ret, err := validators(1)
+
+	require.NoError(t, err)
+	require.Equal(t, len(validatorWallets), len(ret.Validators))
+	for _, val := range ret.Validators {
+		require.True(t, isValidator(rtypes0.Address(val.Address)))
+	}
+}
+
+func TestMinSelfStakeRatio(t *testing.T) {
+	valWal := validatorWallets[0]
+	valStakes, err := rweb3.GetDelegatee(valWal.Address())
+	require.NoError(t, err)
+
+	sender := randCommonWallet()
+	require.NoError(t, sender.Unlock(rpcNode.Pass))
+	require.NoError(t, sender.SyncAccount(rweb3))
+
+	// allowed
+	maxAllowedAmt := valStakes.TotalAmount
+	ret, err := sender.StakingSync(valWal.Address(), gas, maxAllowedAmt, rweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code)
+
+	sender.AddNonce()
+
+	// disallowed
+	ret, err = sender.StakingSync(valWal.Address(), gas, uint256.NewInt(1000000000000000000), rweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
+	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
+
+}
+
+func TestInvalidStakeAmount(t *testing.T) {
+	w := randCommonWallet()
+	require.NoError(t, w.SyncAccount(rweb3))
+	require.NoError(t, w.Unlock(rpcNode.Pass))
+
+	// too small
+	stakeAmt := uint256.MustFromDecimal("1111")
+
+	ret, err := w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+
+	// not multiple
+	stakeAmt = uint256.MustFromDecimal("1000000000000000001")
+
+	ret, err = w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+}
+
 //
 //func TestStakingToSelf(t *testing.T) {
 //

@@ -12,4 +12,6 @@ message GovRuleProto {
   bytes _min_trx_fee = 7;
   int64 min_voting_period_blocks = 8;
   int64 max_voting_period_blocks = 9;
+  int64 min_self_stake_ratio = 10;
+  int64 max_updatable_stake_ratio = 11;
 }

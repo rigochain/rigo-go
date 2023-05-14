@@ -1,9 +1,12 @@
 package node
 
 import (
+	"bytes"
 	"fmt"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
+	abytes "github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/log"
 	"runtime"
@@ -19,7 +22,7 @@ type TrxExecutor struct {
 func NewTrxExecutor(n int, logger log.Logger) *TrxExecutor {
 	txCtxChs := make([]chan *ctrlertypes.TrxContext, n)
 	for i := 0; i < n; i++ {
-		txCtxChs[i] = make(chan *ctrlertypes.TrxContext, 128)
+		txCtxChs[i] = make(chan *ctrlertypes.TrxContext, 5000)
 	}
 	return &TrxExecutor{
 		txCtxChs: txCtxChs,
@@ -41,9 +44,12 @@ func (txe *TrxExecutor) Stop() {
 }
 
 func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if xerr := validateTrx(ctx); xerr != nil {
+	xerr := validateTrx(ctx)
+	if xerr != nil {
 		return xerr
-	} else if xerr := runTrx(ctx); xerr != nil {
+	}
+	xerr = runTrx(ctx)
+	if xerr != nil {
 		return xerr
 	}
 	return nil
@@ -60,6 +66,7 @@ func (txe *TrxExecutor) ExecuteAsync(ctx *ctrlertypes.TrxContext) xerrors.XError
 	//	txe.logger.Info("[DEBUG] TrxExecutor::ExecuteAsync", "index", i, "txhash", ctx.TxHash)
 	//}
 	txe.txCtxChs[i] <- ctx
+
 	return nil
 }
 
@@ -103,6 +110,27 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	if len(ctx.Tx.To) != types.AddrSize {
 		return xerrors.ErrInvalidAddress
+	}
+
+	// check signature
+	var fromAddr types.Address
+	var pubBytes abytes.HexBytes
+
+	if ctx.Exec {
+		tx := ctx.Tx
+		sig := tx.Sig
+		tx.Sig = nil
+		_txbz, xerr := tx.Encode()
+		if xerr != nil {
+			return xerr
+		}
+		if fromAddr, pubBytes, xerr = crypto.Sig2Addr(_txbz, sig); xerr != nil {
+			return xerr
+		}
+		if bytes.Compare(fromAddr, tx.From) != 0 {
+			return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
+		}
+		ctx.SenderPubKey = pubBytes
 	}
 
 	//

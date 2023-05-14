@@ -24,6 +24,8 @@ type IGovHandler interface {
 	MinTrxFee() *uint256.Int
 	MinVotingPeriodBlocks() int64
 	MaxVotingPeriodBlocks() int64
+	MinSelfStakeRatio() int64
+	MaxUpdatableStakeRatio() int64
 
 	// utility methods
 	MaxStakeAmount() *uint256.Int

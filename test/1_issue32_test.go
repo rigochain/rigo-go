@@ -12,7 +12,7 @@ import (
 func TestIssue32(t *testing.T) {
 	wg := sync.WaitGroup{}
 
-	var allAcctHelpers []*acctHelper
+	var allAcctHelpers []*acctObj
 	senderCnt := 0
 
 	for _, w := range wallets {
@@ -22,7 +22,7 @@ func TestIssue32(t *testing.T) {
 
 		require.NoError(t, w.SyncAccount(rweb3))
 
-		acctTestObj := newAcctHelper(w)
+		acctTestObj := newAcctObj(w)
 		allAcctHelpers = append(allAcctHelpers, acctTestObj)
 
 		if w.GetBalance().Cmp(uint256.NewInt(1000000)) >= 0 {
@@ -35,17 +35,17 @@ func TestIssue32(t *testing.T) {
 		}
 	}
 
-	randRecvAcct := web3.NewWallet(TESTPASS)
-	receiverHelper := newAcctHelper(randRecvAcct)
+	randRecvAcct := web3.NewWallet(rpcNode.Pass)
+	receiverHelper := newAcctObj(randRecvAcct)
 	allAcctHelpers = append(allAcctHelpers, receiverHelper)
 
-	randRecvAcct1 := web3.NewWallet(TESTPASS)
-	receiverHelper1 := newAcctHelper(randRecvAcct1)
+	randRecvAcct1 := web3.NewWallet(rpcNode.Pass)
+	receiverHelper1 := newAcctObj(randRecvAcct1)
 	allAcctHelpers = append(allAcctHelpers, receiverHelper1)
 
-	for _, v := range senderAcctHelpers {
+	for _, v := range senderAcctObjs {
 		wg.Add(1)
-		go bulkTransfer(t, &wg, v, []*acctHelper{receiverHelper, receiverHelper1}, 50) // 50 txs
+		go bulkTransfer(t, &wg, v, []*acctObj{receiverHelper, receiverHelper1}, 50) // 50 txs
 	}
 
 	wg.Wait()

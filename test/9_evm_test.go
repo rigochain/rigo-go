@@ -31,7 +31,7 @@ func TestERC20_Payable(t *testing.T) {
 func testDeploy(t *testing.T) {
 	creator := validatorWallets[0]
 	require.NoError(t, creator.SyncAccount(rweb3))
-	require.NoError(t, creator.Unlock(TESTPASS), string(TESTPASS))
+	require.NoError(t, creator.Unlock(rpcNode.Pass), string(rpcNode.Pass))
 
 	contract, err := vm.NewEVMContract("./erc20_test_contract.json")
 	require.NoError(t, err)
@@ -62,7 +62,7 @@ func testQuery(t *testing.T) {
 
 func testPayable(t *testing.T) {
 	sender := randCommonWallet()
-	require.NoError(t, sender.Unlock(TESTPASS), string(TESTPASS))
+	require.NoError(t, sender.Unlock(rpcNode.Pass), string(rpcNode.Pass))
 	require.NoError(t, sender.SyncAccount(rweb3))
 
 	contAcct, err := rweb3.GetAccount(evmContract.GetAddress())

@@ -1,7 +1,9 @@
 package test
 
 import (
+	"errors"
 	"fmt"
+	"github.com/containerd/continuity/fs"
 	"github.com/rigochain/rigo-go/cmd/commands"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/node"
@@ -13,74 +15,102 @@ import (
 	"path/filepath"
 )
 
-var (
-	testChainID = "rigo_unit_test_net"
-	testConfig  *cfg.Config
-	nd          *tmnode.Node
-	rpcURL      = "http://localhost:26657"
-	wsEndpoint  = "ws://localhost:26657/websocket"
+type PeerMock struct {
+	ChainID string
+	Config  *cfg.Config
+	nd      *tmnode.Node
+	RPCURL  string
+	WSEnd   string
 
-	TESTPASS = []byte("1111")
-)
+	Pass []byte
+}
 
-func init() {
-	testConfig = cfg.DefaultConfig()
-	testConfig.LogLevel = "rigo_EVMCtrler:debug,*:error"
-	testConfig.SetRoot(filepath.Join(os.TempDir(), "rigo_test"))
-	tmcfg.EnsureRoot(testConfig.RootDir)
-	fmt.Println("root directory", testConfig.RootDir)
-	testConfig.RPC.ListenAddress = "tcp://localhost:36657"
-	if err := testConfig.ValidateBasic(); err != nil {
+func NewPeerMock(chain, id string, p2pPort, rpcPort int, logLevel string) *PeerMock {
+	config := cfg.DefaultConfig()
+	config.LogLevel = logLevel
+	config.SetRoot(filepath.Join(os.TempDir(), "rigo_test_"+id))
+	tmcfg.EnsureRoot(config.RootDir)
+
+	config.P2P.AllowDuplicateIP = true
+	config.P2P.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", p2pPort)
+	config.RPC.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", rpcPort)
+	if err := config.ValidateBasic(); err != nil {
 		panic(fmt.Errorf("error in rootConfig file: %v", err))
 	}
 
-	rpcURL = "http://localhost:36657"
-	wsEndpoint = "ws://localhost:36657/websocket"
+	return &PeerMock{
+		ChainID: chain,
+		Config:  config,
+		RPCURL:  fmt.Sprintf("http://localhost:%d", rpcPort),
+		WSEnd:   fmt.Sprintf("ws://localhost:%d/websocket", rpcPort),
+		Pass:    []byte("1111"),
+	}
 }
 
-func initNode() error {
-	return commands.InitFilesWith(testChainID, testConfig, TESTPASS)
+func (peer *PeerMock) CopyGenesisFrom(source string) error {
+	return fs.CopyFile(
+		peer.Config.GenesisFile(),
+		source)
 }
 
-func runNode() error {
-	var err error
+func (peer *PeerMock) IDAddress() (string, error) {
+	if peer.nd == nil {
+		return "", errors.New("not created node")
+	}
+	ni := peer.nd.NodeInfo()
+	na, _ := ni.NetAddress()
+	return fmt.Sprintf("%s@127.0.0.1:%d", ni.ID(), na.Port), nil
+}
 
+func (peer *PeerMock) SetPeers(other *PeerMock) {
+	peer.Config.P2P.PersistentPeers, _ = other.IDAddress()
+	fmt.Println("SetPeers", peer.Config.P2P.PersistentPeers)
+}
+
+func (peer *PeerMock) SetPass(pass []byte) {
+	peer.Pass = pass
+}
+
+func (peer *PeerMock) Init() error {
+	return commands.InitFilesWith(peer.ChainID, peer.Config, peer.Pass)
+}
+
+func (peer *PeerMock) Start() error {
 	logger := tmlog.NewNopLogger()
 
 	logger = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
-	if testConfig.LogFormat == "json" {
+	if peer.Config.LogFormat == "json" {
 		logger = tmlog.NewTMJSONLogger(tmlog.NewSyncWriter(os.Stdout))
 	}
-	logger, err = tmflags.ParseLogLevel(testConfig.LogLevel, logger, tmcfg.DefaultLogLevel)
+	logger, err := tmflags.ParseLogLevel(peer.Config.LogLevel, logger, tmcfg.DefaultLogLevel)
 
-	nd, err = node.NewRigoNode(testConfig, TESTPASS, logger)
+	peer.nd, err = node.NewRigoNode(peer.Config, peer.Pass, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create rigo: %w", err)
 	}
 
-	err = nd.Start()
+	err = peer.nd.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start rigo: %w", err)
 	}
-
 	return nil
 }
 
-func stopNode() {
-	if nd.IsRunning() {
-		if err := nd.ProxyApp().Stop(); err != nil {
+func (peer *PeerMock) Stop() {
+	if peer.nd.IsRunning() {
+		if err := peer.nd.ProxyApp().Stop(); err != nil {
 			panic(fmt.Errorf("unable to stop the rigo proxy app: %v", err))
 		}
-		if err := nd.Stop(); err != nil {
+		if err := peer.nd.Stop(); err != nil {
 			panic(fmt.Errorf("unable to stop the rigo node: %v", err))
 		}
 	}
 }
 
-func walletPath() string {
-	return filepath.Join(testConfig.Config.RootDir, "walkeys")
+func (peer *PeerMock) WalletPath() string {
+	return filepath.Join(peer.Config.RootDir, "walkeys")
 }
 
-func privValKeyPath() string {
-	return testConfig.PrivValidatorKeyFile()
+func (peer *PeerMock) PrivValKeyPath() string {
+	return peer.Config.PrivValidatorKeyFile()
 }

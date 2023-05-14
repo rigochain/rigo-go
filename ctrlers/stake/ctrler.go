@@ -1,6 +1,7 @@
 package stake
 
 import (
+	"fmt"
 	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
@@ -90,9 +91,6 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
 	case ctrlertypes.TRX_UNSTAKING:
@@ -134,8 +132,10 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		return xerr
 	}
 
+	selfStaking := false
 	if delegatee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 		// self staking
+		selfStaking = true
 		// add new delegatee
 		delegatee = NewDelegatee(ctx.Tx.From, ctx.SenderPubKey)
 	} else if delegatee == nil {
@@ -146,6 +146,16 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	// create stake and delegate it to delegatee
 	// the block reward for this stake will be started at ctx.Height + 1. (issue #29)
 	s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height+1, ctx.TxHash, ctx.GovHandler)
+	if !selfStaking {
+		// it's delegating. check minSelfStakeRatio
+		selfRatio := delegatee.SelfStakeRatio(s0.Power)
+		if selfRatio < ctrler.govHandler.MinSelfStakeRatio() {
+			return xerrors.From(fmt.Errorf("not enough self power - validator: %v, self power: %v", delegatee.Addr, delegatee.GetSelfPower()))
+		}
+	}
+
+	ctrler.GetTotalPower()
+
 	if xerr := delegatee.addStake(s0); xerr != nil {
 		return xerr
 	}
