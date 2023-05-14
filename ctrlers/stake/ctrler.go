@@ -436,6 +436,32 @@ func (ctrler *StakeCtrler) PowerOf(addr types.Address) int64 {
 	}
 }
 
+func (ctrler *StakeCtrler) SelfPowerOf(addr types.Address) int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(addr)); xerr != nil {
+		return 0
+	} else if delegatee == nil {
+		return 0
+	} else {
+		return delegatee.SelfPower
+	}
+}
+
+func (ctrler *StakeCtrler) DelegatedPowerOf(addr types.Address) int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(addr)); xerr != nil {
+		return 0
+	} else if delegatee == nil {
+		return 0
+	} else {
+		return delegatee.TotalPower - delegatee.SelfPower
+	}
+}
+
 func (ctrler *StakeCtrler) GetTotalAmount() *uint256.Int {
 	ret := uint256.NewInt(0)
 	_ = ctrler.delegateeLedger.IterateAllFinalityItems(func(delegatee *Delegatee) xerrors.XError {

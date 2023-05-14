@@ -119,11 +119,25 @@ func TestStakingByTx(t *testing.T) {
 	sumPower := stakeCtrler.GetTotalPower()
 
 	for _, txctx := range stakingTrxCtxs {
-		err := stakeCtrler.ExecuteTrx(txctx)
-		require.NoError(t, err)
+		power0 := stakeCtrler.SelfPowerOf(txctx.Tx.To)
+		power1 := stakeCtrler.DelegatedPowerOf(txctx.Tx.To)
+		maxAmt := govHelper.PowerToAmount(power0 - power1)
 
-		_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += txctx.GovHandler.AmountToPower(txctx.Tx.Amount)
+		err := stakeCtrler.ExecuteTrx(txctx)
+
+		if txctx.Tx.Amount.Cmp(maxAmt) > 0 {
+			require.Error(t, err)
+			for i, ctx := range unstakingTrxCtxs {
+				if bytes.Compare(ctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash, txctx.TxHash) == 0 {
+					unstakingTrxCtxs = append(unstakingTrxCtxs[:i], unstakingTrxCtxs[i+1:]...)
+					break
+				}
+			}
+		} else {
+			require.NoError(t, err)
+			_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
+			sumPower += txctx.GovHandler.AmountToPower(txctx.Tx.Amount)
+		}
 	}
 
 	_, _, err := stakeCtrler.Commit()
