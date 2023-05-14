@@ -17,14 +17,18 @@ import (
 	"sync"
 )
 
+type InitStake struct {
+	PubKeys bytes.HexBytes
+	Stakes  []*Stake
+}
+
 type StakeCtrler struct {
 	lastValidators  DelegateeArray
 	delegateeLedger ledger.IFinalityLedger[*Delegatee]
 	frozenLedger    ledger.IFinalityLedger[*Stake]
 
-	govHandler ctrlertypes.IGovHandler
-	logger     tmlog.Logger
-	mtx        sync.RWMutex
+	logger tmlog.Logger
+	mtx    sync.RWMutex
 }
 
 func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovHandler, logger tmlog.Logger) (*StakeCtrler, error) {
@@ -47,7 +51,6 @@ func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovHandler, logg
 		delegateeLedger: delegateeLedger,
 		//stakeLedger:     stakeLedger,
 		frozenLedger: frozenLedger,
-		govHandler:   govHandler,
 		logger:       logger.With("module", "rigo_StakeCtrler"),
 	}
 	return ret, nil
@@ -58,29 +61,20 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	validators, ok := req.([]abcitypes.ValidatorUpdate)
+	initStakes, ok := req.([]*InitStake)
 	if !ok {
-		return xerrors.ErrInitChain.Wrapf("wrong parameter: StakeCtrler::InitLedger() requires []ValidatorUpdates")
+		return xerrors.ErrInitChain.Wrapf("wrong parameter: StakeCtrler::InitLedger() requires []*InitStake")
 	}
 
-	for _, val := range validators {
-		pubBytes := val.PubKey.GetSecp256K1()
-		addr, xerr := crypto.PubBytes2Addr(pubBytes)
-		if xerr != nil {
-			return xerr
-		}
-		s0 := NewStakeWithPower(
-			addr, addr, // self staking
-			val.Power,
-			1,
-			bytes.ZeroBytes(32), // 0x00... txhash
-			ctrler.govHandler)
-
-		d := NewDelegatee(addr, pubBytes)
-		if xerr := d.AddStake(s0); xerr != nil {
-			return xerr
-		} else if xerr := ctrler.delegateeLedger.SetFinality(d); xerr != nil {
-			return xerr
+	for _, initS0 := range initStakes {
+		for _, s0 := range initS0.Stakes {
+			d := NewDelegatee(s0.To, initS0.PubKeys)
+			if xerr := d.AddStake(s0); xerr != nil {
+				return xerr
+			}
+			if xerr := ctrler.delegateeLedger.SetFinality(d); xerr != nil {
+				return xerr
+			}
 		}
 	}
 
@@ -95,7 +89,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	if byzantines != nil {
 		ctrler.logger.Debug("Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
-			if slashed, xerr := ctrler.doPunish(&evi); xerr != nil {
+			if slashed, xerr := ctrler.doPunish(&evi, blockCtx.GovHandler.SlashRatio()); xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
@@ -120,17 +114,17 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	return evts, nil
 }
 
-func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
-	return ctrler.doPunish(evi)
+func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
+	return ctrler.doPunish(evi, slashRatio)
 }
 
-func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
+func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
 	delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(evi.Validator.Address))
 	if xerr != nil {
 		return 0, xerr
 	}
 
-	slashed := delegatee.DoSlash(ctrler.govHandler.SlashRatio())
+	slashed := delegatee.DoSlash(slashRatio)
 	_ = ctrler.delegateeLedger.SetFinality(delegatee)
 
 	return slashed, nil
@@ -195,7 +189,7 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	if !selfStaking {
 		// it's delegating. check minSelfStakeRatio
 		selfRatio := delegatee.SelfStakeRatio(s0.Power)
-		if selfRatio < ctrler.govHandler.MinSelfStakeRatio() {
+		if selfRatio < ctx.GovHandler.MinSelfStakeRatio() {
 			return xerrors.From(fmt.Errorf("not enough self power - validator: %v, self power: %v", delegatee.Addr, delegatee.GetSelfPower()))
 		}
 	}

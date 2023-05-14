@@ -172,7 +172,7 @@ func TestPunish(t *testing.T) {
 						},
 					},
 				},
-			}, nil, nil, nil),
+			}, govHelper, nil, nil),
 		)
 
 		delegatee := stakeCtrler.Delegatee(byzantine.Address())

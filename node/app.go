@@ -172,7 +172,28 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	if xerr := ctrler.acctCtrler.InitLedger(&appState); xerr != nil {
 		panic(xerr)
 	}
-	if xerr := ctrler.stakeCtrler.InitLedger(req.Validators); xerr != nil {
+
+	// initial stakes
+	initStakes := make([]*stake.InitStake, len(req.Validators))
+	for i, val := range req.Validators {
+		pubBytes := val.PubKey.GetSecp256K1()
+		addr, xerr := crypto.PubBytes2Addr(pubBytes)
+		if xerr != nil {
+			panic(xerr)
+		}
+		s0 := stake.NewStakeWithPower(
+			addr, addr, // self staking
+			val.Power,
+			1,
+			bytes.ZeroBytes(32), // 0x00... txhash
+			ctrler.govCtrler)
+		initStakes[i] = &stake.InitStake{
+			pubBytes,
+			[]*stake.Stake{s0},
+		}
+	}
+
+	if xerr := ctrler.stakeCtrler.InitLedger(initStakes); xerr != nil {
 		panic(xerr)
 	}
 
