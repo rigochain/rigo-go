@@ -29,9 +29,11 @@ func TestERC20_Payable(t *testing.T) {
 }
 
 func testDeploy(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
 	creator := validatorWallets[0]
 	require.NoError(t, creator.SyncAccount(rweb3))
-	require.NoError(t, creator.Unlock(rpcNode.Pass), string(rpcNode.Pass))
+	require.NoError(t, creator.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
 
 	contract, err := vm.NewEVMContract("./erc20_test_contract.json")
 	require.NoError(t, err)
@@ -43,7 +45,7 @@ func testDeploy(t *testing.T) {
 	//require.NotNil(t, ret.Data)
 	//require.Equal(t, 20, len(ret.Data))
 
-	txRet, err := waitTrxResult(ret.Hash, 15)
+	txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 	require.NotNil(t, txRet.TxResult.Data)
@@ -53,6 +55,8 @@ func testDeploy(t *testing.T) {
 }
 
 func testQuery(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
 	sender := randCommonWallet()
 	require.NoError(t, sender.SyncAccount(rweb3))
 	ret, err := evmContract.Call("name", nil, sender.Address(), 0, rweb3)
@@ -61,8 +65,10 @@ func testQuery(t *testing.T) {
 }
 
 func testPayable(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
 	sender := randCommonWallet()
-	require.NoError(t, sender.Unlock(rpcNode.Pass), string(rpcNode.Pass))
+	require.NoError(t, sender.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
 	require.NoError(t, sender.SyncAccount(rweb3))
 
 	contAcct, err := rweb3.GetAccount(evmContract.GetAddress())
@@ -83,7 +89,7 @@ func testPayable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
-	txRet, err := waitTrxResult(ret.Hash, 15)
+	txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 
@@ -109,7 +115,7 @@ func testPayable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
-	txRet, err = waitTrxResult(ret.Hash, 15)
+	txRet, err = waitTrxResult(ret.Hash, 15, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 

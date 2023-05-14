@@ -13,7 +13,9 @@ import (
 // DO NOT RUN this test code yet.
 
 func TestQueryValidators(t *testing.T) {
-	ret, err := validators(1)
+	rweb3 := randRigoWeb3()
+
+	ret, err := validators(1, rweb3)
 
 	require.NoError(t, err)
 	require.Equal(t, len(validatorWallets), len(ret.Validators))
@@ -23,12 +25,14 @@ func TestQueryValidators(t *testing.T) {
 }
 
 func TestMinSelfStakeRatio(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
 	valWal := validatorWallets[0]
 	valStakes, err := rweb3.GetDelegatee(valWal.Address())
 	require.NoError(t, err)
 
 	sender := randCommonWallet()
-	require.NoError(t, sender.Unlock(rpcNode.Pass))
+	require.NoError(t, sender.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, sender.SyncAccount(rweb3))
 
 	// allowed
@@ -48,9 +52,11 @@ func TestMinSelfStakeRatio(t *testing.T) {
 }
 
 func TestInvalidStakeAmount(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
 	w := randCommonWallet()
 	require.NoError(t, w.SyncAccount(rweb3))
-	require.NoError(t, w.Unlock(rpcNode.Pass))
+	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
 
 	// too small
 	stakeAmt := uint256.MustFromDecimal("1111")

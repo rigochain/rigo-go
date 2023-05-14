@@ -9,15 +9,17 @@ import (
 )
 
 func TestStaking2GenesisValidator(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
 	valWal := validatorWallets[0]
 	require.NoError(t, valWal.SyncAccount(rweb3))
-	require.NoError(t, valWal.Unlock(rpcNode.Pass))
+	require.NoError(t, valWal.Unlock(defaultRpcNode.Pass))
 
 	ret, err := valWal.StakingSync(valWal.Address(), gas, uint256.NewInt(1000000000000000000), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
-	txRet, err := waitTrxResult(ret.Hash, 15)
+	txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 

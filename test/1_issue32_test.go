@@ -12,6 +12,8 @@ import (
 func TestIssue32(t *testing.T) {
 	wg := sync.WaitGroup{}
 
+	rweb3 := randRigoWeb3()
+
 	var allAcctHelpers []*acctObj
 	senderCnt := 0
 
@@ -35,11 +37,11 @@ func TestIssue32(t *testing.T) {
 		}
 	}
 
-	randRecvAcct := web3.NewWallet(rpcNode.Pass)
+	randRecvAcct := web3.NewWallet(defaultRpcNode.Pass)
 	receiverHelper := newAcctObj(randRecvAcct)
 	allAcctHelpers = append(allAcctHelpers, receiverHelper)
 
-	randRecvAcct1 := web3.NewWallet(rpcNode.Pass)
+	randRecvAcct1 := web3.NewWallet(defaultRpcNode.Pass)
 	receiverHelper1 := newAcctObj(randRecvAcct1)
 	allAcctHelpers = append(allAcctHelpers, receiverHelper1)
 

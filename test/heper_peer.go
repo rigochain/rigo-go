@@ -6,16 +6,25 @@ import (
 	"github.com/containerd/continuity/fs"
 	"github.com/rigochain/rigo-go/cmd/commands"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
+	rigoweb3 "github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/node"
 	tmcfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmnode "github.com/tendermint/tendermint/node"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
+)
+
+var (
+	peers []*PeerMock
 )
 
 type PeerMock struct {
+	PeerID  string
 	ChainID string
 	Config  *cfg.Config
 	nd      *tmnode.Node
@@ -27,8 +36,10 @@ type PeerMock struct {
 
 func NewPeerMock(chain, id string, p2pPort, rpcPort int, logLevel string) *PeerMock {
 	config := cfg.DefaultConfig()
+	config.P2P.AllowDuplicateIP = true
 	config.LogLevel = logLevel
 	config.SetRoot(filepath.Join(os.TempDir(), "rigo_test_"+id))
+	os.RemoveAll(config.RootDir) // reset root directory
 	tmcfg.EnsureRoot(config.RootDir)
 
 	config.P2P.AllowDuplicateIP = true
@@ -39,6 +50,7 @@ func NewPeerMock(chain, id string, p2pPort, rpcPort int, logLevel string) *PeerM
 	}
 
 	return &PeerMock{
+		PeerID:  id,
 		ChainID: chain,
 		Config:  config,
 		RPCURL:  fmt.Sprintf("http://localhost:%d", rpcPort),
@@ -64,7 +76,6 @@ func (peer *PeerMock) IDAddress() (string, error) {
 
 func (peer *PeerMock) SetPeers(other *PeerMock) {
 	peer.Config.P2P.PersistentPeers, _ = other.IDAddress()
-	fmt.Println("SetPeers", peer.Config.P2P.PersistentPeers)
 }
 
 func (peer *PeerMock) SetPass(pass []byte) {
@@ -113,4 +124,42 @@ func (peer *PeerMock) WalletPath() string {
 
 func (peer *PeerMock) PrivValKeyPath() string {
 	return peer.Config.PrivValidatorKeyFile()
+}
+
+func randPeer() *PeerMock {
+	rand.Seed(time.Now().UnixNano())
+	n := rand.Intn(len(peers))
+	return peers[n]
+}
+
+func randRigoWeb3() *rigoweb3.RigoWeb3 {
+	peer := randPeer()
+	return rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(peer.RPCURL))
+}
+
+func runPeers(n int) {
+	for i := 0; i < n; i++ {
+		ll := "*:error"
+		if i == n-1 {
+			ll = "*:error"
+		}
+		_peer := NewPeerMock("rigo_test_chain", strconv.FormatInt(int64(i), 10), 26656+i, 36657+i, ll)
+		if err := _peer.Init(); err != nil {
+			panic(err)
+		}
+
+		if i > 0 {
+			prevPeer := peers[i-1]
+			if err := _peer.CopyGenesisFrom(prevPeer.Config.GenesisFile()); err != nil {
+				panic(err)
+			}
+			_peer.SetPeers(prevPeer)
+		}
+
+		if err := _peer.Start(); err != nil {
+			panic(err)
+		}
+
+		peers = append(peers, _peer)
+	}
 }

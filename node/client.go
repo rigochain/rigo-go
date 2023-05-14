@@ -127,17 +127,18 @@ func (client *rigoLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverTx)
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
-	rr := newLocalReqRes(abcitypes.ToRequestDeliverTx(params), abcitypes.ToResponseDeliverTx(abcitypes.ResponseDeliverTx{}))
-	client.deliverTxReqReses = append(client.deliverTxReqReses, rr)
+	// todo: Implement parallel tx processing
+	//rr := newLocalReqRes(abcitypes.ToRequestDeliverTx(params), abcitypes.ToResponseDeliverTx(abcitypes.ResponseDeliverTx{}))
+	//client.deliverTxReqReses = append(client.deliverTxReqReses, rr)
+	//
+	//_ = client.Application.DeliverTx(params)
+	//return nil
 
-	_ = client.Application.DeliverTx(params)
-	return nil
-
-	//res := web3.Application.DeliverTx(params)
-	//return web3.callback(
-	//	abcitypes.ToRequestDeliverTx(params),
-	//	abcitypes.ToResponseDeliverTx(res),
-	//)
+	res := client.Application.DeliverTx(params)
+	return client.callback(
+		abcitypes.ToRequestDeliverTx(params),
+		abcitypes.ToResponseDeliverTx(res),
+	)
 }
 
 func defualtOnTrxExecFinished(client abcicli.Client, txidx int, req *abcitypes.RequestDeliverTx, res *abcitypes.ResponseDeliverTx) {
@@ -145,6 +146,7 @@ func defualtOnTrxExecFinished(client abcicli.Client, txidx int, req *abcitypes.R
 }
 
 func (client *rigoLocalClient) onTrxFinished(txidx int, req *abcitypes.RequestDeliverTx, res *abcitypes.ResponseDeliverTx) {
+	client.Logger.Info("rigoLocalClient receives finished tx", "index", txidx)
 	if txidx >= len(client.deliverTxReqReses) {
 		panic("web3.deliverTxReqReses's length is wrong")
 	}
@@ -341,13 +343,14 @@ func (client *rigoLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*abc
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
-	// wait that all txs are finished
-	for _, rr := range client.deliverTxReqReses {
-		rr.Wait()
-		client.Callback(rr.Request, rr.Response)
-		rr.InvokeCallback()
-	}
-	client.deliverTxReqReses = nil
+	// todo: Implement parallel tx processing
+	//// wait that all txs are finished
+	//for _, rr := range client.deliverTxReqReses {
+	//	rr.Wait()
+	//	client.Callback(rr.Request, rr.Response)
+	//	rr.InvokeCallback()
+	//}
+	//client.deliverTxReqReses = nil
 
 	res := client.Application.EndBlock(req)
 	return &res, nil

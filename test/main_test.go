@@ -6,7 +6,6 @@ import (
 	tmcfg "github.com/tendermint/tendermint/config"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"os"
-	"strconv"
 	"sync"
 	"testing"
 )
@@ -16,44 +15,18 @@ func TestMain(m *testing.M) {
 	//test_on_external_node(m)
 }
 
-var (
-	peers []*PeerMock
-)
-
 func test_on_internal_node(m *testing.M) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 
-		for i := 0; i < 10; i++ {
-			ll := "none"
-			//if i == 9 {
-			//	ll = "rigo:debug,*:error"
-			//}
-			_peer := NewPeerMock("rigo_test_chain", strconv.FormatInt(int64(i), 10), 26656+i, 36657+i, ll)
-			if err := _peer.Init(); err != nil {
-				panic(err)
-			}
+		runPeers(3)
 
-			if i > 0 {
-				prevPeer := peers[i-1]
-				if err := _peer.CopyGenesisFrom(prevPeer.Config.GenesisFile()); err != nil {
-					panic(err)
-				}
-				_peer.SetPeers(prevPeer)
-			}
-
-			if err := _peer.Start(); err != nil {
-				panic(err)
-			}
-
-			peers = append(peers, _peer)
-		}
 		wg.Done()
 	}()
 	wg.Wait()
 
-	rpcNode = peers[0]
+	defaultRpcNode = peers[len(peers)-1]
 	subWg, err := waitEvent("tm.event='NewBlock'", func(event *coretypes.ResultEvent, err error) bool {
 		return true
 	})
@@ -96,7 +69,7 @@ func test_on_external_node(m *testing.M) {
 		WSEnd:   "ws://localhost:26657/websocket",
 		Pass:    []byte("1"),
 	}
-	rpcNode = peer
+	defaultRpcNode = peer
 
 	prepareTest(peer)
 

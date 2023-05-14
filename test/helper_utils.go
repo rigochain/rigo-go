@@ -21,7 +21,6 @@ import (
 )
 
 var (
-	rweb3            *rigoweb3.RigoWeb3
 	validatorWallets []*rigoweb3.Wallet
 	wallets          []*rigoweb3.Wallet
 	walletsMap       map[rtypes1.AcctKey]*rigoweb3.Wallet
@@ -29,12 +28,10 @@ var (
 	W1               *rigoweb3.Wallet
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
 	gas              = uint256.NewInt(10)
-	rpcNode          *PeerMock
+	defaultRpcNode   *PeerMock
 )
 
 func prepareTest(peer *PeerMock) {
-	rweb3 = rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(peer.RPCURL))
-
 	files, err := os.ReadDir(peer.WalletPath())
 	if err != nil {
 		panic(err)
@@ -70,16 +67,18 @@ func prepareTest(peer *PeerMock) {
 	W1 = wallets[1]
 }
 
-func waitTrxResult(txhash []byte, maxTimes int) (*rweb3types.TrxResult, error) {
+func waitTrxResult(txhash []byte, maxTimes int, rweb3 *rigoweb3.RigoWeb3) (*rweb3types.TrxResult, error) {
 	for i := 0; i < maxTimes; i++ {
 		time.Sleep(100 * time.Millisecond)
 
 		// todo: check why it takes more than 10 secs to fetch a transaction
 
 		txRet, err := rweb3.GetTransaction(txhash)
-		if err != nil && !strings.Contains(err.Error(), ") not found") {
+		if err != nil && strings.Contains(err.Error(), ") not found") {
+			continue
+		} else if err != nil {
 			return nil, err
-		} else if err == nil {
+		} else {
 			return txRet, nil
 		}
 	}
@@ -111,7 +110,7 @@ func isValidator(addr rtypes0.Address) bool {
 	return false
 }
 
-func validators(height int64) (*coretypes.ResultValidators, error) {
+func validators(height int64, rweb3 *rigoweb3.RigoWeb3) (*coretypes.ResultValidators, error) {
 	return rweb3.GetValidators(height, 1, len(validatorWallets))
 }
 
@@ -125,13 +124,13 @@ func randCommonWallet() *rigoweb3.Wallet {
 }
 
 func saveRandWallet(w *rigoweb3.Wallet) error {
-	path := filepath.Join(rpcNode.WalletPath(), fmt.Sprintf("wk%X.json", w.Address()))
+	path := filepath.Join(defaultRpcNode.WalletPath(), fmt.Sprintf("wk%X.json", w.Address()))
 	return w.Save(libs.NewFileWriter(path))
 }
 
 func waitEvent(query string, cb func(*coretypes.ResultEvent, error) bool) (*sync.WaitGroup, error) {
 	subWg := sync.WaitGroup{}
-	sub, err := rigoweb3.NewSubscriber(rpcNode.WSEnd)
+	sub, err := rigoweb3.NewSubscriber(defaultRpcNode.WSEnd)
 	if err != nil {
 		return nil, err
 	}

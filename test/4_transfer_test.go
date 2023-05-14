@@ -17,9 +17,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestTransfer_Bulk(t *testing.T) {
+	rweb3 := randRigoWeb3()
 
 	wg := sync.WaitGroup{}
 
@@ -34,28 +36,29 @@ func TestTransfer_Bulk(t *testing.T) {
 
 		acctTestObj := newAcctObj(w)
 		allAcctObjs = append(allAcctObjs, acctTestObj)
-
 		//fmt.Println("TestBulkTransfer - used accounts:", w.Address(), w.GetNonce(), w.GetBalance())
 
-		if senderCnt < 9 && w.GetBalance().Cmp(uint256.NewInt(1000000)) >= 0 {
+		if senderCnt < 90 && w.GetBalance().Cmp(uint256.NewInt(1000000)) >= 0 {
 			addSenderAcctHelper(w.Address().String(), acctTestObj)
 			senderCnt++
 		}
 	}
 	require.Greater(t, senderCnt, 1)
 
-	// 최대 100 개 까지 계정 생성하여 리시버로 사용.
-	// 100 개 이상이면 이미 있는 계정 사용.
+	//// 최대 100 개 까지 계정 생성하여 리시버로 사용.
+	//// 100 개 이상이면 이미 있는 계정 사용.
 	for i := len(allAcctObjs); i < 100; i++ {
-		newAcctTestObj := newAcctObj(web3.NewWallet(rpcNode.Pass))
+		newAcctTestObj := newAcctObj(web3.NewWallet(defaultRpcNode.Pass))
 		require.NoError(t, saveRandWallet(newAcctTestObj.w))
 		allAcctObjs = append(allAcctObjs, newAcctTestObj)
 	}
 
 	for _, v := range senderAcctObjs {
 		wg.Add(1)
-		go bulkTransfer(t, &wg, v, allAcctObjs, 50) // 300 txs
+		go bulkTransfer(t, &wg, v, allAcctObjs, 500) // 100 txs per sender
 	}
+
+	fmt.Printf("TestBulkTransfer - Sender accounts: %d, Receiver accounts: %d\n", len(senderAcctObjs), len(allAcctObjs))
 
 	wg.Wait()
 
@@ -90,18 +93,19 @@ func TestTransfer_Bulk(t *testing.T) {
 
 func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, receivers []*acctObj, cnt int) {
 	w := senderAcctObj.w
-	require.NoError(t, w.Unlock(rpcNode.Pass))
+	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
 
-	//fmt.Printf("Begin of bulkTransfer - account: %v, balance: %v, nonce: %v\n", w.Address(), w.GetBalance(), w.GetNonce())
+	rpcNode := randPeer()
+	fmt.Printf("Begin of bulkTransfer - account: %v, balance: %v, nonce: %v, rpcPeerIdx: %v\n", w.Address(), w.GetBalance(), w.GetNonce(), rpcNode.PeerID)
+	_rweb3 := web3.NewRigoWeb3(web3.NewHttpProvider(rpcNode.RPCURL))
 
-	subWg := sync.WaitGroup{}
+	subWg := &sync.WaitGroup{}
 	sub, err := web3.NewSubscriber(rpcNode.WSEnd)
 	defer func() {
 		sub.Stop()
 	}()
 	require.NoError(t, err)
 	query := fmt.Sprintf("tm.event='Tx' AND tx.sender='%v'", w.Address())
-	//fmt.Println("query", query)
 	err = sub.Start(query, func(sub *web3.Subscriber, result []byte) {
 
 		event := &coretypes.ResultEvent{}
@@ -122,11 +126,19 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 		err = tx.Decode(eventDataTx.Tx)
 		require.NoError(t, err)
 
-		fmt.Println("bulkTransfer - event: ", rbytes.HexBytes(txHash), tx.From, tx.To, tx.Amount.Dec())
 		senderAcctObj.retTxsCnt++
+
 		subWg.Done()
+
 	})
 	require.NoError(t, err)
+
+	//checkTxRoutine := func(txhash []byte) {
+	//	retTx, err := waitTrxResult(txhash, 10, _rweb3)
+	//	require.NoError(t, err)
+	//	require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
+	//	subWg.Done()
+	//}
 
 	maxAmt := new(uint256.Int).Div(senderAcctObj.originBalance, uint256.NewInt(uint64(cnt)))
 	maxAmt = new(uint256.Int).Sub(maxAmt, gas)
@@ -149,13 +161,13 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 
 		subWg.Add(1)
 
-		ret, err := w.TransferSync(raddr, gas, randAmt, rweb3)
+		ret, err := w.TransferSync(raddr, gas, randAmt, _rweb3)
 
 		if err != nil && strings.Contains(err.Error(), "mempool is full") {
-			i--
 			subWg.Done()
+			time.Sleep(time.Millisecond * 1000)
 
-			//time.Sleep(time.Millisecond * 3)
+			i--
 			continue
 		}
 		require.NoError(t, err)
@@ -163,16 +175,15 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 		if ret.Code == xerrors.ErrCodeCheckTx &&
 			strings.Contains(ret.Log, "invalid nonce") {
 
-			require.NoError(t, w.SyncAccount(rweb3))
-			i--
 			subWg.Done()
+			require.NoError(t, w.SyncAccount(_rweb3))
+
+			i--
 			continue
 		}
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, w.GetNonce(), ret.Hash)
 
-		//retTx, err := waitTrxResult(ret.Hash, 15)
-		//require.NoError(t, err)
-		//require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
+		//checkTxRoutine(ret.Hash)
 
 		senderAcctObj.addTxHashOfAddr(ret.Hash, w.Address())
 		senderAcctObj.addSpentGas(gas)
@@ -180,7 +191,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 		senderAcctObj.addExpectedNonce()
 		racctState.addExpectedBalance(randAmt)
 
-		fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce(), randAmt)
+		//fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce(), randAmt)
 
 		w.AddNonce()
 
@@ -188,7 +199,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 	}
 	//fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
 	subWg.Wait()
-	fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
+	//fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
 
 	wg.Done()
 
@@ -196,9 +207,11 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 }
 
 func TestTransfer_OverBalance(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
 	require.NoError(t, W0.SyncBalance(rweb3))
 	require.NoError(t, W1.SyncBalance(rweb3))
-	require.NoError(t, W0.Unlock(rpcNode.Pass))
+	require.NoError(t, W0.Unlock(defaultRpcNode.Pass))
 
 	testObj0 := newAcctObj(W0)
 	testObj1 := newAcctObj(W1)
@@ -233,8 +246,10 @@ func TestTransfer_OverBalance(t *testing.T) {
 }
 
 func TestTransfer_WrongAddr(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
 	require.NoError(t, W0.SyncBalance(rweb3))
-	require.NoError(t, W0.Unlock(rpcNode.Pass))
+	require.NoError(t, W0.Unlock(defaultRpcNode.Pass))
 	require.NotEqual(t, uint256.NewInt(0).String(), W0.GetBalance().String())
 
 	tmpAmt := new(uint256.Int).Div(W0.GetBalance(), uint256.NewInt(2))

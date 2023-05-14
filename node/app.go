@@ -303,6 +303,8 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 	}
 }
 
+// deliverTxAsync is not fully implemented yet
+// todo: Fully implement deliverTxAsync which processes txs in parallel.
 func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	txIdx := ctrler.currBlockCtx.TxsCnt()
 	ctrler.currBlockCtx.AddTxsCnt(1)
@@ -376,7 +378,7 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 }
 
 func (ctrler *RigoApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	return ctrler.deliverTxAsync(req)
+	return ctrler.deliverTxSync(req)
 }
 
 func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
