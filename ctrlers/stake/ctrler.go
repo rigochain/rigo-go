@@ -89,7 +89,10 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	if byzantines != nil {
 		ctrler.logger.Debug("Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
-			if slashed, xerr := ctrler.doPunish(&evi, blockCtx.GovHandler.SlashRatio()); xerr != nil {
+			if slashed, xerr := ctrler.doPunish(
+				&evi, blockCtx.GovHandler.SlashRatio(),
+				blockCtx.GovHandler.AmountPerPower(),
+				blockCtx.GovHandler.RewardPerPower()); xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
@@ -114,17 +117,17 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	return evts, nil
 }
 
-func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
-	return ctrler.doPunish(evi, slashRatio)
+func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64, amtPerPower, rwdPerPower *uint256.Int) (int64, xerrors.XError) {
+	return ctrler.doPunish(evi, slashRatio, amtPerPower, rwdPerPower)
 }
 
-func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
+func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64, amtPerPower, rwdPerPower *uint256.Int) (int64, xerrors.XError) {
 	delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(evi.Validator.Address))
 	if xerr != nil {
 		return 0, xerr
 	}
 
-	slashed := delegatee.DoSlash(slashRatio)
+	slashed := delegatee.DoSlash(slashRatio, amtPerPower, rwdPerPower)
 	_ = ctrler.delegateeLedger.SetFinality(delegatee)
 
 	return slashed, nil
@@ -172,10 +175,7 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		return xerr
 	}
 
-	selfStaking := false
 	if delegatee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
-		// self staking
-		selfStaking = true
 		// add new delegatee
 		delegatee = NewDelegatee(ctx.Tx.From, ctx.SenderPubKey)
 	} else if delegatee == nil {
@@ -186,7 +186,7 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	// create stake and delegate it to delegatee
 	// the block reward for this stake will be started at ctx.Height + 1. (issue #29)
 	s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height+1, ctx.TxHash, ctx.GovHandler)
-	if !selfStaking {
+	if !s0.IsSelfStake() {
 		// it's delegating. check minSelfStakeRatio
 		selfRatio := delegatee.SelfStakeRatio(s0.Power)
 		if selfRatio < ctx.GovHandler.MinSelfStakeRatio() {

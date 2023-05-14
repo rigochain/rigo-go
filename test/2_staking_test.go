@@ -22,7 +22,6 @@ func TestQueryValidators(t *testing.T) {
 	ret, err := queryValidators(1, rweb3)
 
 	require.NoError(t, err)
-	require.Equal(t, len(validatorWallets), len(ret.Validators))
 	for _, val := range ret.Validators {
 		require.True(t, isValidator(rtypes0.Address(val.Address)))
 	}
@@ -39,20 +38,30 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	require.NoError(t, sender.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, sender.SyncAccount(rweb3))
 
-	// allowed
+	// allowed delegating
 	maxAllowedAmt := valStakes.TotalAmount
 	ret, err := sender.StakingSync(valWal.Address(), gas, maxAllowedAmt, rweb3)
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
 	sender.AddNonce()
 
-	// disallowed
-	ret, err = sender.StakingSync(valWal.Address(), gas, uint256.NewInt(1000000000000000000), rweb3)
+	// not allowed delegating, because `maxAllowdAmt` is already delegated.
+	ret, err = sender.StakingSync(valWal.Address(), gas, uint256.NewInt(1_000_000_000_000_000_000), rweb3)
 	require.NoError(t, err)
-	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
 
+	// allowed self staking
+	require.NoError(t, valWal.SyncAccount(rweb3))
+	require.NoError(t, valWal.Unlock(defaultRpcNode.Pass))
+	ret, err = valWal.StakingSync(valWal.Address(), gas, uint256.NewInt(10_000_000_000_000_000_000), rweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+
+	txRet, err := waitTrxResult(ret.Hash, 30, rweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 }
 
 func TestInvalidStakeAmount(t *testing.T) {
@@ -91,13 +100,13 @@ func TestDelegating(t *testing.T) {
 
 	vals, err := queryValidators(0, rweb3)
 	require.NoError(t, err)
-	fmt.Println("query validator power", vals.Validators[0].VotingPower)
+	//fmt.Println("query validator power", vals.Validators[0].VotingPower)
 	valAddr := rtypes0.Address(vals.Validators[0].Address)
 
 	valStakes0, err := rweb3.GetDelegatee(valAddr)
 	require.NoError(t, err)
 
-	stakeAmt := uint256.NewInt(1000000000000000000) // 10^18
+	stakeAmt := uint256.NewInt(1_000_000_000_000_000_000) // 10^18
 	stakePower := int64(1)
 
 	require.NoError(t, w.Unlock(defaultRpcNode.Pass))

@@ -293,7 +293,7 @@ func (delegatee *Delegatee) doBlockReward(height int64) *uint256.Int {
 	return reward
 }
 
-func (delegatee *Delegatee) DoSlash(ratio int64) int64 {
+func (delegatee *Delegatee) DoSlash(ratio int64, amtPerPower, rwdPerPower *uint256.Int) int64 {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
@@ -316,11 +316,16 @@ func (delegatee *Delegatee) DoSlash(ratio int64) int64 {
 				s0.Power -= slashingPower
 				slashedPower += slashingPower
 
-				_ = s0.Amount.Mul(s0.Amount, uint256.NewInt(uint64(ratio)))
-				_ = s0.Amount.Div(s0.Amount, uint256.NewInt(100))
+				blocks := uint64(0)
+				if s0.ReceivedReward.Sign() > 0 {
+					blocks = new(uint256.Int).Div(s0.ReceivedReward, s0.BlockRewardUnit).Uint64()
+				}
 
-				_ = s0.ReceivedReward.Mul(s0.ReceivedReward, uint256.NewInt(uint64(ratio)))
-				_ = s0.ReceivedReward.Div(s0.ReceivedReward, uint256.NewInt(100))
+				s0.Amount = new(uint256.Int).Mul(uint256.NewInt(uint64(s0.Power)), amtPerPower)
+				s0.BlockRewardUnit = new(uint256.Int).Mul(rwdPerPower, uint256.NewInt(uint64(s0.Power)))
+				if blocks > 0 {
+					s0.ReceivedReward = new(uint256.Int).Mul(s0.BlockRewardUnit, uint256.NewInt(blocks))
+				}
 
 				slashingPower = 0
 			}

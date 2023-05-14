@@ -75,7 +75,7 @@ func (g *govHandlerMock) Version() int64 {
 }
 
 func (g *govHandlerMock) AmountPerPower() *uint256.Int {
-	return uint256.NewInt(1000)
+	return uint256.NewInt(1_000_000_000_000_000_000)
 }
 
 func (g *govHandlerMock) RewardPerPower() *uint256.Int {

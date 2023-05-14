@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	config.DBPath = DBDIR
 	stakeCtrler, _ = stake.NewStakeCtrler(config, govHelper, tmlog.NewNopLogger())
 
-	Wallets = makeTestWallets(rand.Intn(100) + int(govHelper.MaxValidatorCnt()))
+	Wallets = makeTestWallets(100 + int(govHelper.MaxValidatorCnt()))
 
 	for i := 0; i < 5; i++ {
 		if txctx, err := randMakeStakingToSelfTrxContext(); err != nil {
@@ -125,8 +125,8 @@ func TestStakingByTx(t *testing.T) {
 
 		err := stakeCtrler.ExecuteTrx(txctx)
 
-		if txctx.Tx.Amount.Cmp(maxAmt) > 0 {
-			// try staking over self stakes
+		if txctx.Tx.Amount.Cmp(maxAmt) > 0 && txctx.Tx.From.Compare(txctx.Tx.To) != 0 {
+			// try delegating to validator over self_stake_ratio
 			require.Error(t, err)
 			for i, ctx := range unstakingTrxCtxs {
 				if bytes.Compare(ctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash, txctx.TxHash) == 0 {
