@@ -15,7 +15,11 @@ func TestStaking2GenesisValidator(t *testing.T) {
 	require.NoError(t, valWal.SyncAccount(rweb3))
 	require.NoError(t, valWal.Unlock(defaultRpcNode.Pass))
 
-	ret, err := valWal.StakingSync(valWal.Address(), gas, uint256.NewInt(1000000000000000000), rweb3)
+	valStakes0, err := rweb3.GetDelegatee(valWal.Address())
+	require.NoError(t, err)
+
+	amtStake := uint256.NewInt(1000000000000000000)
+	ret, err := valWal.StakingSync(valWal.Address(), gas, amtStake, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
@@ -35,4 +39,12 @@ func TestStaking2GenesisValidator(t *testing.T) {
 		}
 	}
 	require.True(t, found)
+
+	valStakes1, err := rweb3.GetDelegatee(valWal.Address())
+	require.NoError(t, err)
+	require.Equal(t,
+		new(uint256.Int).Add(valStakes0.GetTotalAmount(), amtStake),
+		valStakes1.GetTotalAmount())
+	require.Equal(t, valStakes1.GetTotalAmount(),
+		valStakes1.SumAmount())
 }

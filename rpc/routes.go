@@ -15,4 +15,5 @@ func AddRoutes() {
 	tmrpccore.Routes["subscribe"] = tmrpccore_server.NewRPCFunc(Subscribe, "query")
 	tmrpccore.Routes["unsubscribe"] = tmrpccore_server.NewRPCFunc(Unsubscribe, "query")
 	tmrpccore.Routes["tx_search"] = tmrpccore_server.NewRPCFunc(TxSearch, "query,prove,page,per_page,order_by")
+	tmrpccore.Routes["validators"] = tmrpccore_server.NewRPCFunc(Validators, "height,page,per_page")
 }

@@ -155,7 +155,11 @@ func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, err
 func (rweb3 *RigoWeb3) GetValidators(height int64, page, perPage int) (*coretypes.ResultValidators, error) {
 	retVals := &coretypes.ResultValidators{}
 
-	_height := strconv.FormatInt(height, 10)
+	_height := "0"
+	if height > 0 {
+		_height = strconv.FormatInt(height, 10)
+	}
+
 	if page == 0 {
 		page = 1
 	}

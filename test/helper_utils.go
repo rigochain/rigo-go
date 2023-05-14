@@ -31,38 +31,41 @@ var (
 	defaultRpcNode   *PeerMock
 )
 
-func prepareTest(peer *PeerMock) {
-	files, err := os.ReadDir(peer.WalletPath())
-	if err != nil {
-		panic(err)
-	}
+func prepareTest(peers []*PeerMock) {
+	for _, peer := range peers {
+		files, err := os.ReadDir(peer.WalletPath())
+		if err != nil {
+			panic(err)
+		}
 
-	walletsMap = make(map[rtypes1.AcctKey]*rigoweb3.Wallet)
+		walletsMap = make(map[rtypes1.AcctKey]*rigoweb3.Wallet)
 
-	if w, err := rigoweb3.OpenWallet(libs.NewFileReader(peer.PrivValKeyPath())); err != nil {
-		panic(err)
-	} else {
-		addValidatorWallet(w)
-	}
+		if w, err := rigoweb3.OpenWallet(libs.NewFileReader(peer.PrivValKeyPath())); err != nil {
+			panic(err)
+		} else {
+			addValidatorWallet(w)
+		}
 
-	for _, file := range files {
-		if !file.IsDir() {
-			if w, err := rigoweb3.OpenWallet(
-				libs.NewFileReader(filepath.Join(peer.WalletPath(), file.Name()))); err != nil {
-				panic(err)
-			} else {
-				wallets = append(wallets, w)
+		for _, file := range files {
+			if !file.IsDir() {
+				if w, err := rigoweb3.OpenWallet(
+					libs.NewFileReader(filepath.Join(peer.WalletPath(), file.Name()))); err != nil {
+					panic(err)
+				} else {
+					wallets = append(wallets, w)
 
-				acctKey := rtypes1.ToAcctKey(w.Address())
-				walletsMap[acctKey] = w
+					acctKey := rtypes1.ToAcctKey(w.Address())
+					walletsMap[acctKey] = w
 
-				//if err := w.SyncAccount(rweb3); err != nil {
-				//	panic(err)
-				//}
-				//fmt.Println(w.Address(), w.GetBalance())
+					//if err := w.SyncAccount(rweb3); err != nil {
+					//	panic(err)
+					//}
+					//fmt.Println(w.Address(), w.GetBalance())
+				}
 			}
 		}
 	}
+
 	W0 = wallets[0]
 	W1 = wallets[1]
 }
@@ -83,49 +86,6 @@ func waitTrxResult(txhash []byte, maxTimes int, rweb3 *rigoweb3.RigoWeb3) (*rweb
 		}
 	}
 	return nil, xerrors.NewOrdinary("timeout")
-}
-
-func randWallet() *rigoweb3.Wallet {
-	rn := rand.Intn(len(wallets))
-	return wallets[rn]
-}
-
-func addValidatorWallet(w *rigoweb3.Wallet) {
-	gmtx.Lock()
-	defer gmtx.Unlock()
-
-	validatorWallets = append(validatorWallets, w)
-}
-
-func isValidatorWallet(w *rigoweb3.Wallet) bool {
-	return isValidator(w.Address())
-}
-
-func isValidator(addr rtypes0.Address) bool {
-	for _, vw := range validatorWallets {
-		if bytes.Compare(vw.Address(), addr) == 0 {
-			return true
-		}
-	}
-	return false
-}
-
-func validators(height int64, rweb3 *rigoweb3.RigoWeb3) (*coretypes.ResultValidators, error) {
-	return rweb3.GetValidators(height, 1, len(validatorWallets))
-}
-
-func randCommonWallet() *rigoweb3.Wallet {
-	for {
-		w := randWallet()
-		if isValidatorWallet(w) == false {
-			return w
-		}
-	}
-}
-
-func saveRandWallet(w *rigoweb3.Wallet) error {
-	path := filepath.Join(defaultRpcNode.WalletPath(), fmt.Sprintf("wk%X.json", w.Address()))
-	return w.Save(libs.NewFileWriter(path))
 }
 
 func waitEvent(query string, cb func(*coretypes.ResultEvent, error) bool) (*sync.WaitGroup, error) {
@@ -150,4 +110,52 @@ func waitEvent(query string, cb func(*coretypes.ResultEvent, error) bool) (*sync
 	}
 
 	return &subWg, nil
+}
+
+func addValidatorWallet(w *rigoweb3.Wallet) {
+	gmtx.Lock()
+	defer gmtx.Unlock()
+
+	validatorWallets = append(validatorWallets, w)
+}
+
+func isValidatorWallet(w *rigoweb3.Wallet) bool {
+	return isValidator(w.Address())
+}
+
+func isValidator(addr rtypes0.Address) bool {
+	for _, vw := range validatorWallets {
+		if bytes.Compare(vw.Address(), addr) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func queryValidators(height int, rweb3 *rigoweb3.RigoWeb3) (*coretypes.ResultValidators, error) {
+	return rweb3.GetValidators(int64(height), 1, len(validatorWallets))
+}
+
+func randWallet() *rigoweb3.Wallet {
+	rn := rand.Intn(len(wallets))
+	return wallets[rn]
+}
+
+func randValidatorWallet() *rigoweb3.Wallet {
+	rn := rand.Intn(len(validatorWallets))
+	return validatorWallets[rn]
+}
+
+func randCommonWallet() *rigoweb3.Wallet {
+	for {
+		w := randWallet()
+		if isValidatorWallet(w) == false {
+			return w
+		}
+	}
+}
+
+func saveWallet(w *rigoweb3.Wallet) error {
+	path := filepath.Join(defaultRpcNode.WalletPath(), fmt.Sprintf("wk%X.json", w.Address()))
+	return w.Save(libs.NewFileWriter(path))
 }

@@ -35,7 +35,7 @@ func test_on_internal_node(m *testing.M) {
 	}
 	subWg.Wait()
 
-	prepareTest(peers[0])
+	prepareTest(peers)
 
 	exitCode := m.Run()
 
@@ -71,7 +71,7 @@ func test_on_external_node(m *testing.M) {
 	}
 	defaultRpcNode = peer
 
-	prepareTest(peer)
+	prepareTest([]*PeerMock{peer})
 
 	exitCode := m.Run()
 

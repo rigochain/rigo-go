@@ -49,7 +49,7 @@ func TestTransfer_Bulk(t *testing.T) {
 	//// 100 개 이상이면 이미 있는 계정 사용.
 	for i := len(allAcctObjs); i < 100; i++ {
 		newAcctTestObj := newAcctObj(web3.NewWallet(defaultRpcNode.Pass))
-		require.NoError(t, saveRandWallet(newAcctTestObj.w))
+		require.NoError(t, saveWallet(newAcctTestObj.w))
 		allAcctObjs = append(allAcctObjs, newAcctTestObj)
 	}
 
