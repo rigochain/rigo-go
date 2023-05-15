@@ -37,6 +37,27 @@ func NewSimpleLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func()
 	}
 }
 
+func (ledger *SimpleLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (*SimpleLedger[T], xerrors.XError) {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	tree, err := iavl.NewMutableTree(ledger.db, cacheSize)
+	if err != nil {
+		return nil, xerrors.From(err)
+	}
+
+	_, err = tree.LazyLoadVersion(n)
+	if err != nil {
+		return nil, xerrors.From(err)
+	}
+
+	return &SimpleLedger[T]{
+		tree:        tree,
+		cachedItems: newMemItems[T](),
+		getNewItem:  ledger.getNewItem,
+	}, nil
+}
+
 func (ledger *SimpleLedger[T]) Set(item T) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
@@ -106,7 +127,7 @@ func (ledger *SimpleLedger[T]) CancelDel(key LedgerKey) xerrors.XError {
 	return nil
 }
 
-func (ledger *SimpleLedger[T]) IterateAllItems(cb func(T) xerrors.XError) xerrors.XError {
+func (ledger *SimpleLedger[T]) IterateReadAllItems(cb func(T) xerrors.XError) xerrors.XError {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
@@ -154,7 +175,8 @@ func (ledger *SimpleLedger[T]) Read(key LedgerKey) (T, xerrors.XError) {
 	if item, xerr := ledger.read(key); xerr != nil {
 		return emptyNil, xerr
 	} else {
-		ledger.cachedItems.setGotItem(item) // ledger.gotItems[item.Key()] = item
+		// Do not call ledger.cachedItems.setGotItem(...)
+		// Read() only reads a item from tree
 		return item, nil
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/rigochain/rigo-go/types/crypto"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmnode "github.com/tendermint/tendermint/node"
-	"github.com/tendermint/tendermint/p2p"
+	tmp2p "github.com/tendermint/tendermint/p2p"
 )
 
 type Provider func(*cfg.Config, []byte, tmlog.Logger) (*tmnode.Node, error)
@@ -16,13 +16,38 @@ type Provider func(*cfg.Config, []byte, tmlog.Logger) (*tmnode.Node, error)
 // PrivValidator, ClientCreator, GenesisDoc, and DBProvider.
 // It implements NodeProvider.
 func NewRigoNode(config *cfg.Config, s []byte, logger tmlog.Logger) (*tmnode.Node, error) {
-	nodeKey, err := p2p.LoadOrGenNodeKey(config.NodeKeyFile())
+	nodeKey, err := tmp2p.LoadOrGenNodeKey(config.NodeKeyFile())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load or gen rigo key %s: %w", config.NodeKeyFile(), err)
 	}
 
 	rpcOption := func(node *tmnode.Node) {
 		rpc.AddRoutes()
+
+		//
+		//_ := tmrpccore.Environment{
+		//	ProxyAppQuery:   node.ProxyApp().Query(),
+		//	ProxyAppMempool: node.ProxyApp().Mempool(),
+		//
+		//	StateStore:     nil, //n.stateStore,
+		//	BlockStore:     node.BlockStore(),
+		//	EvidencePool:   node.EvidencePool(),
+		//	ConsensusState: node.ConsensusState(),
+		//	P2PPeers:       node.Switch(),
+		//	P2PTransport:   node,
+		//
+		//	PubKey:           nil, //,
+		//	GenDoc:           node.GenesisDoc(),
+		//	TxIndexer:        nil, //n.txIndexer,
+		//	BlockIndexer:     nil, //n.blockIndexer,
+		//	ConsensusReactor: node.ConsensusReactor(),
+		//	EventBus:         node.EventBus(),
+		//	Mempool:          node.Mempool(),
+		//
+		//	Logger: node.Logger.With("module", "rpc"),
+		//
+		//	Config: *node.Config().RPC,
+		//}
 	}
 
 	return tmnode.NewNode(config.Config,

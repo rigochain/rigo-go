@@ -2,13 +2,13 @@ package node
 
 import (
 	"fmt"
-	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/cmd/version"
 	"github.com/rigochain/rigo-go/ctrlers/account"
 	"github.com/rigochain/rigo-go/ctrlers/gov"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/ctrlers/vm/evm"
 	"github.com/rigochain/rigo-go/genesis"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
@@ -17,10 +17,13 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmtime "github.com/tendermint/tendermint/types/time"
 	tmver "github.com/tendermint/tendermint/version"
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var _ abcitypes.Application = (*RigoApp)(nil)
@@ -30,10 +33,11 @@ type RigoApp struct {
 
 	currBlockCtx *types2.BlockContext
 
-	stateDB     *StateDB
+	metaDB      *MetaDB
 	acctCtrler  *account.AcctCtrler
 	stakeCtrler *stake.StakeCtrler
 	govCtrler   *gov.GovCtrler
+	vmCtrler    *evm.EVMCtrler
 	txExecutor  *TrxExecutor
 
 	localClient abcicli.Client
@@ -45,7 +49,7 @@ type RigoApp struct {
 }
 
 func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
-	stateDB, err := openStateDB("rigo_app", config.DBDir())
+	stateDB, err := openMetaDB("rigo_app", config.DBDir())
 	if err != nil {
 		panic(err)
 	}
@@ -65,13 +69,16 @@ func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
 		panic(err)
 	}
 
+	vmCtrler := evm.NewEVMCtrler(config.DBDir(), acctCtrler, logger)
+
 	txExecutor := NewTrxExecutor(runtime.GOMAXPROCS(0), logger)
 
 	return &RigoApp{
-		stateDB:     stateDB,
+		metaDB:      stateDB,
 		acctCtrler:  acctCtrler,
 		stakeCtrler: stakeCtrler,
 		govCtrler:   govCtrler,
+		vmCtrler:    vmCtrler,
 		txExecutor:  txExecutor,
 		logger:      logger,
 	}
@@ -95,7 +102,7 @@ func (ctrler *RigoApp) Stop() error {
 	if err := ctrler.govCtrler.Close(); err != nil {
 		return err
 	}
-	if err := ctrler.stateDB.Close(); err != nil {
+	if err := ctrler.metaDB.Close(); err != nil {
 		return err
 	}
 	return nil
@@ -114,12 +121,34 @@ func (ctrler *RigoApp) SetLocalClient(client abcicli.Client) {
 func (ctrler *RigoApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 	ctrler.logger.Info("Info", "version", tmver.ABCIVersion, "AppVersion", version.String())
 
+	var appHash bytes.HexBytes
+	var lastHeight int64
+	ctrler.currBlockCtx = ctrler.metaDB.LastBlockContext()
+	if ctrler.currBlockCtx == nil {
+		// to ensure backward compatibility
+		lastHeight = ctrler.metaDB.LastBlockHeight()
+		appHash = ctrler.metaDB.LastBlockAppHash()
+
+		ctrler.currBlockCtx = types2.NewBlockContext(
+			abcitypes.RequestBeginBlock{
+				Header: tmproto.Header{
+					Height: lastHeight,
+					Time:   tmtime.Canonical(time.Now()),
+				},
+			},
+			nil, nil, nil)
+		ctrler.currBlockCtx.SetAppHash(appHash)
+	} else {
+		lastHeight = ctrler.currBlockCtx.Height()
+		appHash = ctrler.currBlockCtx.AppHash()
+	}
+
 	return abcitypes.ResponseInfo{
 		Data:             "",
 		Version:          tmver.ABCIVersion,
 		AppVersion:       version.Uint64(),
-		LastBlockHeight:  ctrler.stateDB.LastBlockHeight(),
-		LastBlockAppHash: ctrler.stateDB.LastBlockAppHash(),
+		LastBlockHeight:  lastHeight,
+		LastBlockAppHash: appHash,
 	}
 }
 
@@ -143,7 +172,28 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	if xerr := ctrler.acctCtrler.InitLedger(&appState); xerr != nil {
 		panic(xerr)
 	}
-	if xerr := ctrler.stakeCtrler.InitLedger(req.Validators); xerr != nil {
+
+	// initial stakes
+	initStakes := make([]*stake.InitStake, len(req.Validators))
+	for i, val := range req.Validators {
+		pubBytes := val.PubKey.GetSecp256K1()
+		addr, xerr := crypto.PubBytes2Addr(pubBytes)
+		if xerr != nil {
+			panic(xerr)
+		}
+		s0 := stake.NewStakeWithPower(
+			addr, addr, // self staking
+			val.Power,
+			1,
+			bytes.ZeroBytes(32), // 0x00... txhash
+			ctrler.govCtrler)
+		initStakes[i] = &stake.InitStake{
+			pubBytes,
+			[]*stake.Stake{s0},
+		}
+	}
+
+	if xerr := ctrler.stakeCtrler.InitLedger(initStakes); xerr != nil {
 		panic(xerr)
 	}
 
@@ -154,153 +204,160 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 }
 
 func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
-	response := abcitypes.ResponseCheckTx{Code: abcitypes.CodeTypeOK}
-
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
-		if txctx, xerr := types2.NewTrxContext(req.Tx,
-			ctrler.stateDB.LastBlockHeight()+int64(1),
+		txctx, xerr := types2.NewTrxContext(req.Tx,
+			0, //ctrler.currBlockCtx.Height()+int64(1),
+			0,
 			false,
 			func(_txctx *types2.TrxContext) xerrors.XError {
-				_tx := _txctx.Tx
-
-				_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
+				_txctx.TrxGovHandler = ctrler.govCtrler
+				_txctx.TrxAcctHandler = ctrler.acctCtrler
+				_txctx.TrxStakeHandler = ctrler.stakeCtrler
+				_txctx.TrxEVMHandler = ctrler.vmCtrler
 				_txctx.GovHandler = ctrler.govCtrler
-				_txctx.AcctHandler = ctrler.acctCtrler
 				_txctx.StakeHandler = ctrler.stakeCtrler
-				_txctx.GovHelper = ctrler.govCtrler
-				_txctx.StakeHelper = ctrler.stakeCtrler
 				return nil
-			}); xerr != nil {
+			})
+		if xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
-			response.Code = xerr.Code()
-			response.Log = xerr.Error()
-		} else if xerr := ctrler.txExecutor.ExecuteSync(txctx); xerr != nil {
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		xerr = ctrler.txExecutor.ExecuteSync(txctx)
+		if xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
-			response.Code = xerr.Code()
-			response.Log = xerr.Error()
-		} else {
-			response.GasWanted = int64(txctx.Tx.Gas.Uint64())
-			response.GasUsed = int64(txctx.GasUsed.Uint64())
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		return abcitypes.ResponseCheckTx{
+			Code:      abcitypes.CodeTypeOK,
+			Log:       "",
+			Data:      txctx.RetData,
+			GasWanted: int64(txctx.Tx.Gas.Uint64()),
+			GasUsed:   int64(txctx.GasUsed.Uint64()),
 		}
 	case abcitypes.CheckTxType_Recheck:
 		// do nothing
 	}
-	return response
+	return abcitypes.ResponseCheckTx{Code: abcitypes.CodeTypeOK}
 }
 
 func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	if req.Header.Height != ctrler.stateDB.LastBlockHeight()+1 {
-		panic(fmt.Errorf("error block height: expected(%v), actural(%v)", ctrler.stateDB.LastBlockHeight()+1, req.Header.Height))
+	if req.Header.Height != ctrler.currBlockCtx.Height()+1 {
+		panic(fmt.Errorf("error block height: expected(%v), actural(%v)", ctrler.currBlockCtx.Height()+1, req.Header.Height))
 	}
+	ctrler.logger.Debug("RigoApp::BeginBlock",
+		"height", req.Header.Height,
+		"hash", req.Hash,
+		"prev.hash", req.Header.LastBlockId.Hash)
 
 	// save the block fee info. - it will be used for rewarding
-	ctrler.currBlockCtx = &types2.BlockContext{
-		BlockInfo:   req,
-		TxsCnt:      0,
-		Fee:         uint256.NewInt(0),
-		GovHelper:   ctrler.govCtrler,
-		AcctHelper:  ctrler.acctCtrler,
-		StakeHelper: ctrler.stakeCtrler,
+	ctrler.currBlockCtx = types2.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
+
+	ev, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
+
+	return abcitypes.ResponseBeginBlock{
+		Events: ev,
 	}
-
-	// todo: implement processing for the evidences (req.ByzantineValidators)
-
-	// todo: change new callback function of ctrler.localClient
-	// the new callback should wait that a DeliverTx is completed.
-
-	return abcitypes.ResponseBeginBlock{}
 }
 
 func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	response := abcitypes.ResponseDeliverTx{}
 
-	if txctx, xerr := types2.NewTrxContext(req.Tx,
-		ctrler.stateDB.LastBlockHeight()+int64(1),
+	txctx, xerr := types2.NewTrxContext(req.Tx,
+		ctrler.currBlockCtx.Height(),
+		ctrler.currBlockCtx.TimeNano(),
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
-			_tx := _txctx.Tx
+			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt()
+			ctrler.currBlockCtx.AddTxsCnt(1)
 
-			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt
-			ctrler.currBlockCtx.TxsCnt++
-
-			_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
+			_txctx.TrxGovHandler = ctrler.govCtrler
+			_txctx.TrxAcctHandler = ctrler.acctCtrler
+			_txctx.TrxStakeHandler = ctrler.stakeCtrler
+			_txctx.TrxEVMHandler = ctrler.vmCtrler
 			_txctx.GovHandler = ctrler.govCtrler
-			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
-			_txctx.GovHelper = ctrler.govCtrler
-			_txctx.StakeHelper = ctrler.stakeCtrler
 			return nil
-		}); xerr != nil {
-
+		})
+	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-		response.Code = xerr.Code()
-		response.Log = xerr.Error()
-	} else if xerr := ctrler.txExecutor.ExecuteSync(txctx); xerr != nil {
+		return abcitypes.ResponseDeliverTx{
+			Code: xerr.Code(),
+			Log:  xerr.Error(),
+		}
+	}
+	xerr = ctrler.txExecutor.ExecuteSync(txctx)
+	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-		response.Code = xerr.Code()
-		response.Log = xerr.Error()
+		return abcitypes.ResponseDeliverTx{
+			Code: xerr.Code(),
+			Log:  xerr.Error(),
+		}
 	} else {
 
-		_ = ctrler.currBlockCtx.Fee.Add(ctrler.currBlockCtx.Fee, txctx.GasUsed)
-		response.GasWanted = int64(txctx.Tx.Gas.Uint64())
-		response.GasUsed = int64(txctx.GasUsed.Uint64())
-
-		response.Events = []abcitypes.Event{
-			{
-				Type: "tx",
-				Attributes: []abcitypes.EventAttribute{
-					{Key: []byte(types2.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-					{Key: []byte(types2.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-					{Key: []byte(types2.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
-					{Key: []byte(types2.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
+		ctrler.currBlockCtx.AddGas(txctx.GasUsed)
+		return abcitypes.ResponseDeliverTx{
+			Code:      abcitypes.CodeTypeOK,
+			GasWanted: int64(txctx.Tx.Gas.Uint64()),
+			GasUsed:   int64(txctx.GasUsed.Uint64()),
+			Data:      txctx.RetData,
+			Events: []abcitypes.Event{
+				{
+					Type: "tx",
+					Attributes: []abcitypes.EventAttribute{
+						{Key: []byte(types2.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+						{Key: []byte(types2.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+						{Key: []byte(types2.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
+						{Key: []byte(types2.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
+					},
 				},
 			},
 		}
 	}
-	return response
 }
 
+// deliverTxAsync is not fully implemented yet
+// todo: Fully implement deliverTxAsync which processes txs in parallel.
 func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	txIdx := ctrler.currBlockCtx.TxsCnt
-	ctrler.currBlockCtx.TxsCnt++
+	txIdx := ctrler.currBlockCtx.TxsCnt()
+	ctrler.currBlockCtx.AddTxsCnt(1)
 
-	response := abcitypes.ResponseDeliverTx{}
-
-	if txctx, xerr := types2.NewTrxContext(req.Tx,
-		ctrler.stateDB.LastBlockHeight()+int64(1),
+	txctx, xerr := types2.NewTrxContext(req.Tx,
+		ctrler.currBlockCtx.Height(),
+		ctrler.currBlockCtx.TimeNano(),
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
-			_tx := _txctx.Tx
-
 			_txctx.TxIdx = txIdx
-
-			_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
+			_txctx.TrxGovHandler = ctrler.govCtrler
+			_txctx.TrxAcctHandler = ctrler.acctCtrler
+			_txctx.TrxStakeHandler = ctrler.stakeCtrler
+			_txctx.TrxEVMHandler = ctrler.vmCtrler
 			_txctx.GovHandler = ctrler.govCtrler
-			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
-			_txctx.GovHelper = ctrler.govCtrler
-			_txctx.StakeHelper = ctrler.stakeCtrler
 			// when the 'tx' is finished, it's called
 			_txctx.Callback = func(ctx *types2.TrxContext, xerr xerrors.XError) {
-				// todo: notify that the tx is finisehd
-				// it is called in the executionRoutine goroutine
+				// it is called from executionRoutine goroutine
+				// when execution is finished or error is generated
+				response := abcitypes.ResponseDeliverTx{}
 				if xerr != nil {
 					xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 					response.Code = xerr.Code()
 					response.Log = xerr.Error()
 
 				} else {
-					ctrler.mtx.Lock()
-					defer ctrler.mtx.Unlock()
-
-					_ = ctrler.currBlockCtx.Fee.Add(ctrler.currBlockCtx.Fee, ctx.GasUsed)
-
 					response.GasWanted = int64(ctx.Tx.Gas.Uint64())
 					response.GasUsed = int64(ctx.GasUsed.Uint64())
+					response.Data = ctx.RetData
 					response.Events = []abcitypes.Event{
 						{
 							Type: "tx",
@@ -312,39 +369,54 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 							},
 						},
 					}
+
+					ctrler.currBlockCtx.AddGas(ctx.GasUsed)
 				}
 				ctrler.localClient.(*rigoLocalClient).OnTrxExecFinished(ctrler.localClient, ctx.TxIdx, &req, &response)
 			}
+
 			return nil
-		}); xerr != nil {
-
+		})
+	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-		response.Code = xerr.Code()
-		response.Log = xerr.Error()
-
-		ctrler.localClient.(*rigoLocalClient).OnTrxExecFinished(ctrler.localClient, txIdx, &req, &response)
-	} else if xerr := ctrler.txExecutor.ExecuteAsync(txctx); xerr != nil {
-		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-		response.Code = xerr.Code()
-		response.Log = xerr.Error()
-
+		response := abcitypes.ResponseDeliverTx{
+			Code: xerr.Code(),
+			Log:  xerr.Error(),
+		}
 		ctrler.localClient.(*rigoLocalClient).OnTrxExecFinished(ctrler.localClient, txIdx, &req, &response)
 	}
-	return response
+
+	xerr = ctrler.txExecutor.ExecuteAsync(txctx)
+	if xerr != nil {
+		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
+		response := abcitypes.ResponseDeliverTx{
+			Code: xerr.Code(),
+			Log:  xerr.Error(),
+		}
+		ctrler.localClient.(*rigoLocalClient).OnTrxExecFinished(ctrler.localClient, txIdx, &req, &response)
+	}
+
+	// this return value has no meaning
+	return abcitypes.ResponseDeliverTx{}
 }
 
 func (ctrler *RigoApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	// todo: call ctrler.deliverTxAsync() when is implemented.
-	return ctrler.deliverTxAsync(req)
+	return ctrler.deliverTxSync(req)
 }
 
 func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	_ = ctrler.govCtrler.ExecuteBlock(ctrler.currBlockCtx)
-	_ = ctrler.acctCtrler.ExecuteBlock(ctrler.currBlockCtx)
-	_ = ctrler.stakeCtrler.ExecuteBlock(ctrler.currBlockCtx)
+	ev0, _ := ctrler.govCtrler.EndBlock(ctrler.currBlockCtx)
+	ev1, _ := ctrler.acctCtrler.EndBlock(ctrler.currBlockCtx)
+	ev2, _ := ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
+
+	var ev []abcitypes.Event
+	ev = append(ev, ev0...)
+	ev = append(ev, ev1...)
+	ev = append(ev, ev2...)
 
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates: ctrler.currBlockCtx.ValUpdates,
+		Events:           ev,
 	}
 }
 
@@ -357,31 +429,36 @@ func (ctrler *RigoApp) Commit() abcitypes.ResponseCommit {
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "appHash0", bytes.HexBytes(appHash0))
+	//ctrler.logger.Debug("RigoApp::Commit", "height", ver0, "appHash0", bytes.HexBytes(appHash0))
 
 	appHash1, ver1, err := ctrler.acctCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "appHash1", bytes.HexBytes(appHash1))
+	//ctrler.logger.Debug("RigoApp::Commit", "height", ver1, "appHash1", bytes.HexBytes(appHash1))
 
 	appHash2, ver2, err := ctrler.stakeCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "appHash2", bytes.HexBytes(appHash2))
+	//ctrler.logger.Debug("RigoApp::Commit", "height", ver2, "appHash2", bytes.HexBytes(appHash2))
 
-	if ver0 != ver1 || ver1 != ver2 {
-		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v", ver0, ver1, ver2))
+	appHash3, ver3, err := ctrler.vmCtrler.Commit()
+	if err != nil {
+		panic(err)
+	}
+	//ctrler.logger.Debug("RigoApp::Commit", "height", ver3, "appHash3", bytes.HexBytes(appHash3))
+
+	if ver0 != ver1 || ver1 != ver2 || ver2 != ver3 {
+		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v, vm:%v", ver0, ver1, ver2, ver3))
 	}
 
-	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2)
-	ctrler.logger.Debug("RigoApp-Commit", "height", ver0, "final hash", bytes.HexBytes(appHash))
+	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
+	ctrler.logger.Debug("RigoApp::Commit", "height", ver0, "txs", ctrler.currBlockCtx.TxsCnt(), "app hash", bytes.HexBytes(appHash))
 
-	ctrler.stateDB.PutLastBlockHeight(ver0)
-	ctrler.stateDB.PutLastBlockAppHash(appHash[:])
-	ctrler.stateDB.PutLastBlockContext(ctrler.currBlockCtx)
-	ctrler.currBlockCtx = nil
+	ctrler.currBlockCtx.SetAppHash(appHash)
+	ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
+	ctrler.metaDB.PutLastBlockHeight(ver0)
 
 	return abcitypes.ResponseCommit{
 		Data: appHash[:],

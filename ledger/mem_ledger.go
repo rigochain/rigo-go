@@ -84,7 +84,7 @@ func (ledger *MemLedger[T]) CancelDel(key LedgerKey) xerrors.XError {
 	return nil
 }
 
-func (ledger *MemLedger[T]) IterateAllItems(cb func(T) xerrors.XError) xerrors.XError {
+func (ledger *MemLedger[T]) IterateReadAllItems(cb func(T) xerrors.XError) xerrors.XError {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 

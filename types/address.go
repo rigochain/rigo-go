@@ -23,6 +23,15 @@ func ZeroAddress() Address {
 	return abytes.ZeroBytes(AddrSize)
 }
 
+func IsZeroAddress(addr Address) bool {
+	for _, b := range addr {
+		if b != 0x00 {
+			return false
+		}
+	}
+	return true
+}
+
 func HexToAddress(_hex string) (Address, error) {
 	if strings.HasPrefix(_hex, "0x") {
 		_hex = _hex[2:]

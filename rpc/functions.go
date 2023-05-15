@@ -54,6 +54,25 @@ func QueryRule(ctx *tmrpctypes.Context) (*QueryResult, error) {
 	}
 }
 
+func QueryVM(
+	ctx *tmrpctypes.Context,
+	addr abytes.HexBytes,
+	to abytes.HexBytes,
+	heightPtr *int64,
+	data []byte,
+) (*QueryResult, error) {
+	params := make([]byte, len(addr)+len(to)+len(data))
+	copy(params, addr)
+	copy(params[len(addr):], to)
+	copy(params[len(addr)+len(to):], data)
+
+	if resp, err := tmrpccore.ABCIQuery(ctx, "vm_call", params, *heightPtr, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
 func Subscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultSubscribe, error) {
 	// return error when the event subscription request is received over http session.
 	// related to: #103
@@ -78,4 +97,11 @@ func TxSearch(
 	orderBy string,
 ) (*tmrpccoretypes.ResultTxSearch, error) {
 	return tmrpccore.TxSearch(ctx, hexReg.ReplaceAllStringFunc(query, strings.ToUpper), prove, pagePtr, perPagePtr, orderBy)
+}
+
+func Validators(ctx *tmrpctypes.Context, heightPtr *int64, pagePtr, perPagePtr *int) (*tmrpccoretypes.ResultValidators, error) {
+	if *heightPtr == 0 {
+		heightPtr = nil
+	}
+	return tmrpccore.Validators(ctx, heightPtr, pagePtr, perPagePtr)
 }

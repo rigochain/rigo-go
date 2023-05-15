@@ -1,6 +1,7 @@
-package web3
+package test
 
 import (
+	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -10,12 +11,12 @@ import (
 )
 
 func TestSubscriber(t *testing.T) {
-	sub, err := NewSubscriber("ws://localhost:26657/websocket")
+	sub, err := web3.NewSubscriber(defaultRpcNode.WSEnd)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	err = sub.Start("tm.event='NewBlock'", func(sub *Subscriber, result []byte) {
+	err = sub.Start("tm.event='NewBlock'", func(sub *web3.Subscriber, result []byte) {
 		event := &coretypes.ResultEvent{}
 		err := tmjson.Unmarshal(result, event)
 		require.NoError(t, err)

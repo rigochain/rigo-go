@@ -48,9 +48,9 @@ func TestFinalityLedger_Set(t *testing.T) {
 	require.NoError(t, err)
 
 	// get item that was previously set to SimpleLedger::cachedItems
+	// this is reset by Commit()
 	item, err = testLedger.Get(testItem0.Key())
-	require.NoError(t, err)
-	require.NotNil(t, item)
+	require.Error(t, err)
 
 	// not committed(finalized)
 	item, err = testLedger.Read(testItem0.Key())

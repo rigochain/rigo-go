@@ -1,7 +1,6 @@
 package account
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
@@ -9,9 +8,8 @@ import (
 	"github.com/rigochain/rigo-go/genesis"
 	"github.com/rigochain/rigo-go/ledger"
 	"github.com/rigochain/rigo-go/types"
-	abytes "github.com/rigochain/rigo-go/types/bytes"
-	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sync"
 )
@@ -29,9 +27,21 @@ func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error)
 	} else {
 		return &AcctCtrler{
 			acctLedger: execLedger,
-			logger:     logger,
+			logger:     logger.With("module", "rigo_AcctCtrler"),
 		}, nil
 	}
+}
+
+func (ctrler *AcctCtrler) ImmutableAcctCtrlerAt(height int64) (atypes.IAccountHandler, xerrors.XError) {
+	ledger0, xerr := ctrler.acctLedger.ImmutableLedgerAt(height, 128)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &AcctCtrler{
+		acctLedger: ledger0,
+		logger:     ctrler.logger,
+	}, nil
 }
 
 func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
@@ -57,60 +67,27 @@ func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
-	if len(ctx.Tx.From) != types.AddrSize {
-		return xerrors.ErrInvalidAddress
-	} else if acct := ctrler.FindAccount(ctx.Tx.From, ctx.Exec); acct == nil {
+	ctx.Sender = ctrler.FindAccount(ctx.Tx.From, ctx.Exec)
+	if ctx.Sender == nil {
 		return xerrors.ErrNotFoundAccount
-	} else {
-		ctx.Sender = acct
 	}
-
-	if len(ctx.Tx.To) != types.AddrSize {
-		return xerrors.ErrInvalidAddress
-	} else {
-		ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
-	}
-
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	// check signature
-	var fromAddr types.Address
-	var pubBytes abytes.HexBytes
-
-	if ctx.Exec {
-		tx := ctx.Tx
-		sig := tx.Sig
-		tx.Sig = nil
-		_txbz, xerr := tx.Encode()
-		if xerr != nil {
-			return xerr
-		}
-		if fromAddr, pubBytes, xerr = crypto.Sig2Addr(_txbz, sig); xerr != nil {
-			return xerr
-		}
-		if bytes.Compare(fromAddr, tx.From) != 0 {
-			return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
-		}
-		ctx.SenderPubKey = pubBytes
-	} else {
-		fromAddr = ctx.Tx.From
-	}
+	ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
 
 	if xerr := ctx.Sender.CheckBalance(ctx.NeedAmt); xerr != nil {
 		return xerr
-	} else if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
-		return xerr.Wrap(fmt.Errorf("txhash: %X, address: %v, expected: %v, actual:%v", ctx.TxHash, ctx.Sender.Address, ctx.Sender.Nonce+1, ctx.Tx.Nonce))
+	}
+	if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
+		return xerr.Wrap(fmt.Errorf("invalid nonce - ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), ctx.Tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
 
 	return nil
 }
 
 func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
-	// todo: Remove Lock()/Unlock() or Use RLock()/RUlock() to improve performance
+	// Remove Lock()/Unlock() or Use RLock()/RUlock() to improve performance
 	// Lock()/Unlock() make txs to be processed serially
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
+	//ctrler.mtx.Lock()
+	//defer ctrler.mtx.Unlock()
 
 	// amount + fee
 	if xerr := ctx.Sender.SubBalance(ctx.NeedAmt); xerr != nil {
@@ -135,35 +112,34 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 	return nil
 }
 
-func (ctrler *AcctCtrler) ValidateBlock(ctx *atypes.BlockContext) xerrors.XError {
+func (ctrler *AcctCtrler) BeginBlock(ctx *atypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	// do nothing
-	return nil
+	return nil, nil
 }
 
-func (ctrler *AcctCtrler) ExecuteBlock(ctx *atypes.BlockContext) xerrors.XError {
+func (ctrler *AcctCtrler) EndBlock(ctx *atypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("AcctCtrler-ExecuteBlock", "height", ctx.BlockInfo.Header.Height)
-
-	if ctx.BlockInfo.Header.ProposerAddress != nil && ctx.Fee.Sign() > 0 {
+	header := ctx.BlockInfo().Header
+	if header.GetProposerAddress() != nil && ctx.GasSum().Sign() > 0 {
 		// give fee to block proposer
-		if acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(ctx.BlockInfo.Header.ProposerAddress)); xerr != nil {
-			return xerr
-		} else if xerr := acct.AddBalance(ctx.Fee); xerr != nil {
-			return xerr
-		} else {
-			return ctrler.setAccountCommittable(acct, true)
+		acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(header.GetProposerAddress()))
+		if xerr != nil {
+			return nil, xerr
 		}
+		xerr = acct.AddBalance(ctx.GasSum())
+		if xerr != nil {
+			return nil, xerr
+		}
+		return nil, ctrler.setAccountCommittable(acct, true)
 	}
-	return nil
+	return nil, nil
 }
 
 func (ctrler *AcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
-
-	ctrler.logger.Debug("AcctCtrler-Commit")
 
 	return ctrler.acctLedger.Commit()
 }
@@ -197,28 +173,25 @@ func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *atypes.Acc
 	}
 }
 
-func (ctrler *AcctCtrler) findOrNewAccount(addr types.Address, exec bool) *atypes.Account {
-	if acct := ctrler.findAccount(addr, exec); acct != nil {
-		return acct
-	}
-	acct := atypes.NewAccountWithName(addr, "")
-	fn := ctrler.acctLedger.Set
-	if exec {
-		fn = ctrler.acctLedger.SetFinality
-	}
-	_ = fn(acct)
-	return acct
+func (ctrler *AcctCtrler) newAccount(addr types.Address) *atypes.Account {
+	return atypes.NewAccountWithName(addr, "")
 }
 
 func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atypes.Account {
-	// Use Lock instead of RLock,
-	// because new account is set to `ctrler.acctLedger`
-	// in findOrNewAccount()
-
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.findOrNewAccount(addr, exec)
+	// `AcctCtrler` MUST be locked until new account is set to acctLedger (issue #32)
+
+	if acct := ctrler.findAccount(addr, exec); acct != nil {
+		return acct
+	}
+
+	newAcct := ctrler.newAccount(addr)
+	if newAcct != nil {
+		ctrler.setAccountCommittable(newAcct, exec)
+	}
+	return newAcct
 }
 
 func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *atypes.Account {
@@ -248,16 +221,23 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exe
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if acct0 := ctrler.findAccount(from, exec); acct0 == nil {
+	acct0 := ctrler.findAccount(from, exec)
+	if acct0 == nil {
 		return xerrors.ErrNotFoundAccount
-	} else if acct1 := ctrler.findOrNewAccount(to, exec); acct1 == nil {
-		// not reachable
-		return xerrors.ErrNotFoundAccount
-	} else if xerr := ctrler.transfer(acct0, acct1, amt); xerr != nil {
+	}
+	acct1 := ctrler.findAccount(to, exec)
+	if acct1 == nil {
+		acct1 = ctrler.newAccount(to)
+	}
+	xerr := ctrler.transfer(acct0, acct1, amt)
+	if xerr != nil {
 		return xerr
-	} else if xerr := ctrler.setAccountCommittable(acct0, exec); xerr != nil {
+	}
+
+	if xerr := ctrler.setAccountCommittable(acct0, exec); xerr != nil {
 		return xerr
-	} else if xerr := ctrler.setAccountCommittable(acct1, exec); xerr != nil {
+	}
+	if xerr := ctrler.setAccountCommittable(acct1, exec); xerr != nil {
 		return xerr
 	}
 	return nil
@@ -288,11 +268,11 @@ func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) 
 	return nil
 }
 
-func (ctrler *AcctCtrler) SetAccountCommittable(acct *atypes.Account) xerrors.XError {
+func (ctrler *AcctCtrler) SetAccountCommittable(acct *atypes.Account, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.setAccountCommittable(acct, true)
+	return ctrler.setAccountCommittable(acct, exec)
 }
 
 func (ctrler *AcctCtrler) setAccountCommittable(acct *atypes.Account, exec bool) xerrors.XError {
@@ -307,4 +287,4 @@ func (ctrler *AcctCtrler) setAccountCommittable(acct *atypes.Account, exec bool)
 var _ atypes.ILedgerHandler = (*AcctCtrler)(nil)
 var _ atypes.ITrxHandler = (*AcctCtrler)(nil)
 var _ atypes.IBlockHandler = (*AcctCtrler)(nil)
-var _ atypes.IAccountHelper = (*AcctCtrler)(nil)
+var _ atypes.IAccountHandler = (*AcctCtrler)(nil)

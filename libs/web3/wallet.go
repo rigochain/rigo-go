@@ -52,6 +52,16 @@ func (w *Wallet) Save(wr io.Writer) error {
 	return err
 }
 
+func (w *Wallet) Clone() *Wallet {
+	w.mtx.RLock()
+	defer w.mtx.RUnlock()
+
+	return &Wallet{
+		wkey: w.wkey,
+		acct: w.acct.Clone(),
+	}
+}
+
 func (w *Wallet) Address() types.Address {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
@@ -133,7 +143,7 @@ func (w *Wallet) SignTrx(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error)
 func (w *Wallet) TransferSync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
-		w.acct.GetNonce()+1,
+		w.acct.GetNonce(),
 		gas, amt,
 	)
 	if _, _, err := w.SignTrx(tx); err != nil {
@@ -146,7 +156,7 @@ func (w *Wallet) TransferSync(to types.Address, gas, amt *uint256.Int, rweb3 *Ri
 func (w *Wallet) StakingSync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxStaking(
 		w.Address(), to,
-		w.acct.GetNonce()+1,
+		w.acct.GetNonce(),
 		gas, amt,
 	)
 	if _, _, err := w.SignTrx(tx); err != nil {

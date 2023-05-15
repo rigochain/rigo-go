@@ -15,19 +15,19 @@ import (
 	"math/rand"
 )
 
-type accountHandler struct{}
+type acctHandlerMock struct{}
 
-func (a *accountHandler) FindOrNewAccount(addr types.Address, exec bool) *types2.Account {
+func (a *acctHandlerMock) FindOrNewAccount(addr types.Address, exec bool) *types2.Account {
 	panic("Don't use this method")
 }
 
-func (a *accountHandler) FindAccount(addr types.Address, exec bool) *types2.Account {
+func (a *acctHandlerMock) FindAccount(addr types.Address, exec bool) *types2.Account {
 	if w := FindWallet(addr); w != nil {
 		return w.GetAccount()
 	}
 	return nil
 }
-func (a *accountHandler) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+func (a *acctHandlerMock) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	if sender := a.FindAccount(from, exec); sender == nil {
 		return xerrors.ErrNotFoundAccount
 	} else if receiver := a.FindAccount(to, exec); receiver == nil {
@@ -39,7 +39,7 @@ func (a *accountHandler) Transfer(from, to types.Address, amt *uint256.Int, exec
 	}
 	return nil
 }
-func (a *accountHandler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+func (a *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	if receiver := a.FindAccount(to, exec); receiver == nil {
 		return xerrors.ErrNotFoundAccount
 	} else if xerr := receiver.AddBalance(amt); xerr != nil {
@@ -48,7 +48,15 @@ func (a *accountHandler) Reward(to types.Address, amt *uint256.Int, exec bool) x
 	return nil
 }
 
-var _ types2.IAccountHelper = (*accountHandler)(nil)
+func (a *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (types2.IAccountHandler, xerrors.XError) {
+	return &acctHandlerMock{}, nil
+}
+
+func (a *acctHandlerMock) SetAccountCommittable(account *types2.Account, b bool) xerrors.XError {
+	return nil
+}
+
+var _ types2.IAccountHandler = (*acctHandlerMock)(nil)
 
 func FindWallet(addr types.Address) *web3.Wallet {
 	for _, w := range Wallets {
@@ -59,57 +67,69 @@ func FindWallet(addr types.Address) *web3.Wallet {
 	return nil
 }
 
-type govHelperMock struct{}
+type govHandlerMock struct{}
 
-func (g *govHelperMock) Version() int64 {
+func (g *govHandlerMock) Version() int64 {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g *govHelperMock) AmountPerPower() *uint256.Int {
-	return uint256.NewInt(1000)
+func (g *govHandlerMock) AmountPerPower() *uint256.Int {
+	return uint256.NewInt(1_000_000_000_000_000_000)
 }
 
-func (g *govHelperMock) RewardPerPower() *uint256.Int {
+func (g *govHandlerMock) RewardPerPower() *uint256.Int {
 	return uint256.NewInt(10)
 }
 
-func (g *govHelperMock) MinTrxFee() *uint256.Int {
+func (g *govHandlerMock) MinTrxFee() *uint256.Int {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g *govHelperMock) MinVotingPeriodBlocks() int64 {
+func (g *govHandlerMock) MinVotingPeriodBlocks() int64 {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g *govHelperMock) MaxVotingPeriodBlocks() int64 {
+func (g *govHandlerMock) MaxVotingPeriodBlocks() int64 {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g *govHelperMock) MaxValidatorCnt() int64 {
+func (g *govHandlerMock) MaxValidatorCnt() int64 {
 	return 21
 }
 
-func (g *govHelperMock) LazyRewardBlocks() int64 {
+func (g *govHandlerMock) LazyRewardBlocks() int64 {
 	return 10
 }
 
-func (g *govHelperMock) LazyApplyingBlocks() int64 {
+func (g *govHandlerMock) LazyApplyingBlocks() int64 {
 	return 10
 }
 
-func (g *govHelperMock) MaxStakeAmount() *uint256.Int {
+func (g *govHandlerMock) MaxStakeAmount() *uint256.Int {
 	return new(uint256.Int).Mul(uint256.NewInt(uint64(tmtypes.MaxTotalVotingPower)), g.AmountPerPower())
 }
 
-func (g *govHelperMock) MaxTotalPower() int64 {
+func (g *govHandlerMock) MaxTotalPower() int64 {
 	return tmtypes.MaxTotalVotingPower
 }
 
-func (g *govHelperMock) AmountToPower(amt *uint256.Int) int64 {
+func (g *govHandlerMock) MinSelfStakeRatio() int64 {
+	return 50
+}
+
+func (g *govHandlerMock) MaxUpdatableStakeRatio() int64 {
+	return 30
+}
+
+func (g *govHandlerMock) SlashRatio() int64 {
+	return 27
+}
+
+func (g *govHandlerMock) AmountToPower(amt *uint256.Int) int64 {
 	// 1 VotingPower == 1_000_000_000_000_000_000 (10^18)
 	_vp := new(uint256.Int).Div(amt, g.AmountPerPower())
 	vp := int64(_vp.Uint64())
@@ -119,7 +139,7 @@ func (g *govHelperMock) AmountToPower(amt *uint256.Int) int64 {
 	return vp
 }
 
-func (g *govHelperMock) PowerToAmount(power int64) *uint256.Int {
+func (g *govHandlerMock) PowerToAmount(power int64) *uint256.Int {
 	if power < 0 {
 		panic(fmt.Sprintf("power is negative: %v", power))
 	}
@@ -128,7 +148,7 @@ func (g *govHelperMock) PowerToAmount(power int64) *uint256.Int {
 	return new(uint256.Int).Mul(uint256.NewInt(_power), g.AmountPerPower())
 }
 
-func (g *govHelperMock) PowerToReward(power int64) *uint256.Int {
+func (g *govHandlerMock) PowerToReward(power int64) *uint256.Int {
 	if power < 0 {
 		panic(fmt.Sprintf("power is negative: %v", power))
 	}
@@ -136,7 +156,7 @@ func (g *govHelperMock) PowerToReward(power int64) *uint256.Int {
 	return new(uint256.Int).Mul(uint256.NewInt(_power), g.RewardPerPower())
 }
 
-var _ types2.IGovHelper = (*govHelperMock)(nil)
+var _ types2.IGovHandler = (*govHandlerMock)(nil)
 
 func makeTestWallets(n int) []*web3.Wallet {
 	wallets := make([]*web3.Wallet, n)
@@ -190,7 +210,7 @@ func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*types2.TrxConte
 		Receiver:     to.GetAccount(),
 		NeedAmt:      nil,
 		GasUsed:      nil,
-		GovHelper:    govHelper,
+		GovHandler:   govHelper,
 	}, nil
 }
 
@@ -235,6 +255,6 @@ func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes) (*ty
 		SenderPubKey: from.GetPubKey(),
 		Sender:       from.GetAccount(),
 		Receiver:     to.GetAccount(),
-		GovHelper:    govHelper,
+		GovHandler:   govHelper,
 	}, nil
 }

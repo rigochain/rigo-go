@@ -2,13 +2,13 @@ package web3
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	rweb3types "github.com/rigochain/rigo-go/libs/web3/types"
 	"github.com/rigochain/rigo-go/rpc"
 	"github.com/rigochain/rigo-go/types"
-	"github.com/rigochain/rigo-go/types/xerrors"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"strconv"
@@ -23,7 +23,7 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
+		return nil, errors.New("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (rweb3 *RigoWeb3) GetDelegatee(addr types.Address) (*stake.Delegatee, error
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
+		return nil, errors.New("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
 		return nil, err
 	} else if err := tmjson.Unmarshal(queryResp.Value, delegatee); err != nil {
@@ -83,7 +83,7 @@ func (rweb3 *RigoWeb3) GetStakes(addr types.Address) ([]*stake.Stake, error) {
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
+		return nil, errors.New("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
 		return nil, err
 	} else if err := tmjson.Unmarshal(queryResp.Value, &stakes); err != nil {
@@ -112,11 +112,11 @@ func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*cor
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
+		return nil, errors.New("provider error: " + string(resp.Error))
 	} else {
 		switch method {
 		case "broadcast_tx_async":
-			return nil, xerrors.NewOrdinary("not supported method: " + method)
+			return nil, errors.New("not supported method: " + method)
 		case "broadcast_tx_sync":
 			ret := &coretypes.ResultBroadcastTx{}
 			if err := json.Unmarshal(resp.Result, ret); err != nil {
@@ -124,9 +124,9 @@ func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*cor
 			}
 			return ret, nil
 		case "broadcast_tx_commit":
-			return nil, xerrors.NewOrdinary("not supported method: " + method)
+			return nil, errors.New("not supported method: " + method)
 		default:
-			return nil, xerrors.NewOrdinary("unknown method: " + method)
+			return nil, errors.New("unknown method: " + method)
 		}
 	}
 }
@@ -142,7 +142,7 @@ func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, err
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
+		return nil, errors.New("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, txRet.ResultTx); err != nil {
 		return nil, err
 	} else if err := txRet.TxDetail.Decode(txRet.ResultTx.Tx); err != nil {
@@ -155,7 +155,11 @@ func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, err
 func (rweb3 *RigoWeb3) GetValidators(height int64, page, perPage int) (*coretypes.ResultValidators, error) {
 	retVals := &coretypes.ResultValidators{}
 
-	_height := strconv.FormatInt(height, 10)
+	_height := "0"
+	if height > 0 {
+		_height = strconv.FormatInt(height, 10)
+	}
+
 	if page == 0 {
 		page = 1
 	}
@@ -167,9 +171,33 @@ func (rweb3 *RigoWeb3) GetValidators(height int64, page, perPage int) (*coretype
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
 	} else if resp.Error != nil {
-		return nil, xerrors.NewOrdinary("provider error: " + string(resp.Error))
+		return nil, errors.New("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, retVals); err != nil {
 		return nil, err
 	}
 	return retVals, nil
+}
+
+func (rweb3 *RigoWeb3) VmCall(from, to types.Address, height int64, data []byte) (*ctrlertypes.VMCallResult, error) {
+	req, err := rweb3.NewRequest("vm_call", from, to, strconv.FormatInt(height, 10), data)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := rweb3.provider.Call(req)
+	if err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	}
+
+	qryResp := &rpc.QueryResult{}
+	if err := tmjson.Unmarshal(resp.Result, qryResp); err != nil {
+		return nil, err
+	}
+
+	vmRet := &ctrlertypes.VMCallResult{}
+	if err := tmjson.Unmarshal(qryResp.Value, vmRet); err != nil {
+		return nil, err
+	}
+	return vmRet, nil
 }

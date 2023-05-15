@@ -65,3 +65,15 @@ func NewTrxVoting(from, to types.Address, nonce uint64, gas *uint256.Int, txHash
 			Choice: choice,
 		})
 }
+
+func NewTrxContract(from, to types.Address, nonce uint64, gas, amt *uint256.Int, data bytes.HexBytes) *types2.Trx {
+	return types2.NewTrx(
+		uint32(1),
+		from, to,
+		nonce,
+		gas,
+		amt,
+		&types2.TrxPayloadContract{
+			Data: data,
+		})
+}

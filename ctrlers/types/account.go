@@ -37,6 +37,24 @@ func NewAccountWithName(addr types.Address, name string) *Account {
 	return acct
 }
 
+func (acct *Account) Clone() *Account {
+	acct.mtx.RLock()
+	defer acct.mtx.RUnlock()
+
+	var code []byte
+	if acct.Code != nil {
+		code = make([]byte, len(acct.Code))
+		copy(code, acct.Code)
+	}
+	return &Account{
+		Address: acct.Address,
+		Name:    acct.Name,
+		Nonce:   acct.Nonce,
+		Balance: acct.Balance.Clone(),
+		Code:    code,
+	}
+}
+
 func (acct *Account) GetAddress() types.Address {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
@@ -65,6 +83,13 @@ func (acct *Account) AddNonce() {
 	acct.Nonce++
 }
 
+func (acct *Account) SetNonce(n uint64) {
+	acct.mtx.Lock()
+	defer acct.mtx.Unlock()
+
+	acct.Nonce = n
+}
+
 func (acct *Account) GetNonce() uint64 {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
@@ -76,7 +101,8 @@ func (acct *Account) CheckNonce(n uint64) xerrors.XError {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
-	if acct.Nonce+1 != n {
+	// Change `tx_nonce == nonce + 1` to `tx_nonce == nonce`
+	if acct.Nonce != n {
 		return xerrors.ErrInvalidNonce
 	}
 	return nil

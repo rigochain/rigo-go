@@ -8,24 +8,27 @@ import (
 )
 
 type TrxContext struct {
-	Height int64
-	TxHash bytes2.HexBytes
-	Tx     *Trx
-	TxIdx  int
-	Exec   bool
+	Height    int64
+	BlockTime int64
+	TxHash    bytes2.HexBytes
+	Tx        *Trx
+	TxIdx     int
+	Exec      bool
 
 	SenderPubKey []byte
 	Sender       *Account
 	Receiver     *Account
 	NeedAmt      *uint256.Int
 	GasUsed      *uint256.Int
+	RetData      []byte
 
-	GovHandler   ITrxHandler
-	AcctHandler  ITrxHandler
-	StakeHandler ITrxHandler
+	TrxGovHandler   ITrxHandler
+	TrxAcctHandler  ITrxHandler
+	TrxStakeHandler ITrxHandler
+	TrxEVMHandler   ITrxHandler
 
-	GovHelper   IGovHelper
-	StakeHelper IStakeHelper
+	GovHandler   IGovHandler
+	StakeHandler IStakeHandler
 
 	Callback func(*TrxContext, xerrors.XError)
 }
@@ -37,7 +40,7 @@ type ITrxHandler interface {
 
 type NewTrxContextCb func(*TrxContext) xerrors.XError
 
-func NewTrxContext(txbz []byte, height int64, exec bool, cbfns ...NewTrxContextCb) (*TrxContext, xerrors.XError) {
+func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxContextCb) (*TrxContext, xerrors.XError) {
 	tx := &Trx{}
 	if xerr := tx.Decode(txbz); xerr != nil {
 		return nil, xerr
@@ -48,11 +51,13 @@ func NewTrxContext(txbz []byte, height int64, exec bool, cbfns ...NewTrxContextC
 	}
 
 	txctx := &TrxContext{
-		Tx:      tx,
-		TxHash:  types.Tx(txbz).Hash(),
-		Height:  height,
-		Exec:    exec,
-		GasUsed: uint256.NewInt(0),
+		Tx:        tx,
+		TxHash:    types.Tx(txbz).Hash(),
+		Height:    height,
+		BlockTime: btime,
+		Exec:      exec,
+		NeedAmt:   new(uint256.Int).Add(tx.Amount, tx.Gas),
+		GasUsed:   uint256.NewInt(0),
 	}
 
 	for _, fn := range cbfns {

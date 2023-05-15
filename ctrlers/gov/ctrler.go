@@ -14,6 +14,7 @@ import (
 	abytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	"sync"
@@ -65,7 +66,7 @@ func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
 		ruleLedger:     ruleLedger,
 		proposalLedger: proposalLedger,
 		frozenLedger:   frozenLedger,
-		logger:         logger,
+		logger:         logger.With("module", "rigo_GovCtrler"),
 	}, nil
 }
 
@@ -117,7 +118,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 
 		// check right
-		if ctx.StakeHelper.IsValidator(ctx.Tx.From) == false {
+		if ctx.StakeHandler.IsValidator(ctx.Tx.From) == false {
 			return xerrors.ErrNoRight
 		}
 
@@ -203,7 +204,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	txpayload, _ := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 
 	voters := make(map[string]*proposal.Voter)
-	vals, totalVotingPower := ctx.StakeHelper.Validators()
+	vals, totalVotingPower := ctx.StakeHandler.Validators()
 	for _, v := range vals {
 		voters[types.Address(v.Address).String()] = &proposal.Voter{
 			Addr:   v.Address,
@@ -243,36 +244,35 @@ func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		return xerr
 	}
 	if prop.MajorOption != nil {
-		ctrler.logger.Debug("GovCtrler::execVoting", "major option votes", prop.MajorOption.Votes())
+		ctrler.logger.Debug("Voting to proposal", "key", prop.TxHash, "voter", ctx.Tx.From, "choice", txpayload.Choice)
 	}
 	return nil
 }
 
-func (ctrler *GovCtrler) ValidateBlock(ctx *ctrlertypes.BlockContext) xerrors.XError {
+func (ctrler *GovCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	// do nothing
-	return nil
+	return nil, nil
 }
 
-func (ctrler *GovCtrler) ExecuteBlock(ctx *ctrlertypes.BlockContext) xerrors.XError {
+func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("GovCtrler::ExecuteBlock", "hegith", ctx.BlockInfo.Header.Height)
-	if xerr := ctrler.freezeProposals(ctx.BlockInfo.Header.Height); xerr != nil {
-		return xerr
+	if xerr := ctrler.freezeProposals(ctx.Height()); xerr != nil {
+		return nil, xerr
 	}
-	if xerr := ctrler.applyProposals(ctx.BlockInfo.Header.Height); xerr != nil {
-		return xerr
+	if xerr := ctrler.applyProposals(ctx.Height()); xerr != nil {
+		return nil, xerr
 	}
 
-	return nil
+	return nil, nil
 }
 
 // The following function is called by the Block Executor
 //
 
 func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
-	xerr := ctrler.proposalLedger.IterateAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+	xerr := ctrler.proposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		if prop.EndVotingHeight < height {
 
 			// freezing
@@ -287,7 +287,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
 				}
 			} else {
 				// do nothing. the proposal will be just removed.
-				ctrler.logger.Debug("GovCtrler::freezeProposals", "warning", "not found major option")
+				ctrler.logger.Debug("Freeze proposal", "warning", "not found major option")
 			}
 		}
 		return nil
@@ -296,7 +296,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
 }
 
 func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
-	xerr := ctrler.frozenLedger.IterateAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+	xerr := ctrler.frozenLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		if prop.ApplyingHeight <= height {
 			if _, xerr := ctrler.frozenLedger.DelFinality(prop.Key()); xerr != nil {
 				return xerr
@@ -314,10 +314,10 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 					ctrler.newGovRule = newGovRule
 				default:
 					key := prop.Key()
-					ctrler.logger.Debug("GovCtrler::applyProposals", "propsal_key", abytes.HexBytes(key[:]), "type", prop.OptType)
+					ctrler.logger.Debug("Apply proposal", "key(txHash)", abytes.HexBytes(key[:]), "type", prop.OptType)
 				}
 			} else {
-				ctrler.logger.Error("GovCtrler::applyProposals", "error", "major option is nil")
+				ctrler.logger.Error("Apply proposal", "error", "major option is nil")
 			}
 		}
 		return nil
@@ -329,8 +329,6 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
-
-	ctrler.logger.Debug("GovCtrler::Commit")
 
 	h0, v0, xerr := ctrler.ruleLedger.Commit()
 	if xerr != nil {
@@ -352,7 +350,7 @@ func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	if ctrler.newGovRule != nil {
 		ctrler.GovRule = *ctrler.newGovRule
 		ctrler.newGovRule = nil
-		ctrler.logger.Debug("GovCtrler::applyProposals", "new GovRule", ctrler.GovRule.String())
+		ctrler.logger.Debug("New governance rule is committed", "rule", ctrler.GovRule.String())
 	}
 	return crypto.DefaultHash(h0, h1, h2), v0, nil
 
@@ -364,13 +362,13 @@ func (ctrler *GovCtrler) Close() xerrors.XError {
 
 	if ctrler.ruleLedger != nil {
 		if xerr := ctrler.ruleLedger.Close(); xerr != nil {
-			ctrler.logger.Error("GovCtrler::Close", "ruleLedger.Close() returns error", xerr.Error())
+			ctrler.logger.Error("ruleLedger.Close()", "error", xerr.Error())
 		}
 		ctrler.ruleLedger = nil
 	}
 	if ctrler.proposalLedger != nil {
 		if xerr := ctrler.proposalLedger.Close(); xerr != nil {
-			ctrler.logger.Error("GovCtrler::Close", "proposalLedger.Close() returns error", xerr.Error())
+			ctrler.logger.Error("proposalLedger.Close()", "error", xerr.Error())
 		}
 		ctrler.proposalLedger = nil
 	}
@@ -390,7 +388,7 @@ func (ctrler *GovCtrler) GetProposals() ([]*proposal.GovProposal, xerrors.XError
 
 	var proposals []*proposal.GovProposal
 
-	if xerr := ctrler.proposalLedger.IterateAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+	if xerr := ctrler.proposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		proposals = append(proposals, prop)
 		return nil
 	}); xerr != nil {
@@ -417,4 +415,4 @@ func (ctrler *GovCtrler) ReadProposals(txhash abytes.HexBytes) (*proposal.GovPro
 var _ ctrlertypes.ILedgerHandler = (*GovCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*GovCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*GovCtrler)(nil)
-var _ ctrlertypes.IGovHelper = (*GovCtrler)(nil)
+var _ ctrlertypes.IGovHandler = (*GovCtrler)(nil)

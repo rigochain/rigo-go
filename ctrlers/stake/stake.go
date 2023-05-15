@@ -59,9 +59,9 @@ func (s *Stake) Decode(d []byte) xerrors.XError {
 
 var _ ledger.ILedgerItem = (*Stake)(nil)
 
-func NewStakeWithAmount(from, to types.Address, amt *uint256.Int, height int64, txhash abytes.HexBytes, govHelper ctrlertypes.IGovHelper) *Stake {
-	power := govHelper.AmountToPower(amt)
-	blockReward := govHelper.PowerToReward(power)
+func NewStakeWithAmount(from, to types.Address, amt *uint256.Int, startHeight int64, txhash abytes.HexBytes, govHandler ctrlertypes.IGovHandler) *Stake {
+	power := govHandler.AmountToPower(amt)
+	blockReward := govHandler.PowerToReward(power)
 	return &Stake{
 		From:            from,
 		To:              to,
@@ -69,15 +69,15 @@ func NewStakeWithAmount(from, to types.Address, amt *uint256.Int, height int64, 
 		Power:           power,
 		BlockRewardUnit: blockReward,
 		ReceivedReward:  uint256.NewInt(0),
-		StartHeight:     height,
+		StartHeight:     startHeight,
 		RefundHeight:    0,
 		TxHash:          txhash,
 	}
 }
 
-func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhash abytes.HexBytes, govHelper ctrlertypes.IGovHelper) *Stake {
-	amt := govHelper.PowerToAmount(power)
-	blockReward := govHelper.PowerToReward(power)
+func NewStakeWithPower(owner, to types.Address, power int64, startHeight int64, txhash abytes.HexBytes, govHandler ctrlertypes.IGovHandler) *Stake {
+	amt := govHandler.PowerToAmount(power)
+	blockReward := govHandler.PowerToReward(power)
 	return &Stake{
 		From:            owner,
 		To:              to,
@@ -85,7 +85,7 @@ func NewStakeWithPower(owner, to types.Address, power int64, height int64, txhas
 		Power:           power,
 		BlockRewardUnit: blockReward,
 		ReceivedReward:  uint256.NewInt(0),
-		StartHeight:     height,
+		StartHeight:     startHeight,
 		RefundHeight:    0,
 		TxHash:          txhash,
 	}
@@ -118,16 +118,19 @@ func (s *Stake) Copy() *Stake {
 	}
 }
 
-func (s *Stake) ApplyReward() *uint256.Int {
+func (s *Stake) ApplyReward(height int64) *uint256.Int {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	return s.applyReward()
+	return s.applyReward(height)
 }
 
-func (s *Stake) applyReward() *uint256.Int {
-	s.ReceivedReward = new(uint256.Int).Add(s.ReceivedReward, s.BlockRewardUnit)
-	return s.BlockRewardUnit
+func (s *Stake) applyReward(height int64) *uint256.Int {
+	if height >= s.StartHeight {
+		_ = s.ReceivedReward.Add(s.ReceivedReward, s.BlockRewardUnit)
+		return s.BlockRewardUnit.Clone()
+	}
+	return uint256.NewInt(0)
 }
 
 func (s *Stake) IsSelfStake() bool {

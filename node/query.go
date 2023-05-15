@@ -7,8 +7,9 @@ import (
 
 func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
 	response := abcitypes.ResponseQuery{
-		Code: abcitypes.CodeTypeOK,
-		Key:  req.Data,
+		Code:   abcitypes.CodeTypeOK,
+		Key:    req.Data,
+		Height: req.Height,
 	}
 
 	var xerr xerrors.XError
@@ -20,6 +21,8 @@ func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 		response.Value, xerr = ctrler.stakeCtrler.Query(req)
 	case "proposals", "rule":
 		response.Value, xerr = ctrler.govCtrler.Query(req)
+	case "vm_call":
+		response.Value, xerr = ctrler.vmCtrler.Query(req)
 	default:
 		response.Value, xerr = nil, xerrors.ErrInvalidQueryPath
 	}
@@ -28,5 +31,6 @@ func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 		response.Code = xerr.Code()
 		response.Log = xerr.Error()
 	}
+
 	return response
 }

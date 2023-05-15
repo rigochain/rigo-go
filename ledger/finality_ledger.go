@@ -37,6 +37,19 @@ func NewFinalityLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func
 	}
 }
 
+func (ledger *FinalityLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (IFinalityLedger[T], xerrors.XError) {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+	simledger, xerr := ledger.SimpleLedger.ImmutableLedgerAt(n, cacheSize)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return &FinalityLedger[T]{
+		SimpleLedger:  *simledger,
+		finalityItems: newMemItems[T](),
+	}, nil
+}
+
 func (ledger *FinalityLedger[T]) SetFinality(item T) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
@@ -105,8 +118,8 @@ func (ledger *FinalityLedger[T]) CancelDelFinality(key LedgerKey) xerrors.XError
 	return nil
 }
 
-func (ledger *FinalityLedger[T]) IterateAllFinalityItems(cb func(T) xerrors.XError) xerrors.XError {
-	return ledger.SimpleLedger.IterateAllItems(cb)
+func (ledger *FinalityLedger[T]) IterateReadAllFinalityItems(cb func(T) xerrors.XError) xerrors.XError {
+	return ledger.SimpleLedger.IterateReadAllItems(cb)
 }
 
 func (ledger *FinalityLedger[T]) IterateFinalityGotItems(cb func(T) xerrors.XError) xerrors.XError {
@@ -162,7 +175,7 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 	if r1, r2, err := ledger.tree.SaveVersion(); err != nil {
 		return r1, r2, xerrors.From(err)
 	} else {
-		ledger.SimpleLedger.cachedItems.refresh()
+		ledger.SimpleLedger.cachedItems.reset()
 		ledger.finalityItems.refresh()
 		return r1, r2, nil
 	}
