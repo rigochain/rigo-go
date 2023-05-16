@@ -1,6 +1,7 @@
 package web3
 
 import (
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
@@ -131,6 +132,20 @@ func (w *Wallet) SignTrx(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error)
 	defer w.mtx.RUnlock()
 
 	if txbz, err := tx.Encode(); err != nil {
+		return nil, nil, err
+	} else if sig, err := w.wkey.Sign(txbz); err != nil {
+		return nil, nil, err
+	} else {
+		tx.Sig = sig
+		return sig, txbz, nil
+	}
+}
+
+func (w *Wallet) SignTrxRLP(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error) {
+	w.mtx.RLock()
+	defer w.mtx.RUnlock()
+
+	if txbz, err := rlp.EncodeToBytes(tx); err != nil {
 		return nil, nil, err
 	} else if sig, err := w.wkey.Sign(txbz); err != nil {
 		return nil, nil, err

@@ -121,6 +121,7 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		sig := tx.Sig
 		tx.Sig = nil
 		_txbz, xerr := tx.Encode()
+		tx.Sig = sig
 		if xerr != nil {
 			return xerr
 		}

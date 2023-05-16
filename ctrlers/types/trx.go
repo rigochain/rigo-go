@@ -1,12 +1,16 @@
 package types
 
 import (
+	"fmt"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
+	"io"
 	"time"
 )
 
@@ -26,10 +30,26 @@ const (
 	EVENT_ATTR_ADDRPAIR = "addrpair"
 )
 
+type trxRPL struct {
+	Version uint32
+	Time    uint64
+	Nonce   uint64
+	From    types.Address
+	To      types.Address
+	Amount  string
+	Gas     string
+	Type    uint32
+	Payload bytes.HexBytes
+	Sig     bytes.HexBytes
+}
+
 type ITrxPayload interface {
 	Type() int32
+	Equal(ITrxPayload) bool
 	Encode() ([]byte, xerrors.XError)
 	Decode([]byte) xerrors.XError
+	RLPEncode() ([]byte, error)
+	RLPDecode([]byte) error
 }
 
 type Trx struct {
@@ -44,6 +64,117 @@ type Trx struct {
 	Payload ITrxPayload    `json:"payload,omitempty"`
 	Sig     bytes.HexBytes `json:"sig"`
 }
+
+func (tx *Trx) Equal(_tx *Trx) bool {
+	if tx.Version != _tx.Version {
+		return false
+	}
+	if tx.Time != _tx.Time {
+		return false
+	}
+	if tx.Nonce != _tx.Nonce {
+		return false
+	}
+	if tx.From.Compare(_tx.From) != 0 {
+		return false
+	}
+	if tx.To.Compare(_tx.To) != 0 {
+		return false
+	}
+	if tx.Amount.Cmp(_tx.Amount) != 0 {
+		return false
+	}
+	if tx.Gas.Cmp(_tx.Gas) != 0 {
+		return false
+	}
+	if tx.Type != _tx.Type {
+		return false
+	}
+	if tx.Version != _tx.Version {
+		return false
+	}
+	if tx.Version != _tx.Version {
+		return false
+	}
+	if bytes.Compare(tx.Sig, _tx.Sig) != 0 {
+		return false
+	}
+	if tx.Payload != nil {
+		return tx.Payload.Equal(_tx.Payload)
+	} else if _tx.Payload != nil {
+		return false
+	}
+	return true
+}
+
+func (tx *Trx) EncodeRLP(w io.Writer) error {
+	var payload bytes.HexBytes
+	if tx.Payload != nil {
+		_tmp, err := tx.Payload.RLPEncode()
+		if err != nil {
+			return err
+		}
+		payload = _tmp
+	}
+	tmpTx := &trxRPL{
+		Version: tx.Version,
+		Time:    uint64(tx.Time),
+		Nonce:   tx.Nonce,
+		From:    tx.From,
+		To:      tx.To,
+		Amount:  tx.Amount.Hex(),
+		Gas:     tx.Gas.Hex(),
+		Type:    uint32(tx.Type),
+		Payload: payload,
+		Sig:     tx.Sig,
+	}
+	return rlp.Encode(w, tmpTx)
+}
+
+func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
+	rtx := &trxRPL{}
+	if err := s.Decode(rtx); err != nil {
+		return err
+	}
+
+	var payload ITrxPayload
+	if rtx.Payload != nil && len(rtx.Payload) > 0 {
+		switch int32(rtx.Type) {
+		case TRX_TRANSFER:
+			payload = &TrxPayloadAssetTransfer{}
+		case TRX_STAKING:
+			payload = &TrxPayloadStaking{}
+		case TRX_UNSTAKING:
+			payload = &TrxPayloadUnstaking{}
+		case TRX_PROPOSAL:
+			payload = &TrxPayloadProposal{}
+		case TRX_VOTING:
+			payload = &TrxPayloadVoting{}
+		case TRX_CONTRACT:
+			payload = &TrxPayloadContract{}
+		default:
+			return xerrors.ErrInvalidTrxPayloadType
+		}
+		if err := payload.RLPDecode(rtx.Payload); err != nil {
+			return err
+		}
+	}
+
+	tx.Version = rtx.Version
+	tx.Time = int64(rtx.Time)
+	tx.Nonce = rtx.Nonce
+	tx.From = rtx.From
+	tx.To = rtx.To
+	tx.Amount = uint256.MustFromHex(rtx.Amount)
+	tx.Gas = uint256.MustFromHex(rtx.Gas)
+	tx.Type = int32(rtx.Type)
+	tx.Payload = payload
+	tx.Sig = rtx.Sig
+	return nil
+}
+
+var _ rlp.Encoder = (*Trx)(nil)
+var _ rlp.Decoder = (*Trx)(nil)
 
 func NewTrx(ver uint32, from, to types.Address, nonce uint64, gas, amt *uint256.Int, payload ITrxPayload) *Trx {
 	return &Trx{
@@ -127,7 +258,7 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 			return err
 		}
 	default:
-		return xerrors.NewOrdinary("unknown payload type")
+		return xerrors.ErrInvalidTrxPayloadType
 	}
 
 	tx.Version = txProto.Version
@@ -178,4 +309,41 @@ func (tx *Trx) Hash() ([]byte, error) {
 	}
 
 	return tmtypes.Tx(bz).Hash(), nil
+}
+
+func VerifyTrx(tx *Trx) xerrors.XError {
+	sig := tx.Sig
+	tx.Sig = nil
+	_txbz, xerr := tx.Encode()
+	tx.Sig = sig
+	if xerr != nil {
+		return xerr
+	}
+
+	fromAddr, _, xerr := crypto.Sig2Addr(_txbz, sig)
+	if xerr != nil {
+		return xerr
+	}
+	if bytes.Compare(fromAddr, tx.From) != 0 {
+		return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
+	}
+	return nil
+}
+
+func VerifyTrxRLP(tx *Trx) xerrors.XError {
+	sig := tx.Sig
+	tx.Sig = nil
+	_txbz, err := rlp.EncodeToBytes(tx)
+	tx.Sig = sig
+	if err != nil {
+		return xerrors.From(err)
+	}
+	fromAddr, _, xerr := crypto.Sig2Addr(_txbz, sig)
+	if xerr != nil {
+		return xerr
+	}
+	if bytes.Compare(fromAddr, tx.From) != 0 {
+		return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
+	}
+	return nil
 }
