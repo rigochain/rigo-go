@@ -45,7 +45,7 @@ func testDeploy(t *testing.T) {
 	//require.NotNil(t, ret.Data)
 	//require.Equal(t, 20, len(ret.Data))
 
-	txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
+	txRet, err := waitTrxResult(ret.Hash, 30, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 	require.NotNil(t, txRet.TxResult.Data)

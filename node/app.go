@@ -210,8 +210,9 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
 		txctx, xerr := types2.NewTrxContext(req.Tx,
-			0, //ctrler.currBlockCtx.Height()+int64(1),
-			0,
+
+			ctrler.currBlockCtx.Height()+int64(1),                    // issue #39: set block number expected to include current tx.
+			ctrler.currBlockCtx.TimeNano()+time.Second.Nanoseconds(), // issue #39: set block time expected to be executed.
 			false,
 			func(_txctx *types2.TrxContext) xerrors.XError {
 				_txctx.TrxGovHandler = ctrler.govCtrler
@@ -262,7 +263,9 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 		"prev.hash", req.Header.LastBlockId.Hash)
 
 	// save the block fee info. - it will be used for rewarding
+	ctrler.mtx.Lock()
 	ctrler.currBlockCtx = types2.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
+	ctrler.mtx.Unlock()
 
 	ev, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
 
