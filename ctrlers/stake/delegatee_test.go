@@ -92,7 +92,7 @@ func TestSlash(t *testing.T) {
 	}
 }
 
-func TestAppendStake(t *testing.T) {
+func TestAddStake(t *testing.T) {
 	delegatee := stake.NewDelegatee(Wallets[0].Address(), Wallets[0].GetPubKey())
 
 	amt0 := bytes.RandU256IntN(govHelper.MaxStakeAmount())
@@ -136,7 +136,7 @@ func TestAppendStake(t *testing.T) {
 
 }
 
-func TestApplyReward(t *testing.T) {
+func TestDoReward_Delegatee(t *testing.T) {
 	delegatee := stake.NewDelegatee(Wallets[1].Address(), Wallets[1].GetPubKey())
 
 	// staking

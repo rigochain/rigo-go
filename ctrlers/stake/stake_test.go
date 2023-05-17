@@ -31,7 +31,7 @@ func TestNewStake(t *testing.T) {
 	require.Equal(t, uint256.NewInt(0), s0.ReceivedReward)
 }
 
-func TestApplyRewardByStake(t *testing.T) {
+func TestApplyReward(t *testing.T) {
 	stakeTestObjs := make([]*stakeTestObj, 1000)
 
 	for i := 0; i < 1000; i++ {

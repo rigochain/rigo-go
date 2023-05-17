@@ -7,6 +7,8 @@ import (
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	"github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
+	types3 "github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -95,7 +97,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func TestStakingToSelfByTx(t *testing.T) {
+func TestTrxStakingToSelf(t *testing.T) {
 	sumAmt := uint256.NewInt(0)
 	sumPower := int64(0)
 
@@ -114,7 +116,7 @@ func TestStakingToSelfByTx(t *testing.T) {
 	require.Equal(t, sumPower, stakeCtrler.ReadTotalPower())
 }
 
-func TestStakingByTx(t *testing.T) {
+func TestTrxStakingByTx(t *testing.T) {
 	sumAmt := stakeCtrler.ReadTotalAmount()
 	sumPower := stakeCtrler.ReadTotalPower()
 
@@ -146,6 +148,30 @@ func TestStakingByTx(t *testing.T) {
 
 	require.Equal(t, sumAmt.String(), stakeCtrler.ReadTotalAmount().String())
 	require.Equal(t, sumPower, stakeCtrler.ReadTotalPower())
+}
+
+func TestDoReward(t *testing.T) {
+	valUps := stakeCtrler.UpdateValidators(int(govHelper.MaxValidatorCnt()))
+	require.Greater(t, len(valUps), 0)
+
+	var votes []abcitypes.VoteInfo
+	for _, val := range valUps {
+		addr, err := crypto.PubBytes2Addr(val.PubKey.GetSecp256K1())
+		require.NoError(t, err)
+
+		votes = append(votes, abcitypes.VoteInfo{
+			Validator: abcitypes.Validator{
+				Address: addr,
+				Power:   val.Power,
+			},
+			SignedLastBlock: true,
+		})
+	}
+	lastHeight++
+	err := stakeCtrler.DoReward(lastHeight, votes)
+	require.NoError(t, err)
+	_, _, err = stakeCtrler.Commit()
+	require.NoError(t, err)
 }
 
 func TestPunish(t *testing.T) {
@@ -230,6 +256,36 @@ func TestUnstakingByTx(t *testing.T) {
 }
 
 func TestUnfreezing(t *testing.T) {
+	type expectedReward struct {
+		addr            types3.Address
+		originalBalance *uint256.Int
+		rewardedBalance *uint256.Int
+	}
+
+	expectedRewards := make(map[string]*expectedReward)
+	frozenStakes := stakeCtrler.ReadFrozenStakes()
+	require.Greater(t, len(frozenStakes), 0)
+	for _, s0 := range frozenStakes {
+		//require.NotEqual(t, "0", s0.ReceivedReward.Dec(), "your test may not reward")
+
+		acct := acctHelper.FindAccount(s0.From, true)
+		require.NotNil(t, acct)
+
+		er, ok := expectedRewards[acct.Address.String()]
+		if !ok {
+			er = &expectedReward{
+				addr:            acct.Address,
+				originalBalance: acct.Balance.Clone(),
+				rewardedBalance: uint256.NewInt(0),
+			}
+			expectedRewards[acct.Address.String()] = er
+		}
+
+		_ = er.rewardedBalance.Add(
+			er.rewardedBalance,
+			new(uint256.Int).Add(s0.Amount, s0.ReceivedReward))
+	}
+
 	lastHeight += govHelper.LazyRewardBlocks()
 
 	// execute block at lastHeight
@@ -246,8 +302,16 @@ func TestUnfreezing(t *testing.T) {
 	_, _, err = stakeCtrler.Commit()
 	require.NoError(t, err)
 
-	frozenStakes := stakeCtrler.ReadFrozenStakes()
+	frozenStakes = stakeCtrler.ReadFrozenStakes()
 	require.Equal(t, 0, len(frozenStakes))
 
-	// todo: check received reward and fee
+	for _, er := range expectedRewards {
+		acct1 := acctHelper.FindAccount(er.addr, true)
+		require.NotNil(t, acct1)
+		require.NotEqual(t, acct1.Balance.Dec(), er.originalBalance.Dec())
+
+		expectedBalance := new(uint256.Int).Add(er.originalBalance, er.rewardedBalance)
+		require.Equal(t, expectedBalance.Dec(), acct1.Balance.Dec())
+
+	}
 }

@@ -161,8 +161,6 @@ func (ctrler *StakeCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErro
 	default:
 		return xerrors.ErrUnknownTrxType
 	}
-
-	return nil
 }
 
 func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -227,7 +225,7 @@ func (ctrler *StakeCtrler) execUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XE
 
 	// delete the stake from a delegatee
 	txhash := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
-	if txhash == nil && len(txhash) != 32 {
+	if txhash == nil || len(txhash) != 32 {
 		return xerrors.ErrInvalidTrxPayloadParams
 	}
 	s0 := delegatee.DelStake(txhash)
@@ -277,6 +275,12 @@ func (ctrler *StakeCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 
 	return nil, nil
 }
+func (ctrler *StakeCtrler) DoReward(height int64, votes []abcitypes.VoteInfo) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	return ctrler.doReward(height, votes)
+}
 
 // the following functions are called in EndBlock()
 //
@@ -314,7 +318,12 @@ func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertype
 	return ctrler.frozenLedger.IterateReadAllFinalityItems(func(s0 *Stake) xerrors.XError {
 		if s0.RefundHeight <= height {
 			// un-freezing s0
-			if xerr := acctHandler.Reward(s0.From, s0.ReceivedReward, true); xerr != nil {
+			// return not only s0.ReceivedReward but also s0.Amount
+			xerr := acctHandler.Reward(
+				s0.From,
+				new(uint256.Int).Add(s0.Amount, s0.ReceivedReward),
+				true)
+			if xerr != nil {
 				return xerr
 			}
 
@@ -324,9 +333,16 @@ func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertype
 	})
 }
 
-// UpdateValidators is called after executing staking/unstaking txs, before committing the result of the txs executing
+func (ctrler *StakeCtrler) UpdateValidators(maxVals int) []abcitypes.ValidatorUpdate {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.updateValidators(maxVals)
+}
+
+// UpdateValidators is called after executing staking/unstaking txs and before committing the result of the txs executing.
 // This means that the updated values of ledger is not committed yet.
-// So ledger.IterateReadAllItems/IterateReadAllFinalityItems returns not updated values.
+// So, use ledger.IterateReadAllItems/IterateReadAllFinalityItems to get not changed values.
 func (ctrler *StakeCtrler) updateValidators(maxVals int) []abcitypes.ValidatorUpdate {
 	var allDelegatees DelegateeArray
 	// NOTE:
