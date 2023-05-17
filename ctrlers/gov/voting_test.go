@@ -102,7 +102,7 @@ func TestVoting(t *testing.T) {
 	_, _, xerr := govCtrler.Commit()
 	require.NoError(t, xerr)
 
-	prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.NoError(t, xerr)
 
 	sumVotedPowers := int64(0)
@@ -118,7 +118,7 @@ func TestVoting(t *testing.T) {
 }
 
 func TestMajority(t *testing.T) {
-	prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.NoError(t, xerr)
 
 	opt := prop.UpdateMajorOption()
@@ -132,7 +132,7 @@ func TestMajority(t *testing.T) {
 		_, _, xerr = govCtrler.Commit()
 		require.NoError(t, xerr)
 
-		prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+		prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 		require.NoError(t, xerr)
 
 		votedPowers += stakeHelper.PowerOf(c.txctx.Tx.From)
@@ -157,7 +157,7 @@ func TestMajority(t *testing.T) {
 		_, _, xerr = govCtrler.Commit()
 		require.NoError(t, xerr)
 
-		prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+		prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 		require.NoError(t, xerr)
 
 		opt := prop.UpdateMajorOption()
@@ -176,7 +176,7 @@ func TestFreezingProposal(t *testing.T) {
 	_, _, xerr := govCtrler.Commit()
 	require.NoError(t, xerr)
 
-	prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.NoError(t, xerr)
 
 	//
@@ -188,7 +188,7 @@ func TestFreezingProposal(t *testing.T) {
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	prop, xerr = govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	prop, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.NoError(t, xerr)
 
 	//
@@ -200,7 +200,7 @@ func TestFreezingProposal(t *testing.T) {
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	_, xerr = govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	_, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.Equal(t, xerrors.ErrNotFoundProposal, xerr)
 	frozenProp, xerr := govCtrler.frozenLedger.Get(trxCtxProposal.TxHash.Array32())
 	require.NoError(t, xerr)

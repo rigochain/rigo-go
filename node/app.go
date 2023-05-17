@@ -267,10 +267,11 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 	ctrler.currBlockCtx = types2.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
 	ctrler.mtx.Unlock()
 
-	ev, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
+	ev0, _ := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
+	ev1, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
 
 	return abcitypes.ResponseBeginBlock{
-		Events: ev,
+		Events: append(ev0, ev1...),
 	}
 }
 

@@ -118,6 +118,9 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 }
 
 func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64, amtPerPower, rwdPerPower *uint256.Int) (int64, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	return ctrler.doPunish(evi, slashRatio, amtPerPower, rwdPerPower)
 }
 

@@ -10,7 +10,10 @@ import (
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"math/rand"
 	"testing"
+	"time"
 )
 
 type Case struct {
@@ -30,65 +33,54 @@ func init() {
 	}
 
 	tx0 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, uint256.NewInt(5),
-		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // wrong min fee
+		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, uint256.NewInt(5), // insufficient fee
+		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 
 	tx1 := web3.NewTrxProposal( // no right
 		stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 
-	// Not testable,
-	// TrxContext can not be made because tx.Encode()/Decode() returns error
-	//
-	//h, err := tx1.Hash()
-	//if err != nil {
-	//	panic(err)
-	//}
-	//tx2 := web3.NewTrxVoting(
-	//	stakeHelper.PickAddress(1), types.ZeroAddress(), 1, big.NewInt(10),
-	//	h, 0)
-	//tx2.Type = ctrlertypes.TRX_PROPOSAL // wrong payload type
-
-	// Not testable,
-	// In ValidateTrx/ExecuteTrx, option is not decoded and checked
-	//
-	//tx3 := web3.NewTrxProposal(
-	//	stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, big.NewInt(10),
-	//	"test govrule proposal", 10, 259200, proposal.PROPOSAL_COMMON, bz) // wrong option type
-
-	tx4 := web3.NewTrxProposal(
+	tx3 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal", 10, 159200, proposal.PROPOSAL_GOVRULE, bzOpt) // wrong period
 
-	tx5 := web3.NewTrxProposal(
+	tx4 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // it will be used to test wrong start height
 
-	tx6 := web3.NewTrxProposal(
+	tx5 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // all right
 
 	cases1 = []*Case{
 		{txctx: makeTrxCtx(tx0, 1, true), err: xerrors.ErrInsufficientFee}, // wrong min fee
 		{txctx: makeTrxCtx(tx1, 1, true), err: xerrors.ErrNoRight},
-		{txctx: makeTrxCtx(tx4, 1, true), err: xerrors.ErrInvalidTrxPayloadParams},  // wrong period
-		{txctx: makeTrxCtx(tx5, 20, true), err: xerrors.ErrInvalidTrxPayloadParams}, // wrong start height
-		{txctx: makeTrxCtx(tx6, 1, true), err: nil},                                 // success
+		{txctx: makeTrxCtx(tx3, 1, true), err: xerrors.ErrInvalidTrxPayloadParams},  // wrong period
+		{txctx: makeTrxCtx(tx4, 20, true), err: xerrors.ErrInvalidTrxPayloadParams}, // wrong start height
+		{txctx: makeTrxCtx(tx5, 1, true), err: nil},                                 // success
 	}
 
-	tx7 := web3.NewTrxProposal(
+	tx6 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
 		"test govrule proposal2", 11, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 	cases2 = []*Case{
-		{txctx: makeTrxCtx(tx7, 1, true), err: nil}, // first success, second fail
+		// the tx6 will be submitted two times.
+		// the first must success but the second must fail.
+		{txctx: makeTrxCtx(tx6, 1, true), err: nil},
 	}
 }
 
 func TestAddProposal(t *testing.T) {
+	props0, _ := govCtrler.RealAllProposals()
+	require.NotNil(t, props0)
+
 	for i, c := range cases1 {
 		xerr := runCase(c)
 		require.Equal(t, c.err, xerr, "index", i)
 	}
+
+	props1, _ := govCtrler.RealAllProposals()
+	require.NotNil(t, props1)
 }
 
 func TestCommitProposal(t *testing.T) {
@@ -111,16 +103,67 @@ func TestCommitProposal(t *testing.T) {
 	}
 }
 
-func runCase(c *Case) xerrors.XError {
-	return runTrx(c.txctx)
-}
+func TestPunish(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	valAddr := stakeHelper.PickAddress(rand.Intn(stakeHelper.valCnt))
 
-func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if xerr := govCtrler.ValidateTrx(ctx); xerr != nil {
-		return xerr
+	// original proposals and voter's power
+	props, err := govCtrler.RealAllProposals()
+	require.NoError(t, err)
+
+	type propSnapshot struct {
+		proposal      *proposal.GovProposal
+		punishedVoter *proposal.Voter
 	}
-	if xerr := govCtrler.ExecuteTrx(ctx); xerr != nil {
-		return xerr
+	var props0 []propSnapshot
+	for _, prop := range props {
+		v, ok := prop.Voters[valAddr.String()]
+		if ok {
+			props0 = append(props0,
+				propSnapshot{
+					proposal:      prop,
+					punishedVoter: v,
+				})
+		}
 	}
-	return nil
+
+	slashed, err := govCtrler.DoPunish(&abcitypes.Evidence{
+		Validator: abcitypes.Validator{
+			Address: valAddr,
+			Power:   stakeHelper.PowerOf(valAddr),
+		},
+	})
+	require.NoError(t, err)
+
+	// commit
+	_, _, err = govCtrler.Commit()
+	require.NoError(t, err)
+
+	// proposals and voter's power after punishing
+	props, err = govCtrler.RealAllProposals()
+	require.NoError(t, err)
+
+	var props1 []propSnapshot
+	for _, prop := range props {
+		v, ok := prop.Voters[valAddr.String()]
+		if ok {
+			props1 = append(props1,
+				propSnapshot{
+					proposal:      prop,
+					punishedVoter: v,
+				})
+		}
+	}
+
+	// check punishment result
+	require.Equal(t, len(props0), len(props1))
+	power0, power1 := int64(0), int64(0)
+	for i, prop0 := range props0 {
+		require.Equal(t, prop0.proposal.SumVotingPowers(), prop0.proposal.TotalVotingPower)
+		require.Equal(t, props1[i].proposal.SumVotingPowers(), props1[i].proposal.TotalVotingPower)
+		power0 += prop0.proposal.TotalVotingPower
+		power1 += props1[i].proposal.TotalVotingPower
+	}
+
+	require.Equal(t, power0-slashed, power1)
 }

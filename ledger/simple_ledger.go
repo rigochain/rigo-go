@@ -142,7 +142,7 @@ func (ledger *SimpleLedger[T]) IterateReadAllItems(cb func(T) xerrors.XError) xe
 		} else if xerr := cb(item); xerr != nil {
 			return true
 		}
-		return false
+		return false // continue iteration
 	})
 
 	if err != nil {
