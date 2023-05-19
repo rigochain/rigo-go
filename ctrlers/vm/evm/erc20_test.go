@@ -37,19 +37,19 @@ func Test_callEVM_Deploy(t *testing.T) {
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	to := types.ZeroAddress()
 
-	ret, xerr := rigoEVM.execVM(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(0), input, 1, time.Now().UnixNano())
+	ret, xerr := rigoEVM.execVM(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(0), uint256.NewInt(0), input, 1, time.Now().UnixNano(), true)
 	require.NoError(t, xerr)
 	require.NoError(t, ret.Err)
 
 	contractAddr = ret.ReturnData
 	fmt.Println("TestDeploy", "contract address", contractAddr)
 
-	retUnpack, xerr := execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), 2, time.Now().UnixNano(), "name")
+	retUnpack, xerr := execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), uint256.NewInt(0), 2, time.Now().UnixNano(), "name")
 	require.NoError(t, xerr)
 	require.NoError(t, ret.Err)
 	fmt.Println("TestDeploy", "name", retUnpack[0])
 
-	retUnpack, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), 2, time.Now().UnixNano(), "symbol")
+	retUnpack, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), uint256.NewInt(0), 2, time.Now().UnixNano(), "symbol")
 	require.NoError(t, xerr)
 	require.NoError(t, ret.Err)
 	fmt.Println("TestDeploy", "symbol", retUnpack[0])
@@ -63,17 +63,17 @@ func Test_callEVM_Transfer(t *testing.T) {
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	toAcct := acctHandler.walletsArr[1].GetAccount()
 
-	ret, xerr := queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr := queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(fromAcct.Address))
 	require.NoError(t, xerr)
 	fmt.Println("(BEFORE) balanceOf", fromAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(toAcct.Address))
 	require.NoError(t, xerr)
 	fmt.Println("(BEFORE) balanceOf", toAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
 
-	ret, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
 	fmt.Println("<transferred>")
@@ -82,12 +82,12 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("Commit block", height)
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(fromAcct.Address))
 	require.NoError(t, xerr)
 	fmt.Println(" (AFTER) balanceOf", fromAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(toAcct.Address))
 	require.NoError(t, xerr)
 	fmt.Println(" (AFTER) balanceOf", toAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
@@ -100,12 +100,12 @@ func Test_callEVM_Transfer(t *testing.T) {
 
 	rigoEVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger())
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(fromAcct.Address))
 	require.NoError(t, xerr)
 	fmt.Println("(REOPEN) balanceOf", fromAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(toAcct.Address))
 	require.NoError(t, xerr)
 	fmt.Println("(REOPEN) balanceOf", toAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
@@ -117,13 +117,13 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 }
 
-func execMethod(from, to types.Address, nonce uint64, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
+func execMethod(from, to types.Address, nonce uint64, gas, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
 	input, err := abiContract.Pack(methodName, args...)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
 
-	ret, xerr := rigoEVM.execVM(from, to, nonce, amt, input, bn, bt)
+	ret, xerr := rigoEVM.execVM(from, to, nonce, gas, amt, input, bn, bt, true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -138,7 +138,7 @@ func execMethod(from, to types.Address, nonce uint64, amt *uint256.Int, bn, bt i
 	return retUnpack, nil
 }
 
-func queryMethod(from, to types.Address, nonce uint64, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
+func queryMethod(from, to types.Address, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
 	input, err := abiContract.Pack(methodName, args...)
 	if err != nil {
 		return nil, xerrors.From(err)

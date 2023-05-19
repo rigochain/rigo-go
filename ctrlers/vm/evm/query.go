@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/holiman/uint256"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -13,7 +14,6 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	"math"
-	"math/big"
 )
 
 func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
@@ -77,8 +77,7 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 	}
 
 	nonce := state.GetNonce(from.Array20())
-
-	vmmsg := evmMessage(sender, toAddr, nonce, big.NewInt(0), big.NewInt(0), data)
+	vmmsg := evmMessage(sender, toAddr, nonce, uint64(0), uint256.NewInt(0), data)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)

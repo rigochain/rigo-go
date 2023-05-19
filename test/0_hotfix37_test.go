@@ -19,7 +19,7 @@ func TestStaking2GenesisValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	amtStake := uint256.NewInt(1000000000000000000)
-	ret, err := valWal.StakingSync(valWal.Address(), gas, amtStake, rweb3)
+	ret, err := valWal.StakingSync(valWal.Address(), gas10, amtStake, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 

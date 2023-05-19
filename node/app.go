@@ -20,7 +20,6 @@ import (
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	tmver "github.com/tendermint/tendermint/version"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -71,7 +70,9 @@ func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
 
 	vmCtrler := evm.NewEVMCtrler(config.DBDir(), acctCtrler, logger)
 
-	txExecutor := NewTrxExecutor(runtime.GOMAXPROCS(0), logger)
+	// the first parameter of NewTrxExecutor `n` is 0,
+	// because the parallel tx-processing is not used
+	txExecutor := NewTrxExecutor(0 /*runtime.GOMAXPROCS(0)*/, logger)
 
 	return &RigoApp{
 		metaDB:      stateDB,

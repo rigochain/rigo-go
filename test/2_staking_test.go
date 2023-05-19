@@ -40,14 +40,14 @@ func TestMinSelfStakeRatio(t *testing.T) {
 
 	// allowed delegating
 	maxAllowedAmt := valStakes.TotalAmount
-	ret, err := sender.StakingSync(valWal.Address(), gas, maxAllowedAmt, rweb3)
+	ret, err := sender.StakingSync(valWal.Address(), gas10, maxAllowedAmt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
 	sender.AddNonce()
 
 	// not allowed delegating, because `maxAllowdAmt` is already delegated.
-	ret, err = sender.StakingSync(valWal.Address(), gas, uint256.NewInt(1_000_000_000_000_000_000), rweb3)
+	ret, err = sender.StakingSync(valWal.Address(), gas10, uint256.NewInt(1_000_000_000_000_000_000), rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
@@ -55,7 +55,7 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	// allowed self staking
 	require.NoError(t, valWal.SyncAccount(rweb3))
 	require.NoError(t, valWal.Unlock(defaultRpcNode.Pass))
-	ret, err = valWal.StakingSync(valWal.Address(), gas, uint256.NewInt(10_000_000_000_000_000_000), rweb3)
+	ret, err = valWal.StakingSync(valWal.Address(), gas10, uint256.NewInt(10_000_000_000_000_000_000), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
@@ -74,14 +74,14 @@ func TestInvalidStakeAmount(t *testing.T) {
 	// too small
 	stakeAmt := uint256.MustFromDecimal("1111")
 
-	ret, err := w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
+	ret, err := w.StakingSync(w.Address(), gas10, stakeAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
 	// not multiple
 	stakeAmt = uint256.MustFromDecimal("1000000000000000001")
 
-	ret, err = w.StakingSync(w.Address(), gas, stakeAmt, rweb3)
+	ret, err = w.StakingSync(w.Address(), gas10, stakeAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 }
@@ -111,7 +111,7 @@ func TestDelegating(t *testing.T) {
 
 	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
 	// self staking
-	ret, err := w.StakingSync(valAddr, gas, stakeAmt, rweb3)
+	ret, err := w.StakingSync(valAddr, gas10, stakeAmt, rweb3)
 	require.NoError(t, err)
 
 	require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestDelegating(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 	require.Equal(t, txHash, txRet.Hash)
-	require.Equal(t, gas, txRet.TxDetail.Gas)
+	require.Equal(t, gas10, txRet.TxDetail.Gas)
 	require.Equal(t, stakeAmt, txRet.TxDetail.Amount)
 
 	// check stakes

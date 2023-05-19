@@ -19,6 +19,7 @@ import (
 type StateDBWrapper struct {
 	*state.StateDB
 	acctLedger ctrlertypes.IAccountHandler
+	exec       bool
 	immutable  bool
 
 	logger tmlog.Logger
@@ -81,40 +82,40 @@ func (s *StateDBWrapper) CreateAccount(addr common.Address) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	_ = s.acctLedger.FindOrNewAccount(addr[:], true)
+	_ = s.acctLedger.FindOrNewAccount(addr[:], s.exec)
 	s.StateDB.CreateAccount(addr)
 	s.logger.Debug("Create account", "address", addr)
 }
 
 func (s *StateDBWrapper) SubBalance(addr common.Address, amt *big.Int) {
-	s.logger.Debug("SubBalance", "address", addr, "amount", amt)
-	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
+	if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
 		if err := acct.SubBalance(uint256.MustFromBig(amt)); err != nil {
 			panic(err)
 		}
-		s.acctLedger.SetAccountCommittable(acct, true)
+		s.logger.Debug("SubBalance", "address", addr, "sub.amount", amt, "balance", acct.Balance.Dec())
+		s.acctLedger.SetAccountCommittable(acct, s.exec)
 	}
 }
 
 func (s *StateDBWrapper) AddBalance(addr common.Address, amt *big.Int) {
-	s.logger.Debug("AddBalance", "address", addr, "amount", amt)
-	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
+	if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
 		if err := acct.AddBalance(uint256.MustFromBig(amt)); err != nil {
 			panic(err)
 		}
-		s.acctLedger.SetAccountCommittable(acct, true)
+		s.logger.Debug("AddBalance", "address", addr, "add.amount", amt, "balance", acct.Balance.Dec())
+		s.acctLedger.SetAccountCommittable(acct, s.exec)
 	}
 }
 
 func (s *StateDBWrapper) GetBalance(addr common.Address) *big.Int {
-	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
+	if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
 		return acct.GetBalance().ToBig()
 	}
 	return big.NewInt(0)
 }
 
 func (s *StateDBWrapper) GetNonce(addr common.Address) uint64 {
-	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
+	if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
 		return acct.GetNonce()
 	}
 	return 0
@@ -122,9 +123,9 @@ func (s *StateDBWrapper) GetNonce(addr common.Address) uint64 {
 
 func (s *StateDBWrapper) SetNonce(addr common.Address, n uint64) {
 	s.logger.Debug("SetNonce", "address", addr, "nonce", n)
-	if acct := s.acctLedger.FindAccount(addr[:], true); acct != nil {
+	if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
 		acct.SetNonce(n)
-		s.acctLedger.SetAccountCommittable(acct, true)
+		s.acctLedger.SetAccountCommittable(acct, s.exec)
 	}
 }
 

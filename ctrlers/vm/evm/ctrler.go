@@ -13,8 +13,6 @@ import (
 	"github.com/rigochain/rigo-go/types/xerrors"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmdb "github.com/tendermint/tm-db"
-	"math"
-	"math/big"
 	"strconv"
 	"sync"
 )
@@ -135,19 +133,16 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		return xerrors.ErrUnknownTrxType
 	}
 
-	if ctx.Exec == false {
-		ctx.GasUsed = ctx.Tx.Gas
-		ctrler.logger.Debug("EVMCtrler is not execute a tx at CheckTx")
-		return nil
-	}
 	ret, xerr := ctrler.execVM(
 		ctx.Tx.From,
 		ctx.Tx.To,
 		ctx.Tx.Nonce,
+		ctx.Tx.Gas,
 		ctx.Tx.Amount,
 		ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data,
 		ctx.Height,
 		ctx.BlockTime,
+		ctx.Exec,
 	)
 	if xerr != nil {
 		return xerr
@@ -157,14 +152,14 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	}
 	ctx.RetData = ret.ReturnData
 
-	// `EVM` handles nonce and amount, but not gas.
-	ctx.GasUsed = ctx.Tx.Gas //new(uint256.Int).Add(ctx.GasUsed, uint256.NewInt(ret.UsedGas))
-	ctrler.stateDBWrapper.SubBalance(ctx.Tx.From.Array20(), ctx.GasUsed.ToBig())
+	// Gas is already applied in EVM.
+	// the `EVM` handles nonce, amount and gas.
+	ctx.GasUsed = new(uint256.Int).Add(ctx.GasUsed, uint256.NewInt(ret.UsedGas))
 
 	return nil
 }
 
-func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, amt *uint256.Int, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
+func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, gas, amt *uint256.Int, data []byte, height, blockTime int64, exec bool) (*core.ExecutionResult, xerrors.XError) {
 	var sender common.Address
 	var toAddr *common.Address
 	copy(sender[:], from)
@@ -174,24 +169,20 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, amt *uint2
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, nonce, big.NewInt(0), amt.ToBig(), data)
+	snap := ctrler.stateDBWrapper.Snapshot()
+
+	vmmsg := evmMessage(sender, toAddr, nonce, gas.Uint64(), amt, data)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)
+	ctrler.stateDBWrapper.exec = exec
 	vmevm := vm.NewEVM(blockContext, txContext, ctrler.stateDBWrapper, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
-	gp := new(core.GasPool).AddGas(math.MaxUint64)
+	gp := new(core.GasPool).AddGas(vmmsg.Gas())
 	result, err := core.ApplyMessage(vmevm, vmmsg, gp)
 	if err != nil {
+		ctrler.stateDBWrapper.RevertToSnapshot(snap)
 		return nil, xerrors.From(err)
-	}
-
-	// If the timer caused an abort, return an appropriate error message
-	if vmevm.Cancelled() {
-		return nil, xerrors.From(fmt.Errorf("execution aborted (timeout ???)"))
-	}
-	if err != nil {
-		return nil, xerrors.From(fmt.Errorf("err: %w (supplied gas %d)", err, vmmsg.Gas()))
 	}
 
 	if vmmsg.To() == nil {
@@ -199,6 +190,10 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, amt *uint2
 		result.ReturnData = contractAddr[:]
 
 		ctrler.logger.Info("Create contract", "address", contractAddr)
+	}
+
+	if !exec {
+		ctrler.stateDBWrapper.RevertToSnapshot(snap)
 	}
 
 	return result, nil
