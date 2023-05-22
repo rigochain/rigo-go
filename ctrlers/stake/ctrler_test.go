@@ -217,6 +217,18 @@ func TestPunish(t *testing.T) {
 	}
 }
 
+// test for issue #43
+func TestUnstakingByNotOwner(t *testing.T) {
+	for _, txctx := range unstakingTrxCtxs {
+		ori := txctx.Tx.From
+		txctx.Tx.From = types3.RandAddress()
+		err := stakeCtrler.ExecuteTrx(txctx)
+		require.Error(t, err)
+
+		txctx.Tx.From = ori
+	}
+}
+
 func TestUnstakingByTx(t *testing.T) {
 	sumAmt0 := stakeCtrler.ReadTotalAmount()
 	sumPower0 := stakeCtrler.ReadTotalPower()

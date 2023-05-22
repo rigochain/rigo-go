@@ -228,10 +228,19 @@ func (ctrler *StakeCtrler) execUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XE
 	if txhash == nil || len(txhash) != 32 {
 		return xerrors.ErrInvalidTrxPayloadParams
 	}
-	s0 := delegatee.DelStake(txhash)
+
+	_, s0 := delegatee.FindStake(txhash)
 	if s0 == nil {
 		return xerrors.ErrNotFoundStake
 	}
+
+	// issue #43
+	// check that tx's sender is stake's owner
+	if ctx.Tx.From.Compare(s0.From) != 0 {
+		return xerrors.ErrNotFoundStake.Wrapf("you not stake owner")
+	}
+
+	_ = delegatee.DelStake(txhash)
 
 	s0.RefundHeight = ctx.Height + ctx.GovHandler.LazyRewardBlocks()
 	_ = setUpdateFrozen(s0) // add s0 to frozen ledger

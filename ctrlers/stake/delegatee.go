@@ -97,16 +97,7 @@ func (delegatee *Delegatee) DelStake(txhash bytes2.HexBytes) *Stake {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
-	return delegatee.delStakeByHash(txhash)
-}
-
-func (delegatee *Delegatee) delStakeByHash(txhash bytes2.HexBytes) *Stake {
-	i, s0 := delegatee.findStake(txhash)
-	if i < 0 || s0 == nil {
-		return nil
-	}
-
-	if s := delegatee.delStakeByIdx(i); s != nil {
+	if s := delegatee.delStakeByHash(txhash); s != nil {
 		if s.IsSelfStake() {
 			delegatee.SelfPower -= s.Power
 			_ = delegatee.SelfAmount.Sub(delegatee.SelfAmount, s.Amount)
@@ -117,6 +108,32 @@ func (delegatee *Delegatee) delStakeByHash(txhash bytes2.HexBytes) *Stake {
 		return s
 	}
 	return nil
+}
+
+func (delegatee *Delegatee) DelStakeByIdx(idx int) *Stake {
+	delegatee.mtx.Lock()
+	defer delegatee.mtx.Unlock()
+
+	if s := delegatee.delStakeByIdx(idx); s != nil {
+		if s.IsSelfStake() {
+			delegatee.SelfPower -= s.Power
+			_ = delegatee.SelfAmount.Sub(delegatee.SelfAmount, s.Amount)
+		}
+		delegatee.TotalPower -= s.Power
+		_ = delegatee.TotalAmount.Sub(delegatee.TotalAmount, s.Amount)
+		_ = delegatee.TotalRewardAmount.Sub(delegatee.TotalRewardAmount, s.ReceivedReward)
+		return s
+	}
+	return nil
+}
+
+func (delegatee *Delegatee) delStakeByHash(txhash bytes2.HexBytes) *Stake {
+	i, s0 := delegatee.findStake(txhash)
+	if i < 0 || s0 == nil {
+		return nil
+	}
+
+	return delegatee.delStakeByIdx(i)
 }
 
 func (delegatee *Delegatee) delStakeByIdx(idx int) *Stake {
