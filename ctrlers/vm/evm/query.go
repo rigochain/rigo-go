@@ -13,7 +13,6 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
-	"math"
 )
 
 func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
@@ -61,7 +60,11 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 		return nil, xerrors.From(err)
 	}
 
-	state, xerr := ctrler.stateDBWrapper.ImmutableStateAt(height, hash)
+	state, xerr := ctrler.ImmutableStateAt(height, hash)
+	if xerr != nil {
+		return nil, xerr
+	}
+	xerr = state.Prepare(nil, 0, from, to, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -83,7 +86,7 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
-	gp := new(core.GasPool).AddGas(math.MaxUint64)
+	gp := new(core.GasPool).AddGas(vmmsg.Gas())
 	result, err := core.ApplyMessage(vmevm, vmmsg, gp)
 	if err != nil {
 		return nil, xerrors.From(err)

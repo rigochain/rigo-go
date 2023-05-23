@@ -17,9 +17,6 @@ var (
 func TestERC20_Deploy(t *testing.T) {
 	// deploy
 	testDeploy(t)
-}
-
-func TestERC20_Query(t *testing.T) {
 	testQuery(t)
 }
 

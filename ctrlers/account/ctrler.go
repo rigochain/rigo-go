@@ -71,7 +71,9 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 	if ctx.Sender == nil {
 		return xerrors.ErrNotFoundAccount
 	}
-	ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
+	if !types.IsZeroAddress(ctx.Tx.To) {
+		ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
+	}
 
 	if xerr := ctx.Sender.CheckBalance(ctx.NeedAmt); xerr != nil {
 		return xerr
@@ -107,7 +109,9 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 	ctx.GasUsed = ctx.Tx.Gas
 
 	_ = ctrler.setAccountCommittable(ctx.Sender, ctx.Exec)
-	_ = ctrler.setAccountCommittable(ctx.Receiver, ctx.Exec)
+	if ctx.Receiver != nil {
+		_ = ctrler.setAccountCommittable(ctx.Receiver, ctx.Exec)
+	}
 
 	return nil
 }
@@ -280,7 +284,6 @@ func (ctrler *AcctCtrler) setAccountCommittable(acct *atypes.Account, exec bool)
 	if exec {
 		fn = ctrler.acctLedger.SetFinality
 	}
-
 	return fn(acct)
 }
 

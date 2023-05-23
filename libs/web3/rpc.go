@@ -195,6 +195,10 @@ func (rweb3 *RigoWeb3) VmCall(from, to types.Address, height int64, data []byte)
 		return nil, err
 	}
 
+	if qryResp.Code != 0 {
+		return nil, errors.New(qryResp.Log)
+	}
+
 	vmRet := &ctrlertypes.VMCallResult{}
 	if err := tmjson.Unmarshal(qryResp.Value, vmRet); err != nil {
 		return nil, err

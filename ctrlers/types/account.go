@@ -135,6 +135,13 @@ func (acct *Account) SubBalance(amt *uint256.Int) xerrors.XError {
 	return nil
 }
 
+func (acct *Account) SetBalance(amt *uint256.Int) {
+	acct.mtx.Lock()
+	defer acct.mtx.Unlock()
+
+	acct.Balance.Set(amt)
+}
+
 func (acct *Account) GetBalance() *uint256.Int {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()

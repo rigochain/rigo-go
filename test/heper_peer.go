@@ -141,7 +141,7 @@ func runPeers(n int) {
 	for i := 0; i < n; i++ {
 		ll := "*:error"
 		if i == n-1 {
-			ll = "*:error"
+			ll = "rigo_EVMCtrler:debug,*:error"
 		}
 		_peer := NewPeerMock("rigo_test_chain", strconv.FormatInt(int64(i), 10), 26656+i, 36657+i, ll)
 		if err := _peer.Init(); err != nil {

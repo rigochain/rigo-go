@@ -11,7 +11,7 @@ import (
 var (
 	gasLimit  = uint64(25000000) // issue #44
 	gasPrice  = uint256.NewInt(1)
-	gasFeeCap = uint256.NewInt(1)
+	gasFeeCap = uint256.NewInt(0)
 	gasTipCap = uint256.NewInt(0)
 )
 
