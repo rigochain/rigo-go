@@ -33,15 +33,15 @@ type GovRule struct {
 
 func DefaultGovRule() *GovRule {
 	return &GovRule{
-		version:                0,
+		version:                1,
 		maxValidatorCnt:        21,
 		amountPerPower:         uint256.NewInt(1_000000000_000000000),
 		rewardPerPower:         uint256.NewInt(1_000000000),
-		lazyRewardBlocks:       20,
-		lazyApplyingBlocks:     10,
+		lazyRewardBlocks:       2592000, // = 60 * 60 * 24 * 30 => 30 days
+		lazyApplyingBlocks:     259200,  // = 60 * 60 * 24 * 3 => 3 days
 		minTrxFee:              uint256.NewInt(10),
-		minVotingPeriodBlocks:  259200,  // = 60 * 60 * 24 * 3, // 3 days
-		maxVotingPeriodBlocks:  2592000, // = 60 * 60 * 24 * 30,    // 30 days
+		minVotingPeriodBlocks:  259200,  // = 60 * 60 * 24 * 3 => 3 days
+		maxVotingPeriodBlocks:  2592000, // = 60 * 60 * 24 * 30 => 30 days
 		minSelfStakeRatio:      50,      // 50%
 		maxUpdatableStakeRatio: 30,      // 30%
 		slashRatio:             50,      // 50%
@@ -54,11 +54,11 @@ func Test1GovRule() *GovRule {
 		maxValidatorCnt:        10,
 		amountPerPower:         uint256.NewInt(1_000000000),
 		rewardPerPower:         uint256.NewInt(2_000000000),
-		lazyRewardBlocks:       30,
-		lazyApplyingBlocks:     40,
+		lazyRewardBlocks:       10,
+		lazyApplyingBlocks:     10,
 		minTrxFee:              uint256.NewInt(20),
-		minVotingPeriodBlocks:  50,
-		maxVotingPeriodBlocks:  60,
+		minVotingPeriodBlocks:  10,
+		maxVotingPeriodBlocks:  10,
 		minSelfStakeRatio:      50, // 50%
 		maxUpdatableStakeRatio: 30, // 30%
 		slashRatio:             50, // 50%
