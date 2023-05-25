@@ -202,6 +202,15 @@ func (ledger *SimpleLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
+	// remove
+	for _, k := range ledger.cachedItems.removedKeys {
+		var vk LedgerKey
+		copy(vk[:], k[:])
+		if _, _, err := ledger.tree.Remove(vk[:]); err != nil {
+			return nil, -1, xerrors.From(err)
+		}
+	}
+
 	var keys LedgerKeyList
 	for k, _ := range ledger.cachedItems.updatedItems {
 		keys = append(keys, k)
@@ -214,14 +223,6 @@ func (ledger *SimpleLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		if bz, err := _val.Encode(); err != nil {
 			return nil, -1, err
 		} else if _, err := ledger.tree.Set(_key[:], bz); err != nil {
-			return nil, -1, xerrors.From(err)
-		}
-	}
-
-	for _, k := range ledger.cachedItems.removedKeys {
-		var vk LedgerKey
-		copy(vk[:], k[:])
-		if _, _, err := ledger.tree.Remove(vk[:]); err != nil {
 			return nil, -1, xerrors.From(err)
 		}
 	}

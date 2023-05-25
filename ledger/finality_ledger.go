@@ -147,12 +147,18 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		if _, _, err := ledger.tree.Remove(vk[:]); err != nil {
 			return nil, -1, xerrors.From(err)
 		}
-		delete(ledger.finalityItems.gotItems, vk)
-		delete(ledger.finalityItems.updatedItems, vk)
 
-		// this item should be removed from SimpleLedger too.
-		delete(ledger.SimpleLedger.cachedItems.gotItems, vk)
-		delete(ledger.SimpleLedger.cachedItems.updatedItems, vk)
+		// issue #58
+		// If SetFinality is called again (recreated) after calling DelFinality for the item,
+		// the item's key may exist not only `removedKeys` but also `updatedItems`.
+		// this item is removed at here but should be added again at the following code to update tree.
+
+		//delete(ledger.finalityItems.gotItems, vk)
+		//delete(ledger.finalityItems.updatedItems, vk)
+		//
+		//// this item should be removed from SimpleLedger too.
+		//delete(ledger.SimpleLedger.cachedItems.gotItems, vk)
+		//delete(ledger.SimpleLedger.cachedItems.updatedItems, vk)
 	}
 
 	// update

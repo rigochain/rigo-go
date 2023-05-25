@@ -13,6 +13,7 @@ var (
 	testLedger *FinalityLedger[*MyItem]
 	testItem0  *MyItem
 	testItem1  *MyItem
+	testItem2  *MyItem
 )
 
 func resetLedger(t *testing.T) {
@@ -29,6 +30,7 @@ func resetLedger(t *testing.T) {
 
 	testItem0 = NewMyItem(bytes.RandHexString(32), rand.Int32())
 	testItem1 = NewMyItem(bytes.RandHexString(32), rand.Int32())
+	testItem2 = NewMyItem(bytes.RandHexString(32), rand.Int32())
 }
 
 func TestFinalityLedger_Set(t *testing.T) {
@@ -161,6 +163,31 @@ func TestFinalityLedger_CancelSetFinality(t *testing.T) {
 	item, err = testLedger.GetFinality(testItem0.Key())
 	require.Error(t, err)
 	require.Nil(t, item)
+}
+
+func TestFinalityLedger_SetAfterDelFinality(t *testing.T) {
+	require.NoError(t, testLedger.SetFinality(testItem2))
+
+	// commit finality items
+	_, _, err := testLedger.Commit()
+	require.NoError(t, err)
+
+	item, err := testLedger.DelFinality(testItem2.Key())
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	require.Equal(t, testItem2, item)
+
+	// again set
+	require.NoError(t, testLedger.SetFinality(testItem2))
+
+	// commit finality items
+	_, _, err = testLedger.Commit()
+	require.NoError(t, err)
+
+	// finally deleted
+	item, err = testLedger.Get(testItem2.Key())
+	require.NoError(t, err)
+	require.NotNil(t, item)
 
 	require.NoError(t, testLedger.Close())
 }
