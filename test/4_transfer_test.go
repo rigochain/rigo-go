@@ -7,6 +7,7 @@ import (
 	"github.com/holiman/uint256"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
+	"github.com/rigochain/rigo-go/types"
 	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
@@ -19,6 +20,30 @@ import (
 	"testing"
 	"time"
 )
+
+func TestTransfer_GasUsed(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
+	w := randCommonWallet()
+	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, w.SyncAccount(rweb3))
+
+	oriBalance := w.GetBalance().Clone()
+
+	raddr := types.RandAddress()
+	trAmt := uint256.MustFromDecimal("1000")
+	ret, err := w.TransferSync(raddr, gas10, trAmt, rweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+
+	txRet, xerr := waitTrxResult(ret.Hash, 30, rweb3)
+	require.NoError(t, xerr)
+
+	expectedBalance := new(uint256.Int).Sub(oriBalance, new(uint256.Int).Add(trAmt, uint256.NewInt(uint64(txRet.TxResult.GasUsed))))
+	require.NoError(t, w.SyncAccount(rweb3))
+	require.Equal(t, expectedBalance.Dec(), w.GetBalance().Dec())
+
+}
 
 func TestTransfer_Bulk(t *testing.T) {
 	rweb3 := randRigoWeb3()
@@ -81,6 +106,8 @@ func TestTransfer_Bulk(t *testing.T) {
 		require.NoError(t, acctObj.w.SyncAccount(rweb3))
 		require.Equal(t, acctObj.expectedBalance, acctObj.w.GetBalance(), acctObj.w.Address().String())
 		require.Equal(t, acctObj.expectedNonce, acctObj.w.GetNonce(), acctObj.w.Address().String())
+
+		fmt.Println("TestBulkTransfer", "account", acctObj.w.Address(), "nonce", acctObj.w.GetNonce(), "balance", acctObj.w.GetBalance().Dec())
 
 		sentTxsCnt += acctObj.sentTxsCnt
 		retTxsCnt += acctObj.retTxsCnt

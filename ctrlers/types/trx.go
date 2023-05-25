@@ -21,6 +21,7 @@ const (
 	TRX_PROPOSAL
 	TRX_VOTING
 	TRX_CONTRACT
+	TRX_SETDOC
 )
 
 const (
@@ -152,6 +153,8 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 			payload = &TrxPayloadVoting{}
 		case TRX_CONTRACT:
 			payload = &TrxPayloadContract{}
+		case TRX_SETDOC:
+			payload = &TrxPayloadSetDoc{}
 		default:
 			return xerrors.ErrInvalidTrxPayloadType
 		}
@@ -208,6 +211,8 @@ func (tx *Trx) TypeString() string {
 		return "voting"
 	case TRX_CONTRACT:
 		return "execution"
+	case TRX_SETDOC:
+		return "setdoc"
 	}
 	return ""
 }
@@ -254,6 +259,11 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 		}
 	case TRX_CONTRACT:
 		payload = &TrxPayloadContract{}
+		if err := payload.Decode(txProto.XPayload); err != nil {
+			return err
+		}
+	case TRX_SETDOC:
+		payload = &TrxPayloadSetDoc{}
 		if err := payload.Decode(txProto.XPayload); err != nil {
 			return err
 		}

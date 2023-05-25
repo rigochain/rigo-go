@@ -77,3 +77,14 @@ func NewTrxContract(from, to types.Address, nonce uint64, gas, amt *uint256.Int,
 			Data: data,
 		})
 }
+
+func NewTrxSetDoc(from types.Address, nonce uint64, gas *uint256.Int, name, docUrl string) *types2.Trx {
+	return types2.NewTrx(
+		uint32(1),
+		from, types.ZeroAddress(),
+		nonce,
+		gas,
+		uint256.NewInt(0),
+		&types2.TrxPayloadSetDoc{name, docUrl},
+	)
+}

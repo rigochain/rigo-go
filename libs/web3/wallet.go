@@ -181,6 +181,15 @@ func (w *Wallet) StakingSync(to types.Address, gas, amt *uint256.Int, rweb3 *Rig
 	}
 }
 
+func (w *Wallet) SetDocSync(name, url string, gas *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	tx := NewTrxSetDoc(w.Address(), w.acct.GetNonce(), gas, name, url)
+	if _, _, err := w.SignTrx(tx); err != nil {
+		return nil, err
+	} else {
+		return rweb3.SendTransactionSync(tx)
+	}
+}
+
 func (w *Wallet) syncAccount(rweb3 *RigoWeb3) error {
 	if acct, err := rweb3.GetAccount(w.wkey.Address); err != nil {
 		return err

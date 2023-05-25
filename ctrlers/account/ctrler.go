@@ -82,6 +82,17 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 		return xerr.Wrap(fmt.Errorf("invalid nonce - ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), ctx.Tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
 
+	if ctx.Tx.GetType() == atypes.TRX_SETDOC {
+		name := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).Name
+		url := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).URL
+		if len(name) > atypes.MAX_ACCT_NAME {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("too long name. it should be less than %d.", atypes.MAX_ACCT_NAME)
+		}
+		if len(url) > atypes.MAX_ACCT_DOCURL {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("too long url. it should be less than %d.", atypes.MAX_ACCT_DOCURL)
+		}
+	}
+
 	return nil
 }
 
@@ -96,9 +107,18 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 		return xerr
 	}
 
-	if ctx.Tx.Type == atypes.TRX_TRANSFER {
+	if ctx.Tx.GetType() == atypes.TRX_TRANSFER && ctx.Receiver != nil {
 		if xerr := ctx.Receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
 			return xerr
+		}
+	} else if ctx.Tx.Type == atypes.TRX_SETDOC {
+		name := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).Name
+		url := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).URL
+		if name != "" {
+			ctx.Sender.Name = name
+		}
+		if url != "" {
+			ctx.Sender.DocURL = url
 		}
 	}
 

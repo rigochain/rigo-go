@@ -34,6 +34,7 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 		Nonce   uint64        `json:"nonce,string"`
 		Balance string        `json:"balance"`
 		Code    []byte        `json:"code,omitempty"`
+		DocURL  string        `json:"docURL,omitempty"`
 	}{}
 
 	if err := tmjson.Unmarshal(queryResp.Value, _acct); err != nil {
@@ -52,6 +53,7 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 			Nonce:   _acct.Nonce,
 			Balance: bal,
 			Code:    _acct.Code,
+			DocURL:  _acct.DocURL,
 		}, nil
 	}
 }
