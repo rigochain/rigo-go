@@ -40,11 +40,11 @@ type RigoApp struct {
 	txExecutor  *TrxExecutor
 
 	localClient abcicli.Client
+	rootConfig  *cfg.Config
 
 	started int32
-
-	logger log.Logger
-	mtx    sync.Mutex
+	logger  log.Logger
+	mtx     sync.Mutex
 }
 
 func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
@@ -81,6 +81,7 @@ func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
 		govCtrler:   govCtrler,
 		vmCtrler:    vmCtrler,
 		txExecutor:  txExecutor,
+		rootConfig:  config,
 		logger:      logger,
 	}
 }
@@ -211,9 +212,8 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
 		txctx, xerr := types2.NewTrxContext(req.Tx,
-
-			ctrler.currBlockCtx.Height()+int64(1),                    // issue #39: set block number expected to include current tx.
-			ctrler.currBlockCtx.TimeNano()+time.Second.Nanoseconds(), // issue #39: set block time expected to be executed.
+			ctrler.currBlockCtx.Height()+int64(1), // issue #39: set block number expected to include current tx.
+			ctrler.currBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
 			func(_txctx *types2.TrxContext) xerrors.XError {
 				_txctx.TrxGovHandler = ctrler.govCtrler
@@ -281,7 +281,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 
 	txctx, xerr := types2.NewTrxContext(req.Tx,
 		ctrler.currBlockCtx.Height(),
-		ctrler.currBlockCtx.TimeNano(),
+		ctrler.currBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
 			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt()
@@ -340,7 +340,7 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 
 	txctx, xerr := types2.NewTrxContext(req.Tx,
 		ctrler.currBlockCtx.Height(),
-		ctrler.currBlockCtx.TimeNano(),
+		ctrler.currBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
 			_txctx.TxIdx = txIdx

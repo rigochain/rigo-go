@@ -2,6 +2,7 @@ package test
 
 import (
 	"github.com/holiman/uint256"
+	"github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/libs/rand"
@@ -37,7 +38,7 @@ func TestSetDoc(t *testing.T) {
 	require.Equal(t, name, w.GetAccount().Name)
 	require.Equal(t, url, w.GetAccount().DocURL)
 
-	tooLongName := rand.Str(2049)
+	tooLongName := rand.Str(types.MAX_ACCT_NAME + 1)
 	ret, err = w.SetDocSync(tooLongName, url, gas10, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
