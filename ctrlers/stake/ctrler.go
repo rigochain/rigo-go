@@ -286,14 +286,15 @@ func (ctrler *StakeCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if ctx.TxsCnt() > 0 {
-		if xerr := ctrler.doReward(ctx.BlockInfo().Header.Height, ctx.BlockInfo().LastCommitInfo.Votes); xerr != nil {
-			return nil, xerr
-		}
+	// reward validators for all blocks (including empty blocks): issue #54
+	if xerr := ctrler.doReward(ctx.BlockInfo().Header.Height, ctx.BlockInfo().LastCommitInfo.Votes); xerr != nil {
+		return nil, xerr
 	}
+
 	if xerr := ctrler.unfreezingStakes(ctx.Height(), ctx.AcctHandler); xerr != nil {
 		return nil, xerr
 	}
+
 	ctx.SetValUpdates(ctrler.updateValidators(int(ctx.GovHandler.MaxValidatorCnt())))
 
 	return nil, nil
