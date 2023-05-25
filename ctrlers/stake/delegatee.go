@@ -310,10 +310,70 @@ func (delegatee *Delegatee) doBlockReward(height int64) *uint256.Int {
 	return reward
 }
 
-func (delegatee *Delegatee) DoSlash(ratio int64, amtPerPower, rwdPerPower *uint256.Int) int64 {
+func (delegatee *Delegatee) DoSlash(ratio int64, amtPerPower, rwdPerPower *uint256.Int, slashAll bool) int64 {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
+	if slashAll {
+		// to slash delegators too. issue #49
+		return delegatee.doSlashAll(ratio, amtPerPower, rwdPerPower)
+	} else {
+		return delegatee.doSlashOne(ratio, amtPerPower, rwdPerPower)
+	}
+}
+
+func (delegatee *Delegatee) doSlashAll(ratio int64, amtPerPower, rwdPerPower *uint256.Int) int64 {
+	//_p0 := uint256.NewInt(uint64(delegatee.TotalPower))
+	//_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
+	//_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
+	//slashingPower := int64(_p0.Uint64())
+	slashedPower := int64(0)
+
+	var removingStakes []*Stake
+	for _, s0 := range delegatee.Stakes {
+		_p0 := uint256.NewInt(uint64(s0.Power))
+		_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
+		_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
+		slashingPower := int64(_p0.Uint64())
+
+		if slashingPower < 1 {
+			slashedPower += s0.Power
+			fmt.Println("DEBUG - slashingPower =", slashingPower)
+			// power, amount is processed at out of loop
+			removingStakes = append(removingStakes, s0)
+			continue
+		}
+
+		s0.Power -= slashingPower
+		s0.Amount = new(uint256.Int).Mul(uint256.NewInt(uint64(s0.Power)), amtPerPower)
+
+		blocks := uint64(0)
+		if s0.ReceivedReward.Sign() > 0 {
+			blocks = new(uint256.Int).Div(s0.ReceivedReward, s0.BlockRewardUnit).Uint64()
+		}
+
+		s0.BlockRewardUnit = new(uint256.Int).Mul(rwdPerPower, uint256.NewInt(uint64(s0.Power)))
+		s0.ReceivedReward = new(uint256.Int).Mul(s0.BlockRewardUnit, uint256.NewInt(blocks))
+
+		slashedPower += slashingPower
+	}
+
+	if removingStakes != nil {
+		for _, s1 := range removingStakes {
+			_ = delegatee.delStakeByHash(s1.TxHash)
+		}
+	}
+
+	delegatee.SelfAmount = delegatee.sumAmountOf(delegatee.Addr)
+	delegatee.SelfPower = delegatee.sumPowerOf(delegatee.Addr)
+	delegatee.TotalAmount = delegatee.sumAmountOf(nil)
+	delegatee.TotalPower = delegatee.sumPowerOf(nil)
+	delegatee.TotalRewardAmount = delegatee.sumBlockRewardOf(nil)
+
+	return slashedPower
+}
+
+func (delegatee *Delegatee) doSlashOne(ratio int64, amtPerPower, rwdPerPower *uint256.Int) int64 {
 	_p0 := uint256.NewInt(uint64(delegatee.SelfPower))
 	_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
 	_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))

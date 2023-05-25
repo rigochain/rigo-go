@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestSlash(t *testing.T) {
+func TestSlashOne(t *testing.T) {
 	for _, w := range Wallets[:21] {
 		delegatee := stake.NewDelegatee(w.Address(), w.GetPubKey())
 
@@ -50,10 +50,10 @@ func TestSlash(t *testing.T) {
 			require.Greater(t, r.Sign(), 0, fmt.Sprintf("at height %d", i))
 			_ = totalReward0.Add(totalReward0, r)
 		}
+		selfReward0 := delegatee.SumBlockRewardOf(delegatee.Addr)
 
 		require.Equal(t, totalReward0, delegatee.TotalRewardAmount)
 		require.Equal(t, totalReward0, delegatee.SumBlockRewardOf(nil))
-		selfReward0 := delegatee.SumBlockRewardOf(delegatee.Addr)
 
 		require.Equal(t, selfPower0, delegatee.SelfPower)
 		require.Equal(t, govHelper.PowerToAmount(selfPower0), delegatee.SumAmountOf(delegatee.Addr))
@@ -62,7 +62,7 @@ func TestSlash(t *testing.T) {
 		require.Equal(t, govHelper.PowerToAmount(totalPower0), delegatee.SumAmountOf(nil))
 		require.Equal(t, govHelper.PowerToAmount(totalPower0), delegatee.TotalAmount)
 
-		delegatee.DoSlash(govHelper.SlashRatio(), govHelper.AmountPerPower(), govHelper.RewardPerPower())
+		delegatee.DoSlash(govHelper.SlashRatio(), govHelper.AmountPerPower(), govHelper.RewardPerPower(), false)
 
 		// calculate slashed power
 		_slashed := uint256.NewInt(uint64(selfPower0))
@@ -89,6 +89,110 @@ func TestSlash(t *testing.T) {
 			require.Equal(t, expectedRewardUnit, delegatee.Stakes[i].BlockRewardUnit)
 		}
 
+	}
+}
+
+func TestSlashAll(t *testing.T) {
+	for _, w := range Wallets[:21] {
+		delegatee := stake.NewDelegatee(w.Address(), w.GetPubKey())
+
+		selfPower0 := int64(0)
+		totalPower0 := int64(0)
+		stakesCnt := int64(tmrand.Intn(100) + 100)
+
+		for i := int64(0); i < stakesCnt; i++ {
+			stakeAmt := new(uint256.Int).Mul(govHelper.AmountPerPower(), uint256.NewInt(uint64(tmrand.Int63n(100_000_000))))
+			stakePower := govHelper.AmountToPower(stakeAmt)
+
+			totalPower0 += stakePower
+			fromAddr := types.RandAddress()
+			if tmrand.Int()%2 == 0 {
+				selfPower0 += stakePower
+				fromAddr = delegatee.Addr
+			}
+
+			delegatee.AddStake(
+				stake.NewStakeWithAmount(
+					fromAddr,
+					delegatee.Addr,
+					stakeAmt,               // amount
+					i+1,                    // height
+					bytes.RandHexBytes(32), //txhash
+					govHelper,
+				),
+			)
+		}
+
+		blocks := int64(100)
+		totalReward0 := uint256.NewInt(0)
+		for i := stakesCnt; i < (stakesCnt + blocks); i++ {
+			r := delegatee.DoReward(i + 1)
+			require.Greater(t, r.Sign(), 0, fmt.Sprintf("at height %d", i))
+			_ = totalReward0.Add(totalReward0, r)
+		}
+		require.Equal(t, totalReward0, delegatee.TotalRewardAmount)
+		require.Equal(t, totalReward0, delegatee.SumBlockRewardOf(nil))
+
+		require.Equal(t, selfPower0, delegatee.SelfPower)
+		require.Equal(t, govHelper.PowerToAmount(selfPower0), delegatee.SumAmountOf(delegatee.Addr))
+		require.Equal(t, govHelper.PowerToAmount(selfPower0), delegatee.SelfAmount)
+		require.Equal(t, totalPower0, delegatee.TotalPower)
+		require.Equal(t, govHelper.PowerToAmount(totalPower0), delegatee.SumAmountOf(nil))
+		require.Equal(t, govHelper.PowerToAmount(totalPower0), delegatee.TotalAmount)
+
+		oriStakes := make([]*stake.Stake, delegatee.StakesLen())
+		for i, s0 := range delegatee.GetAllStakes() {
+			oriStakes[i] = s0.Clone()
+		}
+
+		totalSlashedPower0 := delegatee.DoSlash(govHelper.SlashRatio(), govHelper.AmountPerPower(), govHelper.RewardPerPower(), true)
+
+		expectedTotalSlashedPower0 := int64(0)
+		expectedTotalReceivedReward := uint256.NewInt(0)
+		for _, s0 := range oriStakes {
+			p0 := uint256.NewInt(uint64(s0.Power))
+			_ = p0.Mul(p0, uint256.NewInt(uint64(govHelper.SlashRatio())))
+			_ = p0.Div(p0, uint256.NewInt(uint64(100)))
+			slashedPower := int64(p0.Uint64())
+			if slashedPower < 1 {
+				slashedPower = s0.Power
+				expectedTotalSlashedPower0 += slashedPower
+				continue
+			}
+
+			expectedPower := s0.Power - slashedPower
+			require.NotEqual(t, expectedPower, s0.Power)
+
+			expectedAmt := new(uint256.Int).Mul(govHelper.AmountPerPower(), uint256.NewInt(uint64(expectedPower)))
+			require.NotEqual(t, expectedAmt.Dec(), s0.Amount.Dec())
+
+			_blocks := uint64(0)
+			if s0.ReceivedReward.Sign() > 0 {
+				_blocks = new(uint256.Int).Div(s0.ReceivedReward, s0.BlockRewardUnit).Uint64()
+			}
+			require.Equal(t, blocks, int64(_blocks))
+
+			expectedBlockRewardUnit := new(uint256.Int).Mul(govHelper.RewardPerPower(), uint256.NewInt(uint64(expectedPower)))
+			require.NotEqual(t, expectedBlockRewardUnit.Dec(), s0.BlockRewardUnit.Dec())
+			expectedReceivedReward := new(uint256.Int).Mul(expectedBlockRewardUnit, uint256.NewInt(_blocks))
+			require.NotEqual(t, expectedReceivedReward.Dec(), s0.ReceivedReward.Dec())
+
+			_, s1 := delegatee.FindStake(s0.TxHash)
+
+			require.NotNil(t, s1)
+			require.Equal(t, s0.TxHash, s1.TxHash)
+			require.Equal(t, expectedPower, s1.Power)
+			require.Equal(t, expectedAmt.Dec(), s1.Amount.Dec())
+			require.Equal(t, expectedBlockRewardUnit.Dec(), s1.BlockRewardUnit.Dec())
+			require.Equal(t, expectedReceivedReward.Dec(), s1.ReceivedReward.Dec())
+
+			expectedTotalSlashedPower0 += slashedPower
+			_ = expectedTotalReceivedReward.Add(expectedTotalReceivedReward, expectedReceivedReward)
+		}
+		require.Equal(t, expectedTotalSlashedPower0, totalSlashedPower0)
+		require.Equal(t, totalPower0-totalSlashedPower0, delegatee.TotalPower)
+		require.Equal(t, totalPower0-totalSlashedPower0, delegatee.SumPowerOf(nil))
+		require.Equal(t, expectedTotalReceivedReward.Dec(), delegatee.TotalRewardAmount.Dec())
 	}
 }
 

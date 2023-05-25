@@ -133,7 +133,8 @@ func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64, a
 		return 0, xerr
 	}
 
-	slashed := delegatee.DoSlash(slashRatio, amtPerPower, rwdPerPower)
+	// Punish the delegators as well as validator. issue #51
+	slashed := delegatee.DoSlash(slashRatio, amtPerPower, rwdPerPower, true)
 	_ = ctrler.delegateeLedger.SetFinality(delegatee)
 
 	return slashed, nil

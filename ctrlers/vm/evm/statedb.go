@@ -70,7 +70,7 @@ func (s *StateDBWrapper) ApplyTo() xerrors.XError {
 
 			_ = s.acctLedger.SetAccountCommittable(acct, s.exec)
 
-			s.logger.Debug("ApplyTo", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec())
+			//s.logger.Debug("ApplyTo", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec())
 		}
 	}
 

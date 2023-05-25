@@ -102,7 +102,7 @@ func (s *Stake) Equal(o *Stake) bool {
 		s.Amount.Cmp(o.Amount) == 0
 }
 
-func (s *Stake) Copy() *Stake {
+func (s *Stake) Clone() *Stake {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
@@ -113,6 +113,7 @@ func (s *Stake) Copy() *Stake {
 		Power:           s.Power,
 		BlockRewardUnit: new(uint256.Int).Set(s.BlockRewardUnit),
 		ReceivedReward:  new(uint256.Int).Set(s.ReceivedReward),
+		TxHash:          append(s.TxHash, nil...),
 		StartHeight:     s.StartHeight,
 		RefundHeight:    s.RefundHeight,
 	}

@@ -16,6 +16,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -128,7 +129,7 @@ func TestTrxStakingByTx(t *testing.T) {
 		err := stakeCtrler.ExecuteTrx(txctx)
 
 		if txctx.Tx.Amount.Cmp(maxAmt) > 0 && txctx.Tx.From.Compare(txctx.Tx.To) != 0 {
-			// try delegating to validator over self_stake_ratio
+			// it's error to try delegating to validator over self_stake_ratio
 			require.Error(t, err)
 			for i, ctx := range unstakingTrxCtxs {
 				if bytes.Compare(ctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash, txctx.TxHash) == 0 {
@@ -188,7 +189,14 @@ func TestPunish(t *testing.T) {
 		require.Greater(t, expectedSlashed, int64(0))
 		require.Greater(t, selfPower0, expectedSlashed)
 
-		_, _ = stakeCtrler.BeginBlock(types.NewBlockContext(
+		// original stake state
+		delegatee := stakeCtrler.Delegatee(byzantine.Address())
+		oriStakes := make([]*stake.Stake, delegatee.StakesLen())
+		for i, s0 := range delegatee.GetAllStakes() {
+			oriStakes[i] = s0.Clone()
+		}
+
+		ev, xerr := stakeCtrler.BeginBlock(types.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				ByzantineValidators: []abcitypes.Evidence{
 					{
@@ -200,20 +208,67 @@ func TestPunish(t *testing.T) {
 				},
 			}, govHelper, nil, nil),
 		)
+		require.NoError(t, xerr)
+		require.Equal(t, []byte("slashed"), ev[0].Attributes[3].Key)
 
-		delegatee := stakeCtrler.Delegatee(byzantine.Address())
+		totalSlashedPower0, err := strconv.ParseInt(string(ev[0].Attributes[3].Value), 10, 64)
+		require.NoError(t, err)
 
-		require.Equal(t, selfPower0-expectedSlashed, delegatee.GetSelfPower())
-		require.Equal(t, totalPower0-expectedSlashed, delegatee.GetTotalPower())
+		delegatee = stakeCtrler.Delegatee(byzantine.Address())
 
-		_, _, xerr := stakeCtrler.Commit()
+		expectedTotalSlashedPower0 := int64(0)
+		expectedTotalReceivedReward := uint256.NewInt(0)
+		for _, s0 := range oriStakes {
+			p0 := uint256.NewInt(uint64(s0.Power))
+			_ = p0.Mul(p0, uint256.NewInt(uint64(govHelper.SlashRatio())))
+			_ = p0.Div(p0, uint256.NewInt(uint64(100)))
+			slashedPower := int64(p0.Uint64())
+
+			if slashedPower < 1 {
+				slashedPower = s0.Power
+				expectedTotalSlashedPower0 += slashedPower
+				continue
+			}
+			expectedPower := s0.Power - slashedPower
+			require.NotEqual(t, expectedPower, s0.Power)
+
+			expectedAmt := new(uint256.Int).Mul(govHelper.AmountPerPower(), uint256.NewInt(uint64(expectedPower)))
+			require.NotEqual(t, expectedAmt.Dec(), s0.Amount.Dec())
+
+			_blocks := uint64(0)
+			if s0.ReceivedReward.Sign() > 0 {
+				_blocks = new(uint256.Int).Div(s0.ReceivedReward, s0.BlockRewardUnit).Uint64()
+			}
+
+			expectedBlockRewardUnit := new(uint256.Int).Mul(govHelper.RewardPerPower(), uint256.NewInt(uint64(expectedPower)))
+			require.NotEqual(t, expectedBlockRewardUnit.Dec(), s0.BlockRewardUnit.Dec())
+			expectedReceivedReward := new(uint256.Int).Mul(expectedBlockRewardUnit, uint256.NewInt(_blocks))
+			require.NotEqual(t, expectedReceivedReward.Dec(), s0.ReceivedReward.Dec())
+
+			_, s1 := delegatee.FindStake(s0.TxHash)
+
+			require.NotNil(t, s1)
+			require.Equal(t, s0.TxHash, s1.TxHash)
+			require.Equal(t, expectedPower, s1.Power)
+			require.Equal(t, expectedAmt.Dec(), s1.Amount.Dec())
+			require.Equal(t, expectedBlockRewardUnit.Dec(), s1.BlockRewardUnit.Dec())
+			require.Equal(t, expectedReceivedReward.Dec(), s1.ReceivedReward.Dec())
+
+			expectedTotalSlashedPower0 += slashedPower
+			_ = expectedTotalReceivedReward.Add(expectedTotalReceivedReward, expectedReceivedReward)
+		}
+		require.Equal(t, expectedTotalSlashedPower0, totalSlashedPower0)
+		require.Equal(t, totalPower0-totalSlashedPower0, delegatee.TotalPower)
+		require.Equal(t, totalPower0-totalSlashedPower0, delegatee.SumPowerOf(nil))
+		require.Equal(t, expectedTotalReceivedReward.Dec(), delegatee.TotalRewardAmount.Dec())
+
+		_, _, xerr = stakeCtrler.Commit()
 		require.NoError(t, xerr)
 
-		require.Equal(t, selfPower0-expectedSlashed, stakeCtrler.SelfPowerOf(delegatee.Addr))
-		require.Equal(t, totalPower0-expectedSlashed, stakeCtrler.PowerOf(delegatee.Addr))
-		require.Equal(t, allTotalPower0-expectedSlashed, stakeCtrler.ReadTotalPower())
+		require.Equal(t, totalPower0-expectedTotalSlashedPower0, stakeCtrler.PowerOf(delegatee.Addr))
+		require.Equal(t, allTotalPower0-expectedTotalSlashedPower0, stakeCtrler.ReadTotalPower())
 
-		break
+		allTotalPower0 -= expectedTotalSlashedPower0
 	}
 }
 
@@ -237,20 +292,23 @@ func TestUnstakingByTx(t *testing.T) {
 
 	for _, txctx := range unstakingTrxCtxs {
 		stakingTxHash := txctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash
+		delegatee := stakeCtrler.Delegatee(txctx.Tx.To)
+		require.NotNil(t, delegatee)
+
+		_, s0 := delegatee.FindStake(stakingTxHash)
+		require.NotNil(t, s0)
 
 		err := stakeCtrler.ExecuteTrx(txctx)
 		require.NoError(t, err)
 
-		stakingTxCtx := findStakingTxCtx(stakingTxHash)
-
-		sumUnstakingAmt.Add(sumUnstakingAmt, stakingTxCtx.Tx.Amount)
-		sumUnstakingPower += txctx.GovHandler.AmountToPower(stakingTxCtx.Tx.Amount)
+		sumUnstakingAmt.Add(sumUnstakingAmt, s0.Amount)
+		sumUnstakingPower += txctx.GovHandler.AmountToPower(s0.Amount)
 	}
 
 	_, _, err := stakeCtrler.Commit()
 	require.NoError(t, err)
 
-	require.Equal(t, new(uint256.Int).Sub(sumAmt0, sumUnstakingAmt).String(), stakeCtrler.ReadTotalAmount().String())
+	require.Equal(t, new(uint256.Int).Sub(sumAmt0, sumUnstakingAmt).Dec(), stakeCtrler.ReadTotalAmount().Dec())
 	require.Equal(t, sumPower0-sumUnstakingPower, stakeCtrler.ReadTotalPower())
 
 	// test freezing reward

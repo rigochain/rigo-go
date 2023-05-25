@@ -130,7 +130,7 @@ func (g *govHandlerMock) MaxUpdatableStakeRatio() int64 {
 }
 
 func (g *govHandlerMock) SlashRatio() int64 {
-	return 27
+	return 50
 }
 
 func (g *govHandlerMock) AmountToPower(amt *uint256.Int) int64 {
@@ -191,7 +191,7 @@ func randMakeStakingToSelfTrxContext() (*types2.TrxContext, error) {
 
 func randMakeStakingTrxContext() (*types2.TrxContext, error) {
 	from, to := Wallets[rand.Intn(len(Wallets))], DelegateeWallets[rand.Intn(len(DelegateeWallets))]
-	power := rand.Int63n(1000)
+	power := rand.Int63n(1000) + 10
 	return makeStakingTrxContext(from, to, power)
 }
 
