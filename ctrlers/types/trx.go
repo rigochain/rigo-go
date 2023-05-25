@@ -134,9 +134,26 @@ func (tx *Trx) EncodeRLP(w io.Writer) error {
 
 func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 	rtx := &trxRPL{}
-	if err := s.Decode(rtx); err != nil {
+	err := s.Decode(rtx)
+	if err != nil {
 		return err
 	}
+
+	tx.Version = rtx.Version
+	tx.Time = int64(rtx.Time)
+	tx.Nonce = rtx.Nonce
+	tx.From = rtx.From
+	tx.To = rtx.To
+	tx.Amount, err = uint256.FromHex(rtx.Amount)
+	if err != nil {
+		return err
+	}
+	tx.Gas, err = uint256.FromHex(rtx.Gas)
+	if err != nil {
+		return err
+	}
+	tx.Type = int32(rtx.Type)
+	tx.Sig = rtx.Sig
 
 	var payload ITrxPayload
 	if rtx.Payload != nil && len(rtx.Payload) > 0 {
@@ -163,16 +180,7 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 		}
 	}
 
-	tx.Version = rtx.Version
-	tx.Time = int64(rtx.Time)
-	tx.Nonce = rtx.Nonce
-	tx.From = rtx.From
-	tx.To = rtx.To
-	tx.Amount = uint256.MustFromHex(rtx.Amount)
-	tx.Gas = uint256.MustFromHex(rtx.Gas)
-	tx.Type = int32(rtx.Type)
 	tx.Payload = payload
-	tx.Sig = rtx.Sig
 	return nil
 }
 

@@ -200,7 +200,8 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 		SlashRatio             int64  `json:"SlashRatio"`
 	}{}
 
-	if err := tmjson.Unmarshal(bz, tm); err != nil {
+	err := tmjson.Unmarshal(bz, tm)
+	if err != nil {
 		return err
 	}
 
@@ -209,11 +210,20 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 
 	r.version = tm.Version
 	r.maxValidatorCnt = tm.MaxValidatorCnt
-	r.amountPerPower = uint256.MustFromHex(tm.AmountPerPower)
-	r.rewardPerPower = uint256.MustFromHex(tm.RewardPerPower)
+	r.amountPerPower, err = uint256.FromHex(tm.AmountPerPower)
+	if err != nil {
+		return err
+	}
+	r.rewardPerPower, err = uint256.FromHex(tm.RewardPerPower)
+	if err != nil {
+		return err
+	}
 	r.lazyRewardBlocks = tm.LazyRewardBlocks
 	r.lazyApplyingBlocks = tm.LazyApplyingBlocks
-	r.minTrxFee = uint256.MustFromHex(tm.MinTrxFee)
+	r.minTrxFee, err = uint256.FromHex(tm.MinTrxFee)
+	if err != nil {
+		return err
+	}
 	r.minVotingPeriodBlocks = tm.MinVotingBlocks
 	r.maxVotingPeriodBlocks = tm.MaxVotingBlocks
 	r.minSelfStakeRatio = tm.MinSelfStakeRatio
