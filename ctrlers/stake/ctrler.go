@@ -27,6 +27,8 @@ type StakeCtrler struct {
 	delegateeLedger ledger.IFinalityLedger[*Delegatee]
 	frozenLedger    ledger.IFinalityLedger[*Stake]
 
+	govParams ctrlertypes.IGovHandler
+
 	logger tmlog.Logger
 	mtx    sync.RWMutex
 }
@@ -51,6 +53,7 @@ func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovHandler, logg
 		delegateeLedger: delegateeLedger,
 		//stakeLedger:     stakeLedger,
 		frozenLedger: frozenLedger,
+		govParams:    govHandler,
 		logger:       logger.With("module", "rigo_StakeCtrler"),
 	}
 	return ret, nil
@@ -139,6 +142,17 @@ func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64, a
 func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
+		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrler.govParams.AmountPerPower(), new(uint256.Int))
+		// `ctx.Tx.Amount` MUST be greater than or equal to `ctrler.govHelper.AmountPerPower()`
+		//    ==> q.Sign() > 0
+		if q.Sign() <= 0 {
+			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be greater than %v", ctrler.govParams.AmountPerPower()))
+		}
+		// `ctx.Tx.Amount` MUST be multiple to `ctrler.govHelper.AmountPerPower()`
+		//    ==> r.Sign() == 0
+		if r.Sign() != 0 {
+			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be multiple of %v", ctrler.govParams.AmountPerPower()))
+		}
 	case ctrlertypes.TRX_UNSTAKING:
 	default:
 		return xerrors.ErrUnknownTrxType

@@ -3,8 +3,6 @@ package gov
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
@@ -175,18 +173,6 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 
 	// validation by tx type
 	switch ctx.Tx.GetType() {
-	case ctrlertypes.TRX_STAKING:
-		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrler.AmountPerPower(), new(uint256.Int))
-		// `ctx.Tx.Amount` MUST be greater than or equal to `ctrler.govHelper.AmountPerPower()`
-		//    ==> q.Sign() > 0
-		if q.Sign() <= 0 {
-			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be greater than %v", ctrler.AmountPerPower()))
-		}
-		// `ctx.Tx.Amount` MUST be multiple to `ctrler.govHelper.AmountPerPower()`
-		//    ==> r.Sign() == 0
-		if r.Sign() != 0 {
-			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be multiple of %v", ctrler.AmountPerPower()))
-		}
 	case ctrlertypes.TRX_PROPOSAL:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
 			return xerrors.ErrInvalidTrx.Wrap(errors.New("wrong address: the 'to' field in TRX_PROPOSAL should be zero address"))
