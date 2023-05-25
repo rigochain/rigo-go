@@ -19,13 +19,22 @@ type GovProposal struct {
 	mtx sync.RWMutex
 }
 
-func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower int64, voters map[string]*Voter, options ...[]byte) *GovProposal {
+func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
+
+	endVotingHeight := startHeight + votingBlocks
+	applyingHeight := startHeight + votingBlocks + lazyApplyingBlocks
+	// check overflow: issue #51
+	if startHeight > endVotingHeight || startHeight > applyingHeight {
+		return nil, xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v, applyingHeight:%v",
+			startHeight, endVotingHeight, applyingHeight)
+	}
+
 	return &GovProposal{
 		GovProposalHeader: GovProposalHeader{
 			TxHash:            txhash,
 			StartVotingHeight: startHeight,
-			EndVotingHeight:   startHeight + votingBlocks,
-			ApplyingHeight:    startHeight + votingBlocks + lazyApplyingBlocks,
+			EndVotingHeight:   endVotingHeight,
+			ApplyingHeight:    applyingHeight,
 			TotalVotingPower:  totalVotingPower,
 			MajorityPower:     (totalVotingPower * 2) / 3,
 			Voters:            voters,
@@ -33,7 +42,7 @@ func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlo
 		},
 		Options:     NewVoteOptions(options...),
 		MajorOption: nil,
-	}
+	}, nil
 }
 
 func (prop *GovProposal) Key() ledger.LedgerKey {

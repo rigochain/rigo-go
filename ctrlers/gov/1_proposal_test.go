@@ -10,6 +10,7 @@ import (
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
+	"math"
 	"testing"
 )
 
@@ -55,6 +56,7 @@ func init() {
 		{txctx: makeTrxCtx(tx3, 1, true), err: xerrors.ErrInvalidTrxPayloadParams},  // wrong period
 		{txctx: makeTrxCtx(tx4, 20, true), err: xerrors.ErrInvalidTrxPayloadParams}, // wrong start height
 		{txctx: makeTrxCtx(tx5, 1, true), err: nil},                                 // success
+
 	}
 
 	tx6 := web3.NewTrxProposal(
@@ -80,7 +82,7 @@ func TestAddProposal(t *testing.T) {
 	require.NotNil(t, props1)
 }
 
-func TestCommitProposal(t *testing.T) {
+func TestProposalDuplicate(t *testing.T) {
 	for i, c := range cases2 {
 		require.NoError(t, runCase(c), "index", i)
 	}
@@ -98,4 +100,16 @@ func TestCommitProposal(t *testing.T) {
 	for i, c := range cases2 {
 		require.Error(t, xerrors.ErrDuplicatedKey, runCase(c), "index", i)
 	}
+}
+
+func TestOverflowBlockHeight(t *testing.T) {
+	bzOpt, err := json.Marshal(govRule0)
+	require.NoError(t, err)
+
+	tx := web3.NewTrxProposal(
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
+		"test govrule proposal", math.MaxInt64, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
+	xerr := runTrx(makeTrxCtx(tx, 1, true))
+	require.Error(t, xerr)
+	require.Contains(t, xerr.Error(), "overflow occurs")
 }

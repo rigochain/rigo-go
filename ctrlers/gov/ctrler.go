@@ -288,11 +288,13 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		}
 	}
 
-	prop := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
+	prop, xerr := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
 		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks, ctrler.LazyApplyingBlocks(),
 		totalVotingPower, voters, txpayload.Options...)
-
-	if xerr := setProposal(prop); xerr != nil {
+	if xerr != nil {
+		return xerr
+	}
+	if xerr = setProposal(prop); xerr != nil {
 		return xerr
 	}
 
