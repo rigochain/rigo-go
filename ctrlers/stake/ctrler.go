@@ -146,13 +146,35 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		// `ctx.Tx.Amount` MUST be greater than or equal to `ctrler.govHelper.AmountPerPower()`
 		//    ==> q.Sign() > 0
 		if q.Sign() <= 0 {
-			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be greater than %v", ctrler.govParams.AmountPerPower()))
+			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be greater than %v", ctrler.govParams.AmountPerPower())
 		}
 		// `ctx.Tx.Amount` MUST be multiple to `ctrler.govHelper.AmountPerPower()`
 		//    ==> r.Sign() == 0
 		if r.Sign() != 0 {
-			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be multiple of %v", ctrler.govParams.AmountPerPower()))
+			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be multiple of %v", ctrler.govParams.AmountPerPower())
 		}
+
+		if bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
+			// isseu #59
+			// self-staking to become a validator
+			// check MinValidatorStake
+
+			getDelegatee := ctrler.delegateeLedger.Get
+			if ctx.Exec {
+				getDelegatee = ctrler.delegateeLedger.GetFinality
+			}
+
+			expectedStake := ctx.Tx.Amount
+			if delegatee, _ := getDelegatee(ledger.ToLedgerKey(ctx.Tx.From)); delegatee != nil {
+				expectedStake = new(uint256.Int).Add(ctx.Tx.Amount, delegatee.SelfAmount)
+			}
+
+			if expectedStake.Lt(ctrler.govParams.MinValidatorStake()) {
+				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become validator: a minimum is %v", ctrler.govParams.MinValidatorStake())
+			}
+
+		}
+
 	case ctrlertypes.TRX_UNSTAKING:
 	default:
 		return xerrors.ErrUnknownTrxType
@@ -378,7 +400,11 @@ func (ctrler *StakeCtrler) updateValidators(maxVals int) []abcitypes.ValidatorUp
 	//	   (Refer to the comments in updateState(...) at github.com/tendermint/tendermint@v0.34.20/state/execution.go)
 	// So, the account can sign a block from block N+3 in consensus engine
 	if xerr := ctrler.delegateeLedger.IterateReadAllFinalityItems(func(d *Delegatee) xerrors.XError {
-		allDelegatees = append(allDelegatees, d)
+		// issue #59
+		// Only delegatee who have deposited more than `MinValidatorStake` can become validator.
+		if d.SelfAmount.Cmp(ctrler.govParams.MinValidatorStake()) >= 0 {
+			allDelegatees = append(allDelegatees, d)
+		}
 		return nil
 	}); xerr != nil {
 		return nil

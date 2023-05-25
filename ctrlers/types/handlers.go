@@ -17,6 +17,7 @@ type ILedgerHandler interface {
 type IGovHandler interface {
 	Version() int64
 	MaxValidatorCnt() int64
+	MinValidatorStake() *uint256.Int
 	AmountPerPower() *uint256.Int
 	RewardPerPower() *uint256.Int
 	LazyRewardBlocks() int64

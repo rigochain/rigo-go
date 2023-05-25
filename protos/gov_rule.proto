@@ -15,4 +15,5 @@ message GovRuleProto {
   int64 min_self_stake_ratio = 10;
   int64 max_updatable_stake_ratio = 11;
   int64 slash_ratio = 12;
+  bytes _min_validator_stake = 13;
 }

@@ -15,6 +15,26 @@ import (
 	"strings"
 )
 
+func (rweb3 *RigoWeb3) GetRule() (*ctrlertypes.GovRule, error) {
+	queryResp := &rpc.QueryResult{}
+
+	if req, err := rweb3.NewRequest("rule"); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return nil, err
+	}
+
+	govRule := &ctrlertypes.GovRule{}
+	if err := tmjson.Unmarshal(queryResp.Value, govRule); err != nil {
+		return nil, err
+	}
+	return govRule, nil
+
+}
 func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, error) {
 	queryResp := &rpc.QueryResult{}
 

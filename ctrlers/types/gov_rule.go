@@ -16,6 +16,7 @@ import (
 type GovRule struct {
 	version               int64
 	maxValidatorCnt       int64
+	minValidatorStake     *uint256.Int
 	amountPerPower        *uint256.Int
 	rewardPerPower        *uint256.Int
 	lazyRewardBlocks      int64
@@ -33,10 +34,15 @@ type GovRule struct {
 
 func DefaultGovRule() *GovRule {
 	return &GovRule{
-		version:                1,
-		maxValidatorCnt:        21,
-		amountPerPower:         uint256.NewInt(1_000000000_000000000),
-		rewardPerPower:         uint256.NewInt(1_000000000),
+		version:           1,
+		maxValidatorCnt:   21,
+		minValidatorStake: uint256.MustFromDecimal("7000000000000000000000000"), // 7,000,000 RIGO
+		amountPerPower:    uint256.NewInt(1_000000000_000000000),                // 1RIGO == 1Power
+		// block interval = 6s
+		// blocks/1Y = 5_256_000
+		// issuance rate : 5%  => 0.05RIGO / 1RIGO(Power),1Y(5_256_000 blocks)
+		// block reward = 9_512_937_595.1293759513 / 1RIGO & 1 block
+		rewardPerPower:         uint256.NewInt(9_512_937_595),
 		lazyRewardBlocks:       2592000, // = 60 * 60 * 24 * 30 => 30 days
 		lazyApplyingBlocks:     259200,  // = 60 * 60 * 24 * 3 => 3 days
 		minTrxFee:              uint256.NewInt(10),
@@ -48,12 +54,15 @@ func DefaultGovRule() *GovRule {
 	}
 }
 
+// 9512937595
+
 func Test1GovRule() *GovRule {
 	return &GovRule{
 		version:                1,
 		maxValidatorCnt:        10,
-		amountPerPower:         uint256.NewInt(1_000000000),
-		rewardPerPower:         uint256.NewInt(2_000000000),
+		minValidatorStake:      uint256.MustFromDecimal("10000000000000000000"), // 10 RIGO
+		amountPerPower:         uint256.NewInt(1_000_000_000),
+		rewardPerPower:         uint256.NewInt(2_000_000_000),
 		lazyRewardBlocks:       10,
 		lazyApplyingBlocks:     10,
 		minTrxFee:              uint256.NewInt(20),
@@ -69,8 +78,9 @@ func Test2GovRule() *GovRule {
 	return &GovRule{
 		version:                2,
 		maxValidatorCnt:        10,
-		amountPerPower:         uint256.NewInt(1_000000000),
-		rewardPerPower:         uint256.NewInt(2_000000000),
+		minValidatorStake:      uint256.MustFromDecimal("5000000000000000000"), // 5 RIGO
+		amountPerPower:         uint256.NewInt(1_000_000_000),
+		rewardPerPower:         uint256.NewInt(2_000_000_000),
 		lazyRewardBlocks:       30,
 		lazyApplyingBlocks:     40,
 		minTrxFee:              uint256.NewInt(20),
@@ -117,6 +127,7 @@ func (r *GovRule) fromProto(pm *GovRuleProto) {
 
 	r.version = pm.Version
 	r.maxValidatorCnt = pm.MaxValidatorCnt
+	r.minValidatorStake = new(uint256.Int).SetBytes(pm.XMinValidatorStake)
 	r.amountPerPower = new(uint256.Int).SetBytes(pm.XAmountPerPower)
 	r.rewardPerPower = new(uint256.Int).SetBytes(pm.XRewardPerPower)
 	r.lazyRewardBlocks = pm.LazyRewardBlocks
@@ -136,6 +147,7 @@ func (r *GovRule) toProto() *GovRuleProto {
 	a := &GovRuleProto{
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
+		XMinValidatorStake:     r.minValidatorStake.Bytes(),
 		XAmountPerPower:        r.amountPerPower.Bytes(),
 		XRewardPerPower:        r.rewardPerPower.Bytes(),
 		LazyRewardBlocks:       r.lazyRewardBlocks,
@@ -157,6 +169,7 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 	tm := &struct {
 		Version                int64  `json:"version"`
 		MaxValidatorCnt        int64  `json:"maxValidatorCnt"`
+		MinValidatorStake      string `json:"minValidatorStake"`
 		AmountPerPower         string `json:"amountPerPower"`
 		RewardPerPower         string `json:"rewardPerPower"`
 		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
@@ -170,8 +183,9 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 	}{
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
-		AmountPerPower:         r.amountPerPower.String(), // hex-string
-		RewardPerPower:         r.rewardPerPower.String(), // hex-string
+		MinValidatorStake:      r.minValidatorStake.String(), // hex-string
+		AmountPerPower:         r.amountPerPower.String(),    // hex-string
+		RewardPerPower:         r.rewardPerPower.String(),    // hex-string
 		LazyRewardBlocks:       r.lazyRewardBlocks,
 		LazyApplyingBlocks:     r.lazyApplyingBlocks,
 		MinTrxFee:              r.minTrxFee.String(),
@@ -188,6 +202,7 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 	tm := &struct {
 		Version                int64  `json:"version"`
 		MaxValidatorCnt        int64  `json:"maxValidatorCnt"`
+		MinValidatorStake      string `json:"minValidatorStake"`
 		AmountPerPower         string `json:"amountPerPower"`
 		RewardPerPower         string `json:"rewardPerPower"`
 		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
@@ -210,6 +225,10 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 
 	r.version = tm.Version
 	r.maxValidatorCnt = tm.MaxValidatorCnt
+	r.minValidatorStake, err = uint256.FromHex(tm.MinValidatorStake)
+	if err != nil {
+		return err
+	}
 	r.amountPerPower, err = uint256.FromHex(tm.AmountPerPower)
 	if err != nil {
 		return err
@@ -244,6 +263,13 @@ func (r *GovRule) MaxValidatorCnt() int64 {
 	defer r.mtx.RUnlock()
 
 	return r.maxValidatorCnt
+}
+
+func (r *GovRule) MinValidatorStake() *uint256.Int {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return new(uint256.Int).Set(r.minValidatorStake)
 }
 
 func (r *GovRule) AmountPerPower() *uint256.Int {

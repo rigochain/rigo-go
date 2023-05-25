@@ -69,6 +69,10 @@ func FindWallet(addr types.Address) *web3.Wallet {
 
 type govHandlerMock struct{}
 
+func (g *govHandlerMock) MinValidatorStake() *uint256.Int {
+	return uint256.NewInt(1_000_000_000_000_000_000)
+}
+
 func (g *govHandlerMock) Version() int64 {
 	//TODO implement me
 	panic("implement me")
