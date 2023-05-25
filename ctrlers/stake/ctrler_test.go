@@ -5,14 +5,14 @@ import (
 	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
-	"github.com/rigochain/rigo-go/ctrlers/types"
+	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
 	types3 "github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	types2 "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmtypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -29,9 +29,9 @@ var (
 
 	Wallets              []*web3.Wallet
 	DelegateeWallets     []*web3.Wallet
-	stakingToSelfTrxCtxs []*types.TrxContext
-	stakingTrxCtxs       []*types.TrxContext
-	unstakingTrxCtxs     []*types.TrxContext
+	stakingToSelfTrxCtxs []*ctrlertypes.TrxContext
+	stakingTrxCtxs       []*ctrlertypes.TrxContext
+	unstakingTrxCtxs     []*ctrlertypes.TrxContext
 
 	dummyGas   = uint256.NewInt(0)
 	dummyNonce = uint64(0)
@@ -77,7 +77,7 @@ func TestMain(m *testing.M) {
 		} else {
 			already := false
 			for _, _ctx := range unstakingTrxCtxs {
-				if bytes.Compare(_ctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash, txctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash) == 0 {
+				if bytes.Compare(_ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash, txctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash) == 0 {
 					already = true
 				}
 			}
@@ -107,7 +107,7 @@ func TestTrxStakingToSelf(t *testing.T) {
 		require.NoError(t, err)
 
 		_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += txctx.GovHandler.AmountToPower(txctx.Tx.Amount)
+		sumPower += ctrlertypes.AmountToPower(txctx.Tx.Amount)
 	}
 
 	_, _, err := stakeCtrler.Commit()
@@ -124,7 +124,7 @@ func TestTrxStakingByTx(t *testing.T) {
 	for _, txctx := range stakingTrxCtxs {
 		power0 := stakeCtrler.SelfPowerOf(txctx.Tx.To)
 		power1 := stakeCtrler.DelegatedPowerOf(txctx.Tx.To)
-		maxAmt := govHelper.PowerToAmount(power0 - power1)
+		maxAmt := ctrlertypes.PowerToAmount(power0 - power1)
 
 		err := stakeCtrler.ExecuteTrx(txctx)
 
@@ -132,7 +132,7 @@ func TestTrxStakingByTx(t *testing.T) {
 			// it's error to try delegating to validator over self_stake_ratio
 			require.Error(t, err)
 			for i, ctx := range unstakingTrxCtxs {
-				if bytes.Compare(ctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash, txctx.TxHash) == 0 {
+				if bytes.Compare(ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash, txctx.TxHash) == 0 {
 					unstakingTrxCtxs = append(unstakingTrxCtxs[:i], unstakingTrxCtxs[i+1:]...)
 					break
 				}
@@ -140,7 +140,7 @@ func TestTrxStakingByTx(t *testing.T) {
 		} else {
 			require.NoError(t, err)
 			_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
-			sumPower += txctx.GovHandler.AmountToPower(txctx.Tx.Amount)
+			sumPower += ctrlertypes.AmountToPower(txctx.Tx.Amount)
 		}
 	}
 
@@ -196,7 +196,7 @@ func TestPunish(t *testing.T) {
 			oriStakes[i] = s0.Clone()
 		}
 
-		ev, xerr := stakeCtrler.BeginBlock(types.NewBlockContext(
+		ev, xerr := stakeCtrler.BeginBlock(ctrlertypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				ByzantineValidators: []abcitypes.Evidence{
 					{
@@ -232,17 +232,11 @@ func TestPunish(t *testing.T) {
 			expectedPower := s0.Power - slashedPower
 			require.NotEqual(t, expectedPower, s0.Power)
 
-			expectedAmt := new(uint256.Int).Mul(govHelper.AmountPerPower(), uint256.NewInt(uint64(expectedPower)))
+			expectedAmt := new(uint256.Int).Mul(ctrlertypes.AmountPerPower(), uint256.NewInt(uint64(expectedPower)))
 			require.NotEqual(t, expectedAmt.Dec(), s0.Amount.Dec())
 
-			_blocks := uint64(0)
-			if s0.ReceivedReward.Sign() > 0 {
-				_blocks = new(uint256.Int).Div(s0.ReceivedReward, s0.BlockRewardUnit).Uint64()
-			}
-
-			expectedBlockRewardUnit := new(uint256.Int).Mul(govHelper.RewardPerPower(), uint256.NewInt(uint64(expectedPower)))
-			require.NotEqual(t, expectedBlockRewardUnit.Dec(), s0.BlockRewardUnit.Dec())
-			expectedReceivedReward := new(uint256.Int).Mul(expectedBlockRewardUnit, uint256.NewInt(_blocks))
+			expectedReceivedReward := new(uint256.Int).Mul(s0.ReceivedReward, uint256.NewInt(uint64(govHelper.SlashRatio())))
+			_ = expectedReceivedReward.Div(expectedReceivedReward, uint256.NewInt(uint64(100)))
 			require.NotEqual(t, expectedReceivedReward.Dec(), s0.ReceivedReward.Dec())
 
 			_, s1 := delegatee.FindStake(s0.TxHash)
@@ -251,7 +245,6 @@ func TestPunish(t *testing.T) {
 			require.Equal(t, s0.TxHash, s1.TxHash)
 			require.Equal(t, expectedPower, s1.Power)
 			require.Equal(t, expectedAmt.Dec(), s1.Amount.Dec())
-			require.Equal(t, expectedBlockRewardUnit.Dec(), s1.BlockRewardUnit.Dec())
 			require.Equal(t, expectedReceivedReward.Dec(), s1.ReceivedReward.Dec())
 
 			expectedTotalSlashedPower0 += slashedPower
@@ -291,7 +284,7 @@ func TestUnstakingByTx(t *testing.T) {
 	sumUnstakingPower := int64(0)
 
 	for _, txctx := range unstakingTrxCtxs {
-		stakingTxHash := txctx.Tx.Payload.(*types.TrxPayloadUnstaking).TxHash
+		stakingTxHash := txctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
 		delegatee := stakeCtrler.Delegatee(txctx.Tx.To)
 		require.NotNil(t, delegatee)
 
@@ -302,7 +295,7 @@ func TestUnstakingByTx(t *testing.T) {
 		require.NoError(t, err)
 
 		sumUnstakingAmt.Add(sumUnstakingAmt, s0.Amount)
-		sumUnstakingPower += txctx.GovHandler.AmountToPower(s0.Amount)
+		sumUnstakingPower += ctrlertypes.AmountToPower(s0.Amount)
 	}
 
 	_, _, err := stakeCtrler.Commit()
@@ -360,11 +353,11 @@ func TestUnfreezing(t *testing.T) {
 
 	// execute block at lastHeight
 	req := abcitypes.RequestBeginBlock{
-		Header: types2.Header{
+		Header: tmtypes.Header{
 			Height: lastHeight,
 		},
 	}
-	bctx := types.NewBlockContext(req, govHelper, acctHelper, nil)
+	bctx := ctrlertypes.NewBlockContext(req, govHelper, acctHelper, nil)
 	bctx.AddGas(uint256.NewInt(10))
 	_, err := stakeCtrler.EndBlock(bctx)
 	require.NoError(t, err)

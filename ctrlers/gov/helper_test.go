@@ -39,7 +39,7 @@ func (s *stakeHandlerMock) IsValidator(addr types.Address) bool {
 }
 
 func (s *stakeHandlerMock) GetTotalAmount() *uint256.Int {
-	return govCtrler.PowerToAmount(s.GetTotalPower())
+	return ctrlertypes.PowerToAmount(s.GetTotalPower())
 }
 
 func (s *stakeHandlerMock) GetTotalPower() int64 {

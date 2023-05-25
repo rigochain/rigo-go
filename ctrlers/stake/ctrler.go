@@ -94,7 +94,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		for _, evi := range byzantines {
 			if slashed, xerr := ctrler.doPunish(
 				&evi, blockCtx.GovHandler.SlashRatio(),
-				blockCtx.GovHandler.AmountPerPower(),
+				ctrlertypes.AmountPerPower(),
 				blockCtx.GovHandler.RewardPerPower()); xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
@@ -120,14 +120,14 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	return evts, nil
 }
 
-func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64, amtPerPower, rwdPerPower *uint256.Int) (int64, xerrors.XError) {
+func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64, amtPerPower *uint256.Int, rwdPerPower int64) (int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	return ctrler.doPunish(evi, slashRatio, amtPerPower, rwdPerPower)
 }
 
-func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64, amtPerPower, rwdPerPower *uint256.Int) (int64, xerrors.XError) {
+func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64, amtPerPower *uint256.Int, rwdPerPower int64) (int64, xerrors.XError) {
 	delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(evi.Validator.Address))
 	if xerr != nil {
 		return 0, xerr
@@ -143,16 +143,16 @@ func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64, a
 func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
-		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrler.govParams.AmountPerPower(), new(uint256.Int))
+		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrlertypes.AmountPerPower(), new(uint256.Int))
 		// `ctx.Tx.Amount` MUST be greater than or equal to `ctrler.govHelper.AmountPerPower()`
 		//    ==> q.Sign() > 0
 		if q.Sign() <= 0 {
-			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be greater than %v", ctrler.govParams.AmountPerPower())
+			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be greater than %v", ctrlertypes.AmountPerPower())
 		}
 		// `ctx.Tx.Amount` MUST be multiple to `ctrler.govHelper.AmountPerPower()`
 		//    ==> r.Sign() == 0
 		if r.Sign() != 0 {
-			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be multiple of %v", ctrler.govParams.AmountPerPower())
+			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be multiple of %v", ctrlertypes.AmountPerPower())
 		}
 
 		if bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
@@ -223,7 +223,7 @@ func (ctrler *StakeCtrler) execStaking(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	// create stake and delegate it to delegatee
 	// the block reward for this stake will be started at ctx.Height + 1. (issue #29)
-	s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height+1, ctx.TxHash, ctx.GovHandler)
+	s0 := NewStakeWithAmount(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Height+1, ctx.TxHash)
 	if !s0.IsSelfStake() {
 		// it's delegating. check minSelfStakeRatio
 		selfRatio := delegatee.SelfStakeRatio(s0.Power)
@@ -350,7 +350,7 @@ func (ctrler *StakeCtrler) doReward(height int64, votes []abcitypes.VoteInfo) xe
 			continue
 		}
 
-		rwd := delegatee.DoReward(height)
+		rwd := delegatee.DoReward(height, ctrlertypes.AmountPerPower(), ctrler.govParams.RewardPerPower())
 		ctrler.logger.Debug("Block Reward", "address", delegatee.Addr, "reward", rwd.Dec())
 
 		xerr = ctrler.delegateeLedger.SetFinality(delegatee)
@@ -429,12 +429,12 @@ func validatorUpdates(existing, newers DelegateeArray) []abcitypes.ValidatorUpda
 	for i < len(existing) && j < len(newers) {
 		ret := bytes.Compare(existing[i].Addr, newers[j].Addr)
 		if ret < 0 {
-			// this 'existing' validator will be removed because the power is 0
+			// this `existing` validator will be removed because it is not included in `newers`
 			valUpdates = append(valUpdates, abcitypes.UpdateValidator(existing[i].PubKey, 0, "secp256k1"))
 			i++
 		} else if ret == 0 {
 			if existing[i].TotalPower != newers[j].TotalPower {
-				// if power is changed, add newser
+				// if power is changed, add newer who has updated power
 				valUpdates = append(valUpdates, abcitypes.UpdateValidator(newers[j].PubKey, int64(newers[j].TotalPower), "secp256k1"))
 			} else {
 				// if the power is not changed, exclude the validator in updated validators

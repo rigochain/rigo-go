@@ -188,7 +188,7 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 			val.Power,
 			1,
 			bytes.ZeroBytes(32), // 0x00... txhash
-			ctrler.govCtrler)
+		)
 		initStakes[i] = &stake.InitStake{
 			pubBytes,
 			[]*stake.Stake{s0},

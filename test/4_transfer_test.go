@@ -224,9 +224,9 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 
 		senderAcctObj.sentTxsCnt++
 	}
-	//fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
+	fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
 	subWg.Wait()
-	//fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
+	fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
 
 	wg.Done()
 

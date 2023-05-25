@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/holiman/uint256"
+	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
 	rtypes0 "github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -153,6 +154,7 @@ func TestDelegating(t *testing.T) {
 	require.Equal(t, valStakes0.TotalPower+stakePower, valStakes1.TotalPower)
 	require.Equal(t, new(uint256.Int).Add(valStakes0.TotalAmount, stakeAmt), valStakes1.TotalAmount)
 
+	fmt.Println("Wait 5 seconds...")
 	time.Sleep(5 * time.Second)
 
 	vals, err = queryValidators(0, rweb3)
@@ -171,7 +173,7 @@ func TestMinValidatorStake(t *testing.T) {
 	require.NoError(t, sender.SyncAccount(rweb3))
 
 	minValidatorStake := govRule.MinValidatorStake()
-	_amt := new(uint256.Int).Sub(minValidatorStake, govRule.AmountPerPower())
+	_amt := new(uint256.Int).Sub(minValidatorStake, ctrlertypes.AmountPerPower())
 	ret, err := sender.StakingSync(sender.Address(), gas10, _amt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)

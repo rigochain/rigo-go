@@ -15,12 +15,12 @@ import (
 )
 
 type Stake struct {
-	From            types.Address `json:"owner"`
-	To              types.Address `json:"to"`
-	Amount          *uint256.Int  `json:"amount"`
-	Power           int64         `json:"power,string"`
-	BlockRewardUnit *uint256.Int  `json:"blockRewardUnit"`
-	ReceivedReward  *uint256.Int  `json:"ReceivedReward"`
+	From   types.Address `json:"owner"`
+	To     types.Address `json:"to"`
+	Amount *uint256.Int  `json:"amount"`
+	Power  int64         `json:"power,string"`
+	//BlockRewardUnit *uint256.Int  `json:"blockRewardUnit"`
+	ReceivedReward *uint256.Int `json:"ReceivedReward"`
 
 	TxHash       abytes.HexBytes `json:"txhash"`
 	StartHeight  int64           `json:"startHeight,string"`
@@ -59,35 +59,35 @@ func (s *Stake) Decode(d []byte) xerrors.XError {
 
 var _ ledger.ILedgerItem = (*Stake)(nil)
 
-func NewStakeWithAmount(from, to types.Address, amt *uint256.Int, startHeight int64, txhash abytes.HexBytes, govHandler ctrlertypes.IGovHandler) *Stake {
-	power := govHandler.AmountToPower(amt)
-	blockReward := govHandler.PowerToReward(power)
+func NewStakeWithAmount(from, to types.Address, amt *uint256.Int, startHeight int64, txhash abytes.HexBytes) *Stake {
+	power := ctrlertypes.AmountToPower(amt)
+	//blockReward := govHandler.PowerToReward(power)
 	return &Stake{
-		From:            from,
-		To:              to,
-		Amount:          amt,
-		Power:           power,
-		BlockRewardUnit: blockReward,
-		ReceivedReward:  uint256.NewInt(0),
-		StartHeight:     startHeight,
-		RefundHeight:    0,
-		TxHash:          txhash,
+		From:   from,
+		To:     to,
+		Amount: amt,
+		Power:  power,
+		//BlockRewardUnit: blockReward,
+		ReceivedReward: uint256.NewInt(0),
+		StartHeight:    startHeight,
+		RefundHeight:   0,
+		TxHash:         txhash,
 	}
 }
 
-func NewStakeWithPower(owner, to types.Address, power int64, startHeight int64, txhash abytes.HexBytes, govHandler ctrlertypes.IGovHandler) *Stake {
-	amt := govHandler.PowerToAmount(power)
-	blockReward := govHandler.PowerToReward(power)
+func NewStakeWithPower(owner, to types.Address, power int64, startHeight int64, txhash abytes.HexBytes) *Stake {
+	amt := ctrlertypes.PowerToAmount(power)
+	//blockReward := govHandler.PowerToReward(power)
 	return &Stake{
-		From:            owner,
-		To:              to,
-		Amount:          amt,
-		Power:           power,
-		BlockRewardUnit: blockReward,
-		ReceivedReward:  uint256.NewInt(0),
-		StartHeight:     startHeight,
-		RefundHeight:    0,
-		TxHash:          txhash,
+		From:   owner,
+		To:     to,
+		Amount: amt,
+		Power:  power,
+		//BlockRewardUnit: blockReward,
+		ReceivedReward: uint256.NewInt(0),
+		StartHeight:    startHeight,
+		RefundHeight:   0,
+		TxHash:         txhash,
 	}
 }
 
@@ -107,29 +107,29 @@ func (s *Stake) Clone() *Stake {
 	defer s.mtx.RUnlock()
 
 	return &Stake{
-		From:            append(s.From, nil...),
-		To:              append(s.To, nil...),
-		Amount:          new(uint256.Int).Set(s.Amount),
-		Power:           s.Power,
-		BlockRewardUnit: new(uint256.Int).Set(s.BlockRewardUnit),
-		ReceivedReward:  new(uint256.Int).Set(s.ReceivedReward),
-		TxHash:          append(s.TxHash, nil...),
-		StartHeight:     s.StartHeight,
-		RefundHeight:    s.RefundHeight,
+		From:   append(s.From, nil...),
+		To:     append(s.To, nil...),
+		Amount: new(uint256.Int).Set(s.Amount),
+		Power:  s.Power,
+		//BlockRewardUnit: new(uint256.Int).Set(s.BlockRewardUnit),
+		ReceivedReward: new(uint256.Int).Set(s.ReceivedReward),
+		TxHash:         append(s.TxHash, nil...),
+		StartHeight:    s.StartHeight,
+		RefundHeight:   s.RefundHeight,
 	}
 }
 
-func (s *Stake) ApplyReward(height int64) *uint256.Int {
+func (s *Stake) ApplyReward(height int64, rwd *uint256.Int) *uint256.Int {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	return s.applyReward(height)
+	return s.applyReward(height, rwd)
 }
 
-func (s *Stake) applyReward(height int64) *uint256.Int {
+func (s *Stake) applyReward(height int64, rwd *uint256.Int) *uint256.Int {
 	if height >= s.StartHeight {
-		_ = s.ReceivedReward.Add(s.ReceivedReward, s.BlockRewardUnit)
-		return s.BlockRewardUnit.Clone()
+		_ = s.ReceivedReward.Add(s.ReceivedReward, rwd)
+		return s.ReceivedReward.Clone()
 	}
 	return uint256.NewInt(0)
 }
@@ -150,6 +150,11 @@ func (s *Stake) String() string {
 		return fmt.Sprintf("{error: %v}", err)
 	}
 	return string(bz)
+}
+
+func BlockRewardOf(amt, unitAmt *uint256.Int, rwdUnit int64) *uint256.Int {
+	unit := new(uint256.Int).Div(amt, unitAmt)
+	return new(uint256.Int).Mul(unit, uint256.NewInt(uint64(rwdUnit)))
 }
 
 type startHeightOrder []*Stake

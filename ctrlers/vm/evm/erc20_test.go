@@ -263,11 +263,12 @@ func init() {
 		panic(err)
 	} else if abiContract, err = abi.JSON(bytes.NewReader(buildInfo.ABI)); err != nil {
 		panic(err)
-	} else {
-		for _, method := range abiContract.Methods {
-			fmt.Printf("%x: %s\n", method.ID, method.Sig)
-		}
 	}
+	//else {
+	//	for _, method := range abiContract.Methods {
+	//		fmt.Printf("%x: %s\n", method.ID, method.Sig)
+	//	}
+	//}
 
 	os.RemoveAll(dbPath)
 	rigoEVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger())

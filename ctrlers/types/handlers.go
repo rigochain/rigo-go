@@ -18,8 +18,7 @@ type IGovHandler interface {
 	Version() int64
 	MaxValidatorCnt() int64
 	MinValidatorStake() *uint256.Int
-	AmountPerPower() *uint256.Int
-	RewardPerPower() *uint256.Int
+	RewardPerPower() int64
 	LazyRewardBlocks() int64
 	LazyApplyingBlocks() int64
 	MinTrxFee() *uint256.Int
@@ -29,12 +28,12 @@ type IGovHandler interface {
 	MaxUpdatableStakeRatio() int64
 	SlashRatio() int64
 
-	// utility methods
-	MaxStakeAmount() *uint256.Int
-	MaxTotalPower() int64
-	AmountToPower(*uint256.Int) int64
-	PowerToAmount(int64) *uint256.Int
-	PowerToReward(int64) *uint256.Int
+	//// utility methods
+	//MaxStakeAmount() *uint256.Int
+	//MaxTotalPower() int64
+	//AmountToPower(*uint256.Int) int64
+	//PowerToAmount(int64) *uint256.Int
+	//PowerToReward(int64) *uint256.Int
 }
 
 type IAccountHandler interface {
