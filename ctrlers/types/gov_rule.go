@@ -40,11 +40,26 @@ func DefaultGovRule() *GovRule {
 		version:           1,
 		maxValidatorCnt:   21,
 		minValidatorStake: uint256.MustFromDecimal("7000000000000000000000000"), // 7,000,000 RIGO
-		// block interval = 6s
-		// blocks/1Y = 5_256_000
-		// issuance rate : 5%  => 0.05RIGO / 1RIGO(Power),1Y(5_256_000 blocks)
-		// block reward = 9_512_937_595.1293759513 / 1RIGO & 1 block
-		rewardPerPower:         9_512_937_595,
+		//
+		// issue #60
+		//
+		// block interval = 3s
+		// min blocks/1Y = 10,512,000 (if all blocks interval 3s)
+		// max blocks/1Y = 31,536,000 (if all blocks interval 1s)
+		// 1RIGO = 1POWer = 10^18 amount
+		//
+		// When the min issuance rate is 5%,
+		// 			= 0.05 RIGO [per 1Power(RIGO),1Y(10_512_000 blocks)]
+		//			= 0.05 RIGO / 10_512_000 blocks [per 1Power(RIGO), 1block]
+		//          = 50,000,000,000,000,000 / 10,512,000 [per 1Power(RIGO), 1block]
+		//			= 4,756,468,797.5646879756 [per 1Power(RIGO), 1block]
+		// the `rewardPerPower` should be 4,756,468,797.5646879756.
+		// When like this,
+		// the max issuance rate becomes ...
+		//			= 4,756,468,797 * 31,536,000(blocks in 1Y)
+		//			= 149,999,999,982,192,000 [per 1RIGO, 1Y]
+		// , it's about 15% of 1 power
+		rewardPerPower:         4_756_468_797,
 		lazyRewardBlocks:       2592000, // = 60 * 60 * 24 * 30 => 30 days
 		lazyApplyingBlocks:     259200,  // = 60 * 60 * 24 * 3 => 3 days
 		minTrxFee:              uint256.NewInt(10),
