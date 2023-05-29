@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestMain(m *testing.M) {
@@ -40,7 +41,9 @@ func test_on_internal_node(m *testing.M) {
 	exitCode := m.Run()
 
 	for _, p := range peers {
+		time.Sleep(time.Second)
 		p.Stop()
+		time.Sleep(time.Second)
 		os.RemoveAll(p.Config.RootDir)
 	}
 

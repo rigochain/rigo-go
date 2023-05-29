@@ -27,24 +27,28 @@ var (
 	W0               *rigoweb3.Wallet
 	W1               *rigoweb3.Wallet
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
-	gas              = uint256.NewInt(10)
+	gas10            = uint256.NewInt(10)
+	gas09            = uint256.NewInt(9)
+	gasMax           = uint256.NewInt(25000000)
 	defaultRpcNode   *PeerMock
 )
 
 func prepareTest(peers []*PeerMock) {
 	for _, peer := range peers {
+		// validators
+		if w, err := rigoweb3.OpenWallet(libs.NewFileReader(peer.PrivValKeyPath())); err != nil {
+			panic(err)
+		} else {
+			addValidatorWallet(w)
+		}
+
+		// wallets
 		files, err := os.ReadDir(peer.WalletPath())
 		if err != nil {
 			panic(err)
 		}
 
 		walletsMap = make(map[rtypes1.AcctKey]*rigoweb3.Wallet)
-
-		if w, err := rigoweb3.OpenWallet(libs.NewFileReader(peer.PrivValKeyPath())); err != nil {
-			panic(err)
-		} else {
-			addValidatorWallet(w)
-		}
 
 		for _, file := range files {
 			if !file.IsDir() {

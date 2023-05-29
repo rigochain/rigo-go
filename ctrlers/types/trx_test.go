@@ -2,8 +2,10 @@ package types_test
 
 import (
 	"encoding/hex"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/stretchr/testify/require"
@@ -51,6 +53,87 @@ func TestTrxPayloadUnstaking_Decode(t *testing.T) {
 	encoded2, err := decoded0.Encode()
 	require.NoError(t, err)
 	require.Equal(t, encoded0, bytes.HexBytes(encoded2))
+}
+
+func TestRLP_TrxPayloadContract(t *testing.T) {
+	w := web3.NewWallet([]byte("1"))
+	require.NoError(t, w.Unlock([]byte("1")))
+
+	tx0 := &types2.Trx{
+		Version: 1,
+		Time:    time.Now().UnixNano(),
+		Nonce:   rand.Uint64(),
+		From:    w.Address(),
+		To:      types.RandAddress(),
+		Amount:  bytes.RandU256Int(),
+		Gas:     uint256.NewInt(rand.Uint64()),
+		Type:    types2.TRX_CONTRACT,
+		Payload: &types2.TrxPayloadContract{
+			Data: bytes.RandHexBytes(10234),
+		},
+	}
+	_, _, err := w.SignTrxRLP(tx0)
+
+	require.NoError(t, err)
+	require.NoError(t, types2.VerifyTrxRLP(tx0))
+
+	bz0, err := rlp.EncodeToBytes(tx0)
+	require.NoError(t, err)
+
+	tx1 := &types2.Trx{}
+	err = rlp.DecodeBytes(bz0, tx1)
+	require.NoError(t, err)
+	require.NoError(t, types2.VerifyTrxRLP(tx1))
+
+	require.Equal(t,
+		tx0.Payload.(*types2.TrxPayloadContract).Data,
+		tx1.Payload.(*types2.TrxPayloadContract).Data)
+
+	bz1, err := rlp.EncodeToBytes(tx1)
+	require.Equal(t, bz0, bz1)
+}
+
+func TestRLP_TrxPayloadSetDoc(t *testing.T) {
+	w := web3.NewWallet([]byte("1"))
+	require.NoError(t, w.Unlock([]byte("1")))
+
+	tx0 := &types2.Trx{
+		Version: 1,
+		Time:    time.Now().UnixNano(),
+		Nonce:   rand.Uint64(),
+		From:    w.Address(),
+		To:      types.RandAddress(),
+		Amount:  bytes.RandU256Int(),
+		Gas:     uint256.NewInt(rand.Uint64()),
+		Type:    types2.TRX_SETDOC,
+		Payload: &types2.TrxPayloadSetDoc{
+			Name: "test account doc",
+			URL:  "https://test.account.doc/1",
+		},
+	}
+	_, _, err := w.SignTrxRLP(tx0)
+
+	require.NoError(t, err)
+	require.NoError(t, types2.VerifyTrxRLP(tx0))
+
+	bz0, err := rlp.EncodeToBytes(tx0)
+	require.NoError(t, err)
+
+	tx1 := &types2.Trx{}
+	err = rlp.DecodeBytes(bz0, tx1)
+	require.NoError(t, err)
+	require.NoError(t, types2.VerifyTrxRLP(tx1))
+
+	require.Equal(t,
+		tx0.Payload.(*types2.TrxPayloadSetDoc).Name,
+		tx1.Payload.(*types2.TrxPayloadSetDoc).Name)
+
+	require.Equal(t,
+		tx0.Payload.(*types2.TrxPayloadSetDoc).URL,
+		tx1.Payload.(*types2.TrxPayloadSetDoc).URL)
+
+	bz1, err := rlp.EncodeToBytes(tx1)
+	require.Equal(t, bz0, bz1)
 }
 
 func BenchmarkTrxEncode(b *testing.B) {

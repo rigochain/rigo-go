@@ -6,14 +6,13 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/holiman/uint256"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
-	"math"
-	"math/big"
 )
 
 func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
@@ -61,7 +60,11 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 		return nil, xerrors.From(err)
 	}
 
-	state, xerr := ctrler.stateDBWrapper.ImmutableStateAt(height, hash)
+	state, xerr := ctrler.ImmutableStateAt(height, hash)
+	if xerr != nil {
+		return nil, xerr
+	}
+	xerr = state.Prepare(nil, 0, from, to, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -77,14 +80,13 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 	}
 
 	nonce := state.GetNonce(from.Array20())
-
-	vmmsg := evmMessage(sender, toAddr, nonce, big.NewInt(0), big.NewInt(0), data)
+	vmmsg := evmMessage(sender, toAddr, nonce, uint64(0), uint256.NewInt(0), data)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
-	gp := new(core.GasPool).AddGas(math.MaxUint64)
+	gp := new(core.GasPool).AddGas(vmmsg.Gas())
 	result, err := core.ApplyMessage(vmevm, vmmsg, gp)
 	if err != nil {
 		return nil, xerrors.From(err)

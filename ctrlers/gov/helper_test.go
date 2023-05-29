@@ -2,67 +2,14 @@ package gov
 
 import (
 	"github.com/holiman/uint256"
-	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"sort"
 	"time"
 )
-
-var (
-	config      = cfg.DefaultConfig()
-	govCtrler   *GovCtrler
-	stakeHelper *stakeHandlerMock
-	acctHelper  *acctHelperMock
-	govRule0    = ctrlertypes.DefaultGovRule()
-	govRule1    = ctrlertypes.Test1GovRule()
-	govRule2    = ctrlertypes.Test2GovRule()
-)
-
-func init() {
-	config.DBPath = filepath.Join(os.TempDir(), "gov-ctrler-test")
-	os.RemoveAll(config.DBPath)
-	os.MkdirAll(config.DBPath, 0700)
-
-	var err error
-	if govCtrler, err = NewGovCtrler(config, tmlog.NewNopLogger()); err != nil {
-		panic(err)
-	}
-	govCtrler.GovRule = *govRule0
-
-	stakeHelper = &stakeHandlerMock{
-		valCnt: 5,
-		delegatees: []*stake.Delegatee{
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-		},
-	}
-	sort.Sort(stake.PowerOrderDelegatees(stakeHelper.delegatees))
-
-	acctHelper = &acctHelperMock{
-		acctMap: make(map[ctrlertypes.AcctKey]*ctrlertypes.Account),
-	}
-}
 
 type stakeHandlerMock struct {
 	valCnt     int
@@ -92,7 +39,7 @@ func (s *stakeHandlerMock) IsValidator(addr types.Address) bool {
 }
 
 func (s *stakeHandlerMock) GetTotalAmount() *uint256.Int {
-	return govCtrler.PowerToAmount(s.GetTotalPower())
+	return ctrlertypes.PowerToAmount(s.GetTotalPower())
 }
 
 func (s *stakeHandlerMock) GetTotalPower() int64 {
@@ -155,4 +102,18 @@ func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxCo
 	})
 
 	return txctx
+}
+
+func runCase(c *Case) xerrors.XError {
+	return runTrx(c.txctx)
+}
+
+func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	if xerr := govCtrler.ValidateTrx(ctx); xerr != nil {
+		return xerr
+	}
+	if xerr := govCtrler.ExecuteTrx(ctx); xerr != nil {
+		return xerr
+	}
+	return nil
 }

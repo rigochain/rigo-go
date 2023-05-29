@@ -13,11 +13,15 @@ import (
 	"sync"
 )
 
+var (
+	amountPerPower = uint256.NewInt(1_000000000_000000000) // 1RIGO == 1Power
+)
+
 type GovRule struct {
 	version               int64
 	maxValidatorCnt       int64
-	amountPerPower        *uint256.Int
-	rewardPerPower        *uint256.Int
+	minValidatorStake     *uint256.Int
+	rewardPerPower        int64
 	lazyRewardBlocks      int64
 	lazyApplyingBlocks    int64
 	minTrxFee             *uint256.Int
@@ -33,32 +37,53 @@ type GovRule struct {
 
 func DefaultGovRule() *GovRule {
 	return &GovRule{
-		version:                0,
-		maxValidatorCnt:        21,
-		amountPerPower:         uint256.NewInt(1_000000000_000000000),
-		rewardPerPower:         uint256.NewInt(1_000000000),
-		lazyRewardBlocks:       20,
-		lazyApplyingBlocks:     10,
+		version:           1,
+		maxValidatorCnt:   21,
+		minValidatorStake: uint256.MustFromDecimal("7000000000000000000000000"), // 7,000,000 RIGO
+		//
+		// issue #60
+		//
+		// block interval = 3s
+		// min blocks/1Y = 10,512,000 (if all blocks interval 3s)
+		// max blocks/1Y = 31,536,000 (if all blocks interval 1s)
+		// 1RIGO = 1POWer = 10^18 amount
+		//
+		// When the min issuance rate is 5%,
+		// 			= 0.05 RIGO [per 1Power(RIGO),1Y(10_512_000 blocks)]
+		//			= 0.05 RIGO / 10_512_000 blocks [per 1Power(RIGO), 1block]
+		//          = 50,000,000,000,000,000 / 10,512,000 [per 1Power(RIGO), 1block]
+		//			= 4,756,468,797.5646879756 [per 1Power(RIGO), 1block]
+		// the `rewardPerPower` should be 4,756,468,797.5646879756.
+		// When like this,
+		// the max issuance rate becomes ...
+		//			= 4,756,468,797 * 31,536,000(blocks in 1Y)
+		//			= 149,999,999,982,192,000 [per 1RIGO, 1Y]
+		// , it's about 15% of 1 power
+		rewardPerPower:         4_756_468_797,
+		lazyRewardBlocks:       2592000, // = 60 * 60 * 24 * 30 => 30 days
+		lazyApplyingBlocks:     259200,  // = 60 * 60 * 24 * 3 => 3 days
 		minTrxFee:              uint256.NewInt(10),
-		minVotingPeriodBlocks:  259200,  // = 60 * 60 * 24 * 3, // 3 days
-		maxVotingPeriodBlocks:  2592000, // = 60 * 60 * 24 * 30,    // 30 days
+		minVotingPeriodBlocks:  259200,  // = 60 * 60 * 24 * 3 => 3 days
+		maxVotingPeriodBlocks:  2592000, // = 60 * 60 * 24 * 30 => 30 days
 		minSelfStakeRatio:      50,      // 50%
 		maxUpdatableStakeRatio: 30,      // 30%
 		slashRatio:             50,      // 50%
 	}
 }
 
+// 9512937595
+
 func Test1GovRule() *GovRule {
 	return &GovRule{
 		version:                1,
 		maxValidatorCnt:        10,
-		amountPerPower:         uint256.NewInt(1_000000000),
-		rewardPerPower:         uint256.NewInt(2_000000000),
-		lazyRewardBlocks:       30,
-		lazyApplyingBlocks:     40,
+		minValidatorStake:      uint256.MustFromDecimal("10000000000000000000"), // 10 RIGO
+		rewardPerPower:         2_000_000_000,
+		lazyRewardBlocks:       10,
+		lazyApplyingBlocks:     10,
 		minTrxFee:              uint256.NewInt(20),
-		minVotingPeriodBlocks:  50,
-		maxVotingPeriodBlocks:  60,
+		minVotingPeriodBlocks:  10,
+		maxVotingPeriodBlocks:  10,
 		minSelfStakeRatio:      50, // 50%
 		maxUpdatableStakeRatio: 30, // 30%
 		slashRatio:             50, // 50%
@@ -69,8 +94,8 @@ func Test2GovRule() *GovRule {
 	return &GovRule{
 		version:                2,
 		maxValidatorCnt:        10,
-		amountPerPower:         uint256.NewInt(1_000000000),
-		rewardPerPower:         uint256.NewInt(2_000000000),
+		minValidatorStake:      uint256.MustFromDecimal("5000000000000000000"), // 5 RIGO
+		rewardPerPower:         2_000_000_000,
 		lazyRewardBlocks:       30,
 		lazyApplyingBlocks:     40,
 		minTrxFee:              uint256.NewInt(20),
@@ -117,8 +142,8 @@ func (r *GovRule) fromProto(pm *GovRuleProto) {
 
 	r.version = pm.Version
 	r.maxValidatorCnt = pm.MaxValidatorCnt
-	r.amountPerPower = new(uint256.Int).SetBytes(pm.XAmountPerPower)
-	r.rewardPerPower = new(uint256.Int).SetBytes(pm.XRewardPerPower)
+	r.minValidatorStake = new(uint256.Int).SetBytes(pm.XMinValidatorStake)
+	r.rewardPerPower = pm.RewardPerPower
 	r.lazyRewardBlocks = pm.LazyRewardBlocks
 	r.lazyApplyingBlocks = pm.LazyApplyingBlocks
 	r.minTrxFee = new(uint256.Int).SetBytes(pm.XMinTrxFee)
@@ -136,8 +161,8 @@ func (r *GovRule) toProto() *GovRuleProto {
 	a := &GovRuleProto{
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
-		XAmountPerPower:        r.amountPerPower.Bytes(),
-		XRewardPerPower:        r.rewardPerPower.Bytes(),
+		XMinValidatorStake:     r.minValidatorStake.Bytes(),
+		RewardPerPower:         r.rewardPerPower,
 		LazyRewardBlocks:       r.lazyRewardBlocks,
 		LazyApplyingBlocks:     r.lazyApplyingBlocks,
 		XMinTrxFee:             r.minTrxFee.Bytes(),
@@ -157,8 +182,8 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 	tm := &struct {
 		Version                int64  `json:"version"`
 		MaxValidatorCnt        int64  `json:"maxValidatorCnt"`
-		AmountPerPower         string `json:"amountPerPower"`
-		RewardPerPower         string `json:"rewardPerPower"`
+		MinValidatorStake      string `json:"minValidatorStake"`
+		RewardPerPower         int64  `json:"rewardPerPower"`
 		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
 		LazyApplyingBlocks     int64  `json:"lazyApplyingBlocks"`
 		MinTrxFee              string `json:"minTrxFee"`
@@ -166,12 +191,12 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
 		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
 		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
-		SlashRatio             int64  `json:"SlashRatio"`
+		SlashRatio             int64  `json:"slashRatio"`
 	}{
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
-		AmountPerPower:         r.amountPerPower.String(), // hex-string
-		RewardPerPower:         r.rewardPerPower.String(), // hex-string
+		MinValidatorStake:      r.minValidatorStake.String(), // hex-string
+		RewardPerPower:         r.rewardPerPower,             // hex-string
 		LazyRewardBlocks:       r.lazyRewardBlocks,
 		LazyApplyingBlocks:     r.lazyApplyingBlocks,
 		MinTrxFee:              r.minTrxFee.String(),
@@ -188,8 +213,8 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 	tm := &struct {
 		Version                int64  `json:"version"`
 		MaxValidatorCnt        int64  `json:"maxValidatorCnt"`
-		AmountPerPower         string `json:"amountPerPower"`
-		RewardPerPower         string `json:"rewardPerPower"`
+		MinValidatorStake      string `json:"minValidatorStake"`
+		RewardPerPower         int64  `json:"rewardPerPower"`
 		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
 		LazyApplyingBlocks     int64  `json:"lazyApplyingBlocks"`
 		MinTrxFee              string `json:"minTrxFee"`
@@ -197,10 +222,11 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
 		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
 		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
-		SlashRatio             int64  `json:"SlashRatio"`
+		SlashRatio             int64  `json:"slashRatio"`
 	}{}
 
-	if err := tmjson.Unmarshal(bz, tm); err != nil {
+	err := tmjson.Unmarshal(bz, tm)
+	if err != nil {
 		return err
 	}
 
@@ -209,11 +235,17 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 
 	r.version = tm.Version
 	r.maxValidatorCnt = tm.MaxValidatorCnt
-	r.amountPerPower = uint256.MustFromHex(tm.AmountPerPower)
-	r.rewardPerPower = uint256.MustFromHex(tm.RewardPerPower)
+	r.minValidatorStake, err = uint256.FromHex(tm.MinValidatorStake)
+	if err != nil {
+		return err
+	}
+	r.rewardPerPower = tm.RewardPerPower
 	r.lazyRewardBlocks = tm.LazyRewardBlocks
 	r.lazyApplyingBlocks = tm.LazyApplyingBlocks
-	r.minTrxFee = uint256.MustFromHex(tm.MinTrxFee)
+	r.minTrxFee, err = uint256.FromHex(tm.MinTrxFee)
+	if err != nil {
+		return err
+	}
 	r.minVotingPeriodBlocks = tm.MinVotingBlocks
 	r.maxVotingPeriodBlocks = tm.MaxVotingBlocks
 	r.minSelfStakeRatio = tm.MinSelfStakeRatio
@@ -236,18 +268,18 @@ func (r *GovRule) MaxValidatorCnt() int64 {
 	return r.maxValidatorCnt
 }
 
-func (r *GovRule) AmountPerPower() *uint256.Int {
+func (r *GovRule) MinValidatorStake() *uint256.Int {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	return new(uint256.Int).Set(r.amountPerPower)
+	return new(uint256.Int).Set(r.minValidatorStake)
 }
 
-func (r *GovRule) RewardPerPower() *uint256.Int {
+func (r *GovRule) RewardPerPower() int64 {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	return new(uint256.Int).Set(r.rewardPerPower)
+	return r.rewardPerPower
 }
 
 func (r *GovRule) LazyRewardBlocks() int64 {
@@ -303,58 +335,6 @@ func (r *GovRule) SlashRatio() int64 {
 	return r.slashRatio
 }
 
-//
-// utility methods
-
-// MaxStakeAmount means the max of amount which could be deposited.
-// tmtypes.MaxTotalVotingPower = int64(math.MaxInt64) / 8
-// When the type of voting power is `int64`and VP:XCO = 1:1,
-// the MAXSTAKEsau becomes `int64(math.MaxInt64) / 8 * 10^18` (~= 922경 XCO)
-func (r *GovRule) MaxStakeAmount() *uint256.Int {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return new(uint256.Int).Mul(uint256.NewInt(uint64(tmtypes.MaxTotalVotingPower)), r.amountPerPower)
-}
-
-func (r *GovRule) MaxTotalPower() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return tmtypes.MaxTotalVotingPower
-}
-
-func (r *GovRule) AmountToPower(amt *uint256.Int) int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	// 1 VotingPower == 1 XCO
-	_vp := new(uint256.Int).Div(amt, r.amountPerPower)
-	vp := int64(_vp.Uint64())
-	if vp < 0 {
-		panic(fmt.Sprintf("voting power is negative: %v", vp))
-	}
-	return vp
-}
-
-func (r *GovRule) PowerToAmount(power int64) *uint256.Int {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	// 1 VotingPower == 1 XCO
-	return new(uint256.Int).Mul(uint256.NewInt(uint64(power)), r.amountPerPower)
-}
-
-func (r *GovRule) PowerToReward(power int64) *uint256.Int {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	if power < 0 {
-		panic(fmt.Sprintf("power is negative: %v", power))
-	}
-	return new(uint256.Int).Mul(uint256.NewInt(uint64(power)), r.rewardPerPower)
-}
-
 func (r *GovRule) String() string {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
@@ -364,6 +344,40 @@ func (r *GovRule) String() string {
 	} else {
 		return string(bz)
 	}
+}
+
+//
+// utility methods
+
+// MaxStakeAmount means the max of amount which could be deposited.
+// tmtypes.MaxTotalVotingPower = int64(math.MaxInt64) / 8
+// When the type of voting power is `int64`and VP:XCO = 1:1,
+// the MAXSTAKEsau becomes `int64(math.MaxInt64) / 8 * 10^18` (~= 922경 XCO)
+func MaxStakeAmount() *uint256.Int {
+	return new(uint256.Int).Mul(uint256.NewInt(uint64(tmtypes.MaxTotalVotingPower)), amountPerPower)
+}
+
+func MaxTotalPower() int64 {
+	return tmtypes.MaxTotalVotingPower
+}
+
+func AmountToPower(amt *uint256.Int) int64 {
+	// 1 VotingPower == 1 RIGO
+	_vp := new(uint256.Int).Div(amt, amountPerPower)
+	vp := int64(_vp.Uint64())
+	if vp < 0 {
+		panic(fmt.Sprintf("voting power is negative: %v", vp))
+	}
+	return vp
+}
+
+func PowerToAmount(power int64) *uint256.Int {
+	// 1 VotingPower == 1 RIGO
+	return new(uint256.Int).Mul(uint256.NewInt(uint64(power)), amountPerPower)
+}
+
+func AmountPerPower() *uint256.Int {
+	return amountPerPower.Clone()
 }
 
 var _ ledger.ILedgerItem = (*GovRule)(nil)

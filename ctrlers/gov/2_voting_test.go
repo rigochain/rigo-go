@@ -102,7 +102,7 @@ func TestVoting(t *testing.T) {
 	_, _, xerr := govCtrler.Commit()
 	require.NoError(t, xerr)
 
-	prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.NoError(t, xerr)
 
 	sumVotedPowers := int64(0)
@@ -118,8 +118,9 @@ func TestVoting(t *testing.T) {
 }
 
 func TestMajority(t *testing.T) {
-	prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.NoError(t, xerr)
+	require.NotNil(t, prop)
 
 	opt := prop.UpdateMajorOption()
 	require.Nil(t, opt)
@@ -132,13 +133,14 @@ func TestMajority(t *testing.T) {
 		_, _, xerr = govCtrler.Commit()
 		require.NoError(t, xerr)
 
-		prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+		prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 		require.NoError(t, xerr)
+		require.NotNil(t, prop)
 
 		votedPowers += stakeHelper.PowerOf(c.txctx.Tx.From)
 		if votedPowers >= prop.MajorityPower {
 			opt := prop.UpdateMajorOption()
-			require.NotNil(t, opt)
+			require.NotNil(t, opt, votedPowers, prop.MajorityPower)
 			require.EqualValues(t, prop.MajorOption, opt)
 			require.Equal(t, votedPowers, opt.Votes())
 		} else {
@@ -157,8 +159,9 @@ func TestMajority(t *testing.T) {
 		_, _, xerr = govCtrler.Commit()
 		require.NoError(t, xerr)
 
-		prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+		prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 		require.NoError(t, xerr)
+		require.NotNil(t, prop)
 
 		opt := prop.UpdateMajorOption()
 		require.NotNil(t, opt)
@@ -176,7 +179,7 @@ func TestFreezingProposal(t *testing.T) {
 	_, _, xerr := govCtrler.Commit()
 	require.NoError(t, xerr)
 
-	prop, xerr := govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.NoError(t, xerr)
 
 	//
@@ -188,7 +191,7 @@ func TestFreezingProposal(t *testing.T) {
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	prop, xerr = govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	prop, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.NoError(t, xerr)
 
 	//
@@ -200,7 +203,7 @@ func TestFreezingProposal(t *testing.T) {
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	_, xerr = govCtrler.ReadProposals(trxCtxProposal.TxHash)
+	_, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.Equal(t, xerrors.ErrNotFoundProposal, xerr)
 	frozenProp, xerr := govCtrler.frozenLedger.Get(trxCtxProposal.TxHash.Array32())
 	require.NoError(t, xerr)

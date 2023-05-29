@@ -11,7 +11,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 	switch req.Path {
 	case "proposals":
 		if txhash == nil || len(txhash) == 0 {
-			if propos, xerr := ctrler.GetProposals(); xerr != nil {
+			if propos, xerr := ctrler.RealAllProposals(); xerr != nil {
 				if xerr == xerrors.ErrNotFoundResult {
 					return nil, xerrors.ErrNotFoundProposal
 				}
@@ -22,7 +22,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 				return v, nil
 			}
 		} else {
-			if propo, xerr := ctrler.ReadProposals(txhash); xerr != nil {
+			if propo, xerr := ctrler.ReadProposal(txhash); xerr != nil {
 				if xerr == xerrors.ErrNotFoundResult {
 					return nil, xerrors.ErrNotFoundProposal
 				}

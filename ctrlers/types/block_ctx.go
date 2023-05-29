@@ -7,6 +7,7 @@ import (
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"sync"
+	"time"
 )
 
 type BlockContext struct {
@@ -84,6 +85,24 @@ func (bctx *BlockContext) TimeNano() int64 {
 	defer bctx.mtx.RUnlock()
 
 	return bctx.blockInfo.Header.GetTime().UnixNano()
+}
+
+// TimeSeconds returns block time in seconds
+func (bctx *BlockContext) TimeSeconds() int64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	// issue #50
+	// the EVM  requires the block timestamp in seconds.
+	return bctx.blockInfo.Header.GetTime().Unix()
+}
+
+func (bctx *BlockContext) ExpectedNextBlockTimeSeconds(interval time.Duration) int64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	secs := int64(interval.Seconds())
+	return bctx.blockInfo.Header.GetTime().Unix() + secs
 }
 
 func (bctx *BlockContext) GasSum() *uint256.Int {

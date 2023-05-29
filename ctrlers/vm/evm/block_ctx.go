@@ -4,11 +4,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/holiman/uint256"
 	"math/big"
 )
 
 var (
-	gasLimit = uint64(1_000_000_000)
+	gasLimit  = uint64(25000000) // issue #44
+	gasPrice  = uint256.NewInt(1)
+	gasFeeCap = uint256.NewInt(0)
+	gasTipCap = uint256.NewInt(0)
 )
 
 // CanTransfer checks whether there are enough funds in the address' account to make a transfer.
@@ -39,20 +43,25 @@ func evmBlockContext(sender common.Address, bn int64, tm int64) vm.BlockContext 
 		Time:        big.NewInt(tm),
 		Difficulty:  big.NewInt(1),
 		BaseFee:     big.NewInt(0),
-		GasLimit:    gasLimit * 10_000, //10_000_000_000_000_000_000,
+		GasLimit:    gasLimit, // issue #44
 	}
 }
 
-func evmMessage(_from common.Address, _to *common.Address, nonce uint64, gasPrice, amt *big.Int, data []byte) types.Message {
+func evmMessage(_from common.Address, _to *common.Address, nonce, gas uint64, amt *uint256.Int, data []byte) types.Message {
+
+	if gas > gasLimit || gas == 0 {
+		gas = gasLimit
+	}
+
 	return types.NewMessage(
 		_from,
 		_to,
 		nonce,
-		amt,
-		gasLimit,      // gas limit
-		gasPrice,      // gas price
-		big.NewInt(0), // fee cap
-		big.NewInt(0), // tip
+		amt.ToBig(),
+		gas,              // gas limit
+		gasPrice.ToBig(), // gas price
+		gasFeeCap.ToBig(),
+		gasTipCap.ToBig(),
 		data,
 		nil,
 		false,

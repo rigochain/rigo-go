@@ -22,6 +22,7 @@ const (
 	ErrCodeNotFoundDelegatee
 	ErrCodeNotFoundStake
 	ErrCodeNotFoundProposal
+	ErrCodeNotFoundVoter
 )
 
 const (
@@ -59,6 +60,7 @@ var (
 	ErrNotFoundDelegatee       = New(ErrCodeNotFoundDelegatee, "not found delegatee", nil)
 	ErrNotFoundStake           = New(ErrCodeNotFoundStake, "not found stake", nil)
 	ErrNotFoundProposal        = New(ErrCodeNotFoundProposal, "not found proposal", nil)
+	ErrNotFoundVoter           = New(ErrCodeNotFoundVoter, "not found voter", nil)
 
 	ErrInvalidQueryPath   = New(ErrCodeInvalidQueryPath, "invalid query path", nil)
 	ErrInvalidQueryParams = New(ErrCodeInvalidQueryParams, "invalid query parameters", nil)

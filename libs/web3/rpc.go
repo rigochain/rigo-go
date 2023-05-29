@@ -15,6 +15,26 @@ import (
 	"strings"
 )
 
+func (rweb3 *RigoWeb3) GetRule() (*ctrlertypes.GovRule, error) {
+	queryResp := &rpc.QueryResult{}
+
+	if req, err := rweb3.NewRequest("rule"); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return nil, err
+	}
+
+	govRule := &ctrlertypes.GovRule{}
+	if err := tmjson.Unmarshal(queryResp.Value, govRule); err != nil {
+		return nil, err
+	}
+	return govRule, nil
+
+}
 func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, error) {
 	queryResp := &rpc.QueryResult{}
 
@@ -34,6 +54,7 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 		Nonce   uint64        `json:"nonce,string"`
 		Balance string        `json:"balance"`
 		Code    []byte        `json:"code,omitempty"`
+		DocURL  string        `json:"docURL,omitempty"`
 	}{}
 
 	if err := tmjson.Unmarshal(queryResp.Value, _acct); err != nil {
@@ -52,6 +73,7 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 			Nonce:   _acct.Nonce,
 			Balance: bal,
 			Code:    _acct.Code,
+			DocURL:  _acct.DocURL,
 		}, nil
 	}
 }
@@ -193,6 +215,10 @@ func (rweb3 *RigoWeb3) VmCall(from, to types.Address, height int64, data []byte)
 	qryResp := &rpc.QueryResult{}
 	if err := tmjson.Unmarshal(resp.Result, qryResp); err != nil {
 		return nil, err
+	}
+
+	if qryResp.Code != 0 {
+		return nil, errors.New(qryResp.Log)
 	}
 
 	vmRet := &ctrlertypes.VMCallResult{}

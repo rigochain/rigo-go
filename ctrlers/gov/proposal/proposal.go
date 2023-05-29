@@ -2,6 +2,7 @@ package proposal
 
 import (
 	"encoding/json"
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ledger"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
@@ -18,21 +19,30 @@ type GovProposal struct {
 	mtx sync.RWMutex
 }
 
-func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower int64, voters map[string]*Voter, options ...[]byte) *GovProposal {
+func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
+
+	endVotingHeight := startHeight + votingBlocks
+	applyingHeight := startHeight + votingBlocks + lazyApplyingBlocks
+	// check overflow: issue #51
+	if startHeight > endVotingHeight || startHeight > applyingHeight {
+		return nil, xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v, applyingHeight:%v",
+			startHeight, endVotingHeight, applyingHeight)
+	}
+
 	return &GovProposal{
 		GovProposalHeader: GovProposalHeader{
 			TxHash:            txhash,
 			StartVotingHeight: startHeight,
-			EndVotingHeight:   startHeight + votingBlocks,
-			ApplyingHeight:    startHeight + votingBlocks + lazyApplyingBlocks,
+			EndVotingHeight:   endVotingHeight,
+			ApplyingHeight:    applyingHeight,
 			TotalVotingPower:  totalVotingPower,
-			MajorityPower:     totalVotingPower * 2 / 3,
+			MajorityPower:     (totalVotingPower * 2) / 3,
 			Voters:            voters,
 			OptType:           optType,
 		},
 		Options:     NewVoteOptions(options...),
 		MajorOption: nil,
-	}
+	}, nil
 }
 
 func (prop *GovProposal) Key() ledger.LedgerKey {
@@ -99,6 +109,30 @@ func (prop *GovProposal) doVote(voter *Voter, choice int32) {
 		opt.DoVote(voter.Power)
 		voter.Choice = choice
 	}
+}
+
+func (prop *GovProposal) DoPunish(addr types.Address, ratio int64) (int64, xerrors.XError) {
+	prop.mtx.Lock()
+	defer prop.mtx.Unlock()
+
+	voter, ok := prop.Voters[addr.String()]
+	if !ok {
+		return 0, xerrors.ErrNotFoundVoter
+	}
+
+	_p0 := uint256.NewInt(uint64(voter.Power))
+	_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
+	_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
+	slashingPower := int64(_p0.Uint64())
+
+	voter.Power -= slashingPower
+	if voter.Power <= 0 {
+		delete(prop.Voters, addr.String())
+	}
+	prop.TotalVotingPower -= slashingPower
+	prop.MajorityPower = (prop.TotalVotingPower * 2) / 3
+
+	return slashingPower, nil
 }
 
 func (prop *GovProposal) UpdateMajorOption() *voteOption {

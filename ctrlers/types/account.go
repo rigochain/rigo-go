@@ -13,14 +13,19 @@ import (
 	"sync"
 )
 
+const (
+	MAX_ACCT_NAME   = 2048
+	MAX_ACCT_DOCURL = 2048
+)
+
 type Account struct {
 	Address types.Address `json:"address"`
 	Name    string        `json:"name,omitempty"`
 	Nonce   uint64        `json:"nonce,string"`
 	Balance *uint256.Int  `json:"balance"`
 	Code    []byte        `json:"code,omitempty"`
-
-	mtx sync.RWMutex
+	DocURL  string        `json:"docURL,omitempty"`
+	mtx     sync.RWMutex
 }
 
 func NewAccount(addr types.Address) *Account {
@@ -135,6 +140,13 @@ func (acct *Account) SubBalance(amt *uint256.Int) xerrors.XError {
 	return nil
 }
 
+func (acct *Account) SetBalance(amt *uint256.Int) {
+	acct.mtx.Lock()
+	defer acct.mtx.Unlock()
+
+	acct.Balance.Set(amt)
+}
+
 func (acct *Account) GetBalance() *uint256.Int {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
@@ -181,6 +193,7 @@ func (acct *Account) Encode() ([]byte, xerrors.XError) {
 		Nonce:    acct.Nonce,
 		XBalance: acct.Balance.Bytes(),
 		XCode:    acct.Code,
+		DocUrl:   acct.DocURL,
 	}); err != nil {
 		return nil, xerrors.From(err)
 	} else {
@@ -199,6 +212,7 @@ func (acct *Account) Decode(d []byte) xerrors.XError {
 	acct.Nonce = pm.Nonce
 	acct.Balance = new(uint256.Int).SetBytes(pm.XBalance)
 	acct.Code = pm.XCode
+	acct.DocURL = pm.DocUrl
 	return nil
 }
 

@@ -20,7 +20,6 @@ import (
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	tmver "github.com/tendermint/tendermint/version"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,11 +40,11 @@ type RigoApp struct {
 	txExecutor  *TrxExecutor
 
 	localClient abcicli.Client
+	rootConfig  *cfg.Config
 
 	started int32
-
-	logger log.Logger
-	mtx    sync.Mutex
+	logger  log.Logger
+	mtx     sync.Mutex
 }
 
 func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
@@ -71,7 +70,9 @@ func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
 
 	vmCtrler := evm.NewEVMCtrler(config.DBDir(), acctCtrler, logger)
 
-	txExecutor := NewTrxExecutor(runtime.GOMAXPROCS(0), logger)
+	// the first parameter of NewTrxExecutor `n` is 0,
+	// because the parallel tx-processing is not used
+	txExecutor := NewTrxExecutor(0 /*runtime.GOMAXPROCS(0)*/, logger)
 
 	return &RigoApp{
 		metaDB:      stateDB,
@@ -80,6 +81,7 @@ func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
 		govCtrler:   govCtrler,
 		vmCtrler:    vmCtrler,
 		txExecutor:  txExecutor,
+		rootConfig:  config,
 		logger:      logger,
 	}
 }
@@ -186,7 +188,7 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 			val.Power,
 			1,
 			bytes.ZeroBytes(32), // 0x00... txhash
-			ctrler.govCtrler)
+		)
 		initStakes[i] = &stake.InitStake{
 			pubBytes,
 			[]*stake.Stake{s0},
@@ -210,8 +212,8 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
 		txctx, xerr := types2.NewTrxContext(req.Tx,
-			0, //ctrler.currBlockCtx.Height()+int64(1),
-			0,
+			ctrler.currBlockCtx.Height()+int64(1), // issue #39: set block number expected to include current tx.
+			ctrler.currBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
 			func(_txctx *types2.TrxContext) xerrors.XError {
 				_txctx.TrxGovHandler = ctrler.govCtrler
@@ -262,12 +264,16 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 		"prev.hash", req.Header.LastBlockId.Hash)
 
 	// save the block fee info. - it will be used for rewarding
+	ctrler.mtx.Lock()
 	ctrler.currBlockCtx = types2.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
+	ctrler.mtx.Unlock()
 
-	ev, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
+	ev0, _ := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
+	ev1, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
+	ev2, _ := ctrler.vmCtrler.BeginBlock(ctrler.currBlockCtx)
 
 	return abcitypes.ResponseBeginBlock{
-		Events: ev,
+		Events: append(ev0, append(ev1, ev2...)...),
 	}
 }
 
@@ -275,7 +281,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 
 	txctx, xerr := types2.NewTrxContext(req.Tx,
 		ctrler.currBlockCtx.Height(),
-		ctrler.currBlockCtx.TimeNano(),
+		ctrler.currBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
 			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt()
@@ -334,7 +340,7 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 
 	txctx, xerr := types2.NewTrxContext(req.Tx,
 		ctrler.currBlockCtx.Height(),
-		ctrler.currBlockCtx.TimeNano(),
+		ctrler.currBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
 			_txctx.TxIdx = txIdx

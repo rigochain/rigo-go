@@ -3,8 +3,6 @@ package gov
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
@@ -17,6 +15,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
+	"strconv"
 	"sync"
 )
 
@@ -83,6 +82,80 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 	return nil
 }
 
+func (ctrler *GovCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	var evts []abcitypes.Event
+
+	byzantines := blockCtx.BlockInfo().ByzantineValidators
+	if byzantines != nil {
+		ctrler.logger.Debug("Byzantine validators is found", "count", len(byzantines))
+		for _, evi := range byzantines {
+			if slashed, xerr := ctrler.doPunish(&evi); xerr != nil {
+				ctrler.logger.Error("Error when punishing",
+					"byzantine", types.Address(evi.Validator.Address),
+					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
+			} else {
+				_addr := types.Address(evi.Validator.Address).String()
+				_type := abcitypes.EvidenceType_name[int32(evi.Type)]
+				_power0 := strconv.FormatInt(evi.Validator.Power, 10)
+				_slashed := strconv.FormatInt(slashed, 10)
+				evts = append(evts, abcitypes.Event{
+					Type: "punishment",
+					Attributes: []abcitypes.EventAttribute{
+						{Key: []byte("byzantine"), Value: []byte(_addr), Index: true},
+						{Key: []byte("type"), Value: []byte(_type), Index: false},
+						{Key: []byte("power"), Value: []byte(_power0), Index: false},
+						{Key: []byte("slashed"), Value: []byte(_slashed), Index: false},
+						{Key: []byte("proposal"), Value: []byte(_addr), Index: true},
+					},
+				})
+			}
+		}
+	}
+
+	return evts, nil
+}
+
+// DoPunish is called from RigoApp::BeginBlock.
+func (ctrler *GovCtrler) DoPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	return ctrler.doPunish(evi)
+}
+
+func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
+	targetAddr := types.Address(evi.Validator.Address)
+
+	// punish in `proposalLedger`
+	var targetPropsKeys []ledger.LedgerKey
+	ctrler.proposalLedger.IterateReadAllFinalityItems(func(prop *proposal.GovProposal) xerrors.XError {
+		for _, v := range prop.Voters {
+			if bytes.Compare(v.Addr, targetAddr) == 0 {
+				targetPropsKeys = append(targetPropsKeys, prop.Key())
+				break
+			}
+		}
+		return nil
+	})
+
+	slashedPower := int64(0)
+	for _, k := range targetPropsKeys {
+		prop, xerr := ctrler.proposalLedger.GetFinality(k)
+		if xerr != nil {
+			// not reachable
+		}
+		slashed, xerr := prop.DoPunish(targetAddr, ctrler.SlashRatio())
+		if xerr != nil {
+			// not reachable
+		}
+		slashedPower += slashed
+
+		_ = ctrler.proposalLedger.SetFinality(prop)
+	}
+
+	return slashedPower, nil
+}
+
 func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
@@ -100,18 +173,6 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 
 	// validation by tx type
 	switch ctx.Tx.GetType() {
-	case ctrlertypes.TRX_STAKING:
-		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrler.AmountPerPower(), new(uint256.Int))
-		// `ctx.Tx.Amount` MUST be greater than or equal to `ctrler.govHelper.AmountPerPower()`
-		//    ==> q.Sign() > 0
-		if q.Sign() <= 0 {
-			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be greater than %v", ctrler.AmountPerPower()))
-		}
-		// `ctx.Tx.Amount` MUST be multiple to `ctrler.govHelper.AmountPerPower()`
-		//    ==> r.Sign() == 0
-		if r.Sign() != 0 {
-			return xerrors.ErrInvalidTrx.Wrap(fmt.Errorf("wrong amount: it should be multiple of %v", ctrler.AmountPerPower()))
-		}
 	case ctrlertypes.TRX_PROPOSAL:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
 			return xerrors.ErrInvalidTrx.Wrap(errors.New("wrong address: the 'to' field in TRX_PROPOSAL should be zero address"))
@@ -209,15 +270,17 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		voters[types.Address(v.Address).String()] = &proposal.Voter{
 			Addr:   v.Address,
 			Power:  v.Power,
-			Choice: -1, // not choice
+			Choice: proposal.NOT_CHOICE, // -1
 		}
 	}
 
-	prop := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
+	prop, xerr := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
 		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks, ctrler.LazyApplyingBlocks(),
 		totalVotingPower, voters, txpayload.Options...)
-
-	if xerr := setProposal(prop); xerr != nil {
+	if xerr != nil {
+		return xerr
+	}
+	if xerr = setProposal(prop); xerr != nil {
 		return xerr
 	}
 
@@ -247,11 +310,6 @@ func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctrler.logger.Debug("Voting to proposal", "key", prop.TxHash, "voter", ctx.Tx.From, "choice", txpayload.Choice)
 	}
 	return nil
-}
-
-func (ctrler *GovCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	// do nothing
-	return nil, nil
 }
 
 func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
@@ -382,7 +440,7 @@ func (ctrler *GovCtrler) GetRules() ctrlertypes.GovRule {
 	return ctrler.GovRule
 }
 
-func (ctrler *GovCtrler) GetProposals() ([]*proposal.GovProposal, xerrors.XError) {
+func (ctrler *GovCtrler) RealAllProposals() ([]*proposal.GovProposal, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
@@ -398,7 +456,7 @@ func (ctrler *GovCtrler) GetProposals() ([]*proposal.GovProposal, xerrors.XError
 	return proposals, nil
 }
 
-func (ctrler *GovCtrler) ReadProposals(txhash abytes.HexBytes) (*proposal.GovProposal, xerrors.XError) {
+func (ctrler *GovCtrler) ReadProposal(txhash abytes.HexBytes) (*proposal.GovProposal, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 

@@ -22,12 +22,14 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 		Nonce   uint64        `json:"nonce,string"`
 		Balance string        `json:"balance"`
 		Code    []byte        `json:"code,omitempty"`
+		DocURL  string        `json:"docURL,omitempty"`
 	}{
 		Address: acct.Address,
 		Name:    acct.Name,
 		Nonce:   acct.Nonce,
 		Balance: acct.Balance.Dec(),
 		Code:    acct.Code,
+		DocURL:  acct.DocURL,
 	}
 	if raw, err := tmjson.Marshal(_acct); err != nil {
 		return nil, xerrors.ErrQuery.Wrap(err)

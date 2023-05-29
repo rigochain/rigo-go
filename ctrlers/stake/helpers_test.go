@@ -3,25 +3,23 @@ package stake_test
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"github.com/holiman/uint256"
-	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
 	bytes2 "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
-	tmtypes "github.com/tendermint/tendermint/types"
 	"math/rand"
 )
 
 type acctHandlerMock struct{}
 
-func (a *acctHandlerMock) FindOrNewAccount(addr types.Address, exec bool) *types2.Account {
+func (a *acctHandlerMock) FindOrNewAccount(addr types.Address, exec bool) *ctrlertypes.Account {
 	panic("Don't use this method")
 }
 
-func (a *acctHandlerMock) FindAccount(addr types.Address, exec bool) *types2.Account {
+func (a *acctHandlerMock) FindAccount(addr types.Address, exec bool) *ctrlertypes.Account {
 	if w := FindWallet(addr); w != nil {
 		return w.GetAccount()
 	}
@@ -48,15 +46,15 @@ func (a *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec bool) 
 	return nil
 }
 
-func (a *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (types2.IAccountHandler, xerrors.XError) {
+func (a *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	return &acctHandlerMock{}, nil
 }
 
-func (a *acctHandlerMock) SetAccountCommittable(account *types2.Account, b bool) xerrors.XError {
+func (a *acctHandlerMock) SetAccountCommittable(account *ctrlertypes.Account, b bool) xerrors.XError {
 	return nil
 }
 
-var _ types2.IAccountHandler = (*acctHandlerMock)(nil)
+var _ ctrlertypes.IAccountHandler = (*acctHandlerMock)(nil)
 
 func FindWallet(addr types.Address) *web3.Wallet {
 	for _, w := range Wallets {
@@ -69,17 +67,17 @@ func FindWallet(addr types.Address) *web3.Wallet {
 
 type govHandlerMock struct{}
 
+func (g *govHandlerMock) MinValidatorStake() *uint256.Int {
+	return uint256.NewInt(1_000_000_000_000_000_000)
+}
+
 func (g *govHandlerMock) Version() int64 {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g *govHandlerMock) AmountPerPower() *uint256.Int {
-	return uint256.NewInt(1_000_000_000_000_000_000)
-}
-
-func (g *govHandlerMock) RewardPerPower() *uint256.Int {
-	return uint256.NewInt(10)
+func (g *govHandlerMock) RewardPerPower() int64 {
+	return 10
 }
 
 func (g *govHandlerMock) MinTrxFee() *uint256.Int {
@@ -109,14 +107,6 @@ func (g *govHandlerMock) LazyApplyingBlocks() int64 {
 	return 10
 }
 
-func (g *govHandlerMock) MaxStakeAmount() *uint256.Int {
-	return new(uint256.Int).Mul(uint256.NewInt(uint64(tmtypes.MaxTotalVotingPower)), g.AmountPerPower())
-}
-
-func (g *govHandlerMock) MaxTotalPower() int64 {
-	return tmtypes.MaxTotalVotingPower
-}
-
 func (g *govHandlerMock) MinSelfStakeRatio() int64 {
 	return 50
 }
@@ -126,37 +116,10 @@ func (g *govHandlerMock) MaxUpdatableStakeRatio() int64 {
 }
 
 func (g *govHandlerMock) SlashRatio() int64 {
-	return 27
+	return 50
 }
 
-func (g *govHandlerMock) AmountToPower(amt *uint256.Int) int64 {
-	// 1 VotingPower == 1_000_000_000_000_000_000 (10^18)
-	_vp := new(uint256.Int).Div(amt, g.AmountPerPower())
-	vp := int64(_vp.Uint64())
-	if vp < 0 {
-		panic(fmt.Sprintf("voting power is negative: %v", vp))
-	}
-	return vp
-}
-
-func (g *govHandlerMock) PowerToAmount(power int64) *uint256.Int {
-	if power < 0 {
-		panic(fmt.Sprintf("power is negative: %v", power))
-	}
-	// 1 VotingPower == 1 XCO
-	_power := uint64(power)
-	return new(uint256.Int).Mul(uint256.NewInt(_power), g.AmountPerPower())
-}
-
-func (g *govHandlerMock) PowerToReward(power int64) *uint256.Int {
-	if power < 0 {
-		panic(fmt.Sprintf("power is negative: %v", power))
-	}
-	_power := uint64(power)
-	return new(uint256.Int).Mul(uint256.NewInt(_power), g.RewardPerPower())
-}
-
-var _ types2.IGovHandler = (*govHandlerMock)(nil)
+var _ ctrlertypes.IGovHandler = (*govHandlerMock)(nil)
 
 func makeTestWallets(n int) []*web3.Wallet {
 	wallets := make([]*web3.Wallet, n)
@@ -170,7 +133,7 @@ func makeTestWallets(n int) []*web3.Wallet {
 	return wallets
 }
 
-func randMakeStakingToSelfTrxContext() (*types2.TrxContext, error) {
+func randMakeStakingToSelfTrxContext() (*ctrlertypes.TrxContext, error) {
 	from := Wallets[rand.Intn(len(Wallets))]
 	to := from
 
@@ -185,14 +148,14 @@ func randMakeStakingToSelfTrxContext() (*types2.TrxContext, error) {
 
 }
 
-func randMakeStakingTrxContext() (*types2.TrxContext, error) {
+func randMakeStakingTrxContext() (*ctrlertypes.TrxContext, error) {
 	from, to := Wallets[rand.Intn(len(Wallets))], DelegateeWallets[rand.Intn(len(DelegateeWallets))]
-	power := rand.Int63n(1000)
+	power := rand.Int63n(1000) + 10
 	return makeStakingTrxContext(from, to, power)
 }
 
-func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*types2.TrxContext, error) {
-	amt := govHelper.PowerToAmount(power)
+func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*ctrlertypes.TrxContext, error) {
+	amt := ctrlertypes.PowerToAmount(power)
 
 	tx := web3.NewTrxStaking(from.Address(), to.Address(), dummyNonce, dummyGas, amt)
 	bz, err := tx.Encode()
@@ -200,7 +163,7 @@ func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*types2.TrxConte
 		return nil, err
 	}
 
-	return &types2.TrxContext{
+	return &ctrlertypes.TrxContext{
 		Exec:         true,
 		Tx:           tx,
 		TxHash:       crypto.DefaultHash(bz),
@@ -214,7 +177,7 @@ func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*types2.TrxConte
 	}, nil
 }
 
-func findStakingTxCtx(txhash bytes2.HexBytes) *types2.TrxContext {
+func findStakingTxCtx(txhash bytes2.HexBytes) *ctrlertypes.TrxContext {
 	for _, tctx := range stakingTrxCtxs {
 		if bytes.Compare(tctx.TxHash, txhash) == 0 {
 			return tctx
@@ -223,7 +186,7 @@ func findStakingTxCtx(txhash bytes2.HexBytes) *types2.TrxContext {
 	return nil
 }
 
-func randMakeUnstakingTrxContext() (*types2.TrxContext, error) {
+func randMakeUnstakingTrxContext() (*ctrlertypes.TrxContext, error) {
 	rn := rand.Intn(len(stakingTrxCtxs))
 	stakingTxCtx := stakingTrxCtxs[rn]
 
@@ -239,7 +202,7 @@ func randMakeUnstakingTrxContext() (*types2.TrxContext, error) {
 	return makeUnstakingTrxContext(from, to, stakingTxCtx.TxHash)
 }
 
-func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes) (*types2.TrxContext, error) {
+func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes) (*ctrlertypes.TrxContext, error) {
 
 	tx := web3.NewTrxUnstaking(from.Address(), to.Address(), dummyNonce, dummyGas, txhash)
 	tzbz, _, err := from.SignTrx(tx)
@@ -247,7 +210,7 @@ func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes) (*ty
 		return nil, err
 	}
 
-	return &types2.TrxContext{
+	return &ctrlertypes.TrxContext{
 		Exec:         true,
 		Tx:           tx,
 		TxHash:       crypto.DefaultHash(tzbz),

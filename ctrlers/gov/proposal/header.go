@@ -12,6 +12,10 @@ const (
 	PROPOSAL_COMMON   = PROPOSAL_OFFCHAIN | 0x00
 )
 
+const (
+	NOT_CHOICE int32 = -1
+)
+
 type Voter struct {
 	Addr   types.Address `json:"address"`
 	Power  int64         `json:"power"`
@@ -47,6 +51,13 @@ func (h *GovProposalHeader) GetApplyingHeight() int64 {
 
 func (h *GovProposalHeader) GetTotalVotingPower() int64 {
 	return h.TotalVotingPower
+}
+func (h *GovProposalHeader) SumVotingPowers() int64 {
+	sum := int64(0)
+	for _, v := range h.Voters {
+		sum += v.Power
+	}
+	return sum
 }
 
 func (h *GovProposalHeader) GetMajorityPower() int64 {

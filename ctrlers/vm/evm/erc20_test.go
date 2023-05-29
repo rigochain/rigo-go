@@ -11,9 +11,12 @@ import (
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
+	bytes2 "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -27,31 +30,46 @@ var (
 )
 
 func Test_callEVM_Deploy(t *testing.T) {
-	input, err := abiContract.Pack("", "TokenOnRigo", "TOR")
+	deployInput, err := abiContract.Pack("", "TokenOnRigo", "TOR")
 	require.NoError(t, err)
 
 	// deploy code = contract byte code + input parameters
-	input = append(buildInfo.Bytecode, input...)
+	deployInput = append(buildInfo.Bytecode, deployInput...)
 
 	// make transaction
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	to := types.ZeroAddress()
 
-	ret, xerr := rigoEVM.execVM(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(0), input, 1, time.Now().UnixNano())
+	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: rigoEVM.lastBlockHeight + 1}}, nil, &acctHandler, nil)
+	_, xerr := rigoEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
-	require.NoError(t, ret.Err)
 
-	contractAddr = ret.ReturnData
+	txctx := &ctrlertypes.TrxContext{
+		Height:    bctx.Height(),
+		BlockTime: time.Now().UnixNano(),
+		TxHash:    bytes2.RandBytes(32),
+		Tx:        web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(0), uint256.NewInt(0), deployInput),
+		TxIdx:     1,
+		Exec:      true,
+		Sender:    fromAcct,
+		Receiver:  nil,
+		GasUsed:   uint256.NewInt(0),
+	}
+	//ret, xerr := rigoEVM.execVM(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(0), uint256.NewInt(0), deployInput, 1, time.Now().UnixNano())
+	//require.NoError(t, xerr)
+	//require.NoError(t, ret.Err)
+	xerr = rigoEVM.ExecuteTrx(txctx)
+	require.NoError(t, xerr)
+
+	contractAddr = txctx.RetData
 	fmt.Println("TestDeploy", "contract address", contractAddr)
 
-	retUnpack, xerr := execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), 2, time.Now().UnixNano(), "name")
+	retUnpack, xerr := execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), uint256.NewInt(0), bctx.Height(), time.Now().UnixNano(), "name")
 	require.NoError(t, xerr)
-	require.NoError(t, ret.Err)
 	fmt.Println("TestDeploy", "name", retUnpack[0])
 
-	retUnpack, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), 2, time.Now().UnixNano(), "symbol")
+	retUnpack, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), uint256.NewInt(0), bctx.Height(), time.Now().UnixNano(), "symbol")
 	require.NoError(t, xerr)
-	require.NoError(t, ret.Err)
 	fmt.Println("TestDeploy", "symbol", retUnpack[0])
 
 	_, height, xerr := rigoEVM.Commit()
@@ -60,20 +78,26 @@ func Test_callEVM_Deploy(t *testing.T) {
 }
 
 func Test_callEVM_Transfer(t *testing.T) {
+	state, xerr := rigoEVM.ImmutableStateAt(rigoEVM.lastBlockHeight, rigoEVM.lastRootHash)
+	require.NoError(t, xerr)
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	toAcct := acctHandler.walletsArr[1].GetAccount()
 
-	ret, xerr := queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr := queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(fromAcct.Address))
 	require.NoError(t, xerr)
-	fmt.Println("(BEFORE) balanceOf", fromAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
+	fmt.Println("(BEFORE) balanceOf", fromAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(toAcct.Address))
 	require.NoError(t, xerr)
-	fmt.Println("(BEFORE) balanceOf", toAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
+	fmt.Println("(BEFORE) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	ret, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: rigoEVM.lastBlockHeight + 1}}, nil, &acctHandler, nil)
+	_, xerr = rigoEVM.BeginBlock(bctx)
+	require.NoError(t, xerr)
+
+	ret, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), uint256.NewInt(0), bctx.Height(), time.Now().UnixNano(),
 		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
 	fmt.Println("<transferred>")
@@ -82,15 +106,22 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("Commit block", height)
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	state, xerr = rigoEVM.ImmutableStateAt(rigoEVM.lastBlockHeight, rigoEVM.lastRootHash)
+	require.NoError(t, xerr)
+
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(fromAcct.Address))
 	require.NoError(t, xerr)
-	fmt.Println(" (AFTER) balanceOf", fromAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
+	fmt.Println(" (AFTER) balanceOf", fromAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(toAcct.Address))
 	require.NoError(t, xerr)
-	fmt.Println(" (AFTER) balanceOf", toAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
+	fmt.Println(" (AFTER) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
+
+	bctx = ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: rigoEVM.lastBlockHeight + 1}}, nil, &acctHandler, nil)
+	_, xerr = rigoEVM.BeginBlock(bctx)
+	require.NoError(t, xerr)
 
 	_, height, xerr = rigoEVM.Commit()
 	require.NoError(t, xerr)
@@ -100,15 +131,22 @@ func Test_callEVM_Transfer(t *testing.T) {
 
 	rigoEVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger())
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	state, xerr = rigoEVM.ImmutableStateAt(rigoEVM.lastBlockHeight, rigoEVM.lastRootHash)
+	require.NoError(t, xerr)
+
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(fromAcct.Address))
 	require.NoError(t, xerr)
-	fmt.Println("(REOPEN) balanceOf", fromAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
+	fmt.Println("(REOPEN) balanceOf", fromAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	ret, xerr = queryMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(0), rigoEVM.lastBlockHeight, time.Now().UnixNano(),
+	ret, xerr = queryMethod(fromAcct.Address, contractAddr, rigoEVM.lastBlockHeight, time.Now().UnixNano(),
 		"balanceOf", toAddrArr(toAcct.Address))
 	require.NoError(t, xerr)
-	fmt.Println("(REOPEN) balanceOf", toAcct.Address, ret[0], "nonce", rigoEVM.stateDBWrapper.GetNonce(fromAcct.Address.Array20()))
+	fmt.Println("(REOPEN) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
+
+	bctx = ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: rigoEVM.lastBlockHeight + 1}}, nil, &acctHandler, nil)
+	_, xerr = rigoEVM.BeginBlock(bctx)
+	require.NoError(t, xerr)
 
 	_, height, xerr = rigoEVM.Commit()
 	require.NoError(t, xerr)
@@ -117,28 +155,51 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 }
 
-func execMethod(from, to types.Address, nonce uint64, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
+func execMethod(from, to types.Address, nonce uint64, gas, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
 	input, err := abiContract.Pack(methodName, args...)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
 
-	ret, xerr := rigoEVM.execVM(from, to, nonce, amt, input, bn, bt)
+	fromAcct := acctHandler.FindAccount(from, true)
+	toAcct := acctHandler.FindAccount(to, true)
+	txctx := &ctrlertypes.TrxContext{
+		Height:    1,
+		BlockTime: time.Now().UnixNano(),
+		TxHash:    bytes2.RandBytes(32),
+		Tx:        web3.NewTrxContract(from, to, nonce, gas, amt, input),
+		TxIdx:     1,
+		Exec:      true,
+		Sender:    fromAcct,
+		Receiver:  toAcct,
+		GasUsed:   uint256.NewInt(0),
+	}
+	xerr := rigoEVM.ExecuteTrx(txctx)
 	if xerr != nil {
 		return nil, xerr
 	}
-	if ret.Err != nil {
-		return nil, xerrors.From(ret.Err)
-	}
-
-	retUnpack, err := abiContract.Unpack(methodName, ret.ReturnData)
+	retUnpack, err := abiContract.Unpack(methodName, txctx.RetData)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
 	return retUnpack, nil
+
+	//ret, xerr := rigoEVM.execVM(from, to, nonce, gas, amt, input, bn, bt)
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
+	//if ret.Err != nil {
+	//	return nil, xerrors.From(ret.Err)
+	//}
+	//
+	//retUnpack, err := abiContract.Unpack(methodName, ret.ReturnData)
+	//if err != nil {
+	//	return nil, xerrors.From(err)
+	//}
+	//return retUnpack, nil
 }
 
-func queryMethod(from, to types.Address, nonce uint64, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
+func queryMethod(from, to types.Address, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
 	input, err := abiContract.Pack(methodName, args...)
 	if err != nil {
 		return nil, xerrors.From(err)
@@ -202,12 +263,14 @@ func init() {
 		panic(err)
 	} else if abiContract, err = abi.JSON(bytes.NewReader(buildInfo.ABI)); err != nil {
 		panic(err)
-	} else {
-		for _, method := range abiContract.Methods {
-			fmt.Printf("%x: %s\n", method.ID, method.Sig)
-		}
 	}
+	//else {
+	//	for _, method := range abiContract.Methods {
+	//		fmt.Printf("%x: %s\n", method.ID, method.Sig)
+	//	}
+	//}
 
+	os.RemoveAll(dbPath)
 	rigoEVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger())
 }
 

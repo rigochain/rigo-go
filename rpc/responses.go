@@ -39,7 +39,7 @@ func (qr *QueryResult) UnmarshalJSON(bz []byte) error {
 	tmpQr := &struct {
 		Code      uint32           `json:"code,omitempty"`
 		Log       string           `json:"log,omitempty"`
-		Info      string           ` json:"info,omitempty"`
+		Info      string           `json:"info,omitempty"`
 		Index     int64            `json:"index,omitempty"`
 		Key       bytes.HexBytes   `json:"key,omitempty"`
 		Value     json.RawMessage  `json:"value,omitempty"`

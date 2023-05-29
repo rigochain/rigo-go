@@ -1,6 +1,7 @@
 package web3
 
 import (
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
@@ -140,6 +141,20 @@ func (w *Wallet) SignTrx(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error)
 	}
 }
 
+func (w *Wallet) SignTrxRLP(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error) {
+	w.mtx.RLock()
+	defer w.mtx.RUnlock()
+
+	if txbz, err := rlp.EncodeToBytes(tx); err != nil {
+		return nil, nil, err
+	} else if sig, err := w.wkey.Sign(txbz); err != nil {
+		return nil, nil, err
+	} else {
+		tx.Sig = sig
+		return sig, txbz, nil
+	}
+}
+
 func (w *Wallet) TransferSync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
@@ -159,6 +174,15 @@ func (w *Wallet) StakingSync(to types.Address, gas, amt *uint256.Int, rweb3 *Rig
 		w.acct.GetNonce(),
 		gas, amt,
 	)
+	if _, _, err := w.SignTrx(tx); err != nil {
+		return nil, err
+	} else {
+		return rweb3.SendTransactionSync(tx)
+	}
+}
+
+func (w *Wallet) SetDocSync(name, url string, gas *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	tx := NewTrxSetDoc(w.Address(), w.acct.GetNonce(), gas, name, url)
 	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err
 	} else {

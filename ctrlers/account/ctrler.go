@@ -71,13 +71,26 @@ func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
 	if ctx.Sender == nil {
 		return xerrors.ErrNotFoundAccount
 	}
-	ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
+	if !types.IsZeroAddress(ctx.Tx.To) {
+		ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
+	}
 
 	if xerr := ctx.Sender.CheckBalance(ctx.NeedAmt); xerr != nil {
 		return xerr
 	}
 	if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
 		return xerr.Wrap(fmt.Errorf("invalid nonce - ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), ctx.Tx.Nonce, ctx.Sender.Address, ctx.TxHash))
+	}
+
+	if ctx.Tx.GetType() == atypes.TRX_SETDOC {
+		name := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).Name
+		url := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).URL
+		if len(name) > atypes.MAX_ACCT_NAME {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("too long name. it should be less than %d.", atypes.MAX_ACCT_NAME)
+		}
+		if len(url) > atypes.MAX_ACCT_DOCURL {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("too long url. it should be less than %d.", atypes.MAX_ACCT_DOCURL)
+		}
 	}
 
 	return nil
@@ -94,9 +107,18 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 		return xerr
 	}
 
-	if ctx.Tx.Type == atypes.TRX_TRANSFER {
+	if ctx.Tx.GetType() == atypes.TRX_TRANSFER && ctx.Receiver != nil {
 		if xerr := ctx.Receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
 			return xerr
+		}
+	} else if ctx.Tx.Type == atypes.TRX_SETDOC {
+		name := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).Name
+		url := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).URL
+		if name != "" {
+			ctx.Sender.Name = name
+		}
+		if url != "" {
+			ctx.Sender.DocURL = url
 		}
 	}
 
@@ -107,7 +129,9 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 	ctx.GasUsed = ctx.Tx.Gas
 
 	_ = ctrler.setAccountCommittable(ctx.Sender, ctx.Exec)
-	_ = ctrler.setAccountCommittable(ctx.Receiver, ctx.Exec)
+	if ctx.Receiver != nil {
+		_ = ctrler.setAccountCommittable(ctx.Receiver, ctx.Exec)
+	}
 
 	return nil
 }
@@ -280,7 +304,6 @@ func (ctrler *AcctCtrler) setAccountCommittable(acct *atypes.Account, exec bool)
 	if exec {
 		fn = ctrler.acctLedger.SetFinality
 	}
-
 	return fn(acct)
 }
 
