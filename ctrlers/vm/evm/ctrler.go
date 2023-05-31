@@ -19,13 +19,15 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmdb "github.com/tendermint/tm-db"
+	"math/big"
 	"strconv"
 	"strings"
 	"sync"
 )
 
 var (
-	lastBlockHeightKey = []byte("lbh")
+	lastBlockHeightKey       = []byte("lbh")
+	RIGOEVMCtrlerChainConfig = &params.ChainConfig{big.NewInt(220819), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil}
 )
 
 func blockKey(h int64) []byte {
@@ -83,7 +85,7 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 	//	panic(err)
 	//}
 	return &EVMCtrler{
-		ethChainConfig:  params.AllEthashProtocolChanges,
+		ethChainConfig:  RIGOEVMCtrlerChainConfig,
 		ethDB:           db,
 		metadb:          metadb,
 		acctLedger:      acctHandler,
