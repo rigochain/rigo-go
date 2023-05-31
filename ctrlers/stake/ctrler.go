@@ -102,14 +102,14 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 			} else {
 				_addr := types.Address(evi.Validator.Address).String()
 				_type := abcitypes.EvidenceType_name[int32(evi.Type)]
-				_power0 := strconv.FormatInt(evi.Validator.Power, 10)
+				_height0 := strconv.FormatInt(evi.Height, 10)
 				_slashed := strconv.FormatInt(slashed, 10)
 				evts = append(evts, abcitypes.Event{
 					Type: "punishment",
 					Attributes: []abcitypes.EventAttribute{
 						{Key: []byte("byzantine"), Value: []byte(_addr), Index: true},
+						{Key: []byte("height"), Value: []byte(_height0), Index: false},
 						{Key: []byte("type"), Value: []byte(_type), Index: false},
-						{Key: []byte("power"), Value: []byte(_power0), Index: false},
 						{Key: []byte("slashed"), Value: []byte(_slashed), Index: false},
 					},
 				})

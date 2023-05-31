@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -19,6 +20,7 @@ import (
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmdb "github.com/tendermint/tm-db"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -161,10 +163,35 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	// the `EVM` handles nonce, amount and gas.
 	ctx.GasUsed = new(uint256.Int).Add(ctx.GasUsed, uint256.NewInt(ret.UsedGas))
 
-	ctrler.logger.Debug("ExecuteTrx", "used.gas", ctx.GasUsed.Dec())
-
 	if !ctx.Exec {
 		ctrler.stateDBWrapper.RevertToSnapshot(snap)
+	} else {
+		logs := ctrler.stateDBWrapper.GetLogs(ctx.TxHash.Array32(), common.Hash{})
+		if logs != nil && len(logs) > 0 {
+			var attrs []abcitypes.EventAttribute
+			for _, l := range logs {
+				for i, t := range l.Topics {
+					strVal := hex.EncodeToString(t.Bytes())
+					attrs = append(attrs, abcitypes.EventAttribute{
+						Key:   []byte(fmt.Sprintf("topic.%d", i)),
+						Value: []byte(strings.ToUpper(strVal)),
+						Index: true,
+					})
+				}
+				if l.Data != nil && len(l.Data) > 0 {
+					strVal := hex.EncodeToString(l.Data)
+					attrs = append(attrs, abcitypes.EventAttribute{
+						Key:   []byte("data"),
+						Value: []byte(strVal),
+						Index: false,
+					})
+				}
+			}
+			ctx.Events = append(ctx.Events, abcitypes.Event{
+				Type:       "evm",
+				Attributes: attrs,
+			})
+		}
 	}
 
 	return nil
