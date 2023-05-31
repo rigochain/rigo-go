@@ -183,20 +183,6 @@ func execMethod(from, to types.Address, nonce uint64, gas, amt *uint256.Int, bn,
 		return nil, xerrors.From(err)
 	}
 	return retUnpack, nil
-
-	//ret, xerr := rigoEVM.execVM(from, to, nonce, gas, amt, input, bn, bt)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-	//if ret.Err != nil {
-	//	return nil, xerrors.From(ret.Err)
-	//}
-	//
-	//retUnpack, err := abiContract.Unpack(methodName, ret.ReturnData)
-	//if err != nil {
-	//	return nil, xerrors.From(err)
-	//}
-	//return retUnpack, nil
 }
 
 func queryMethod(from, to types.Address, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
@@ -263,12 +249,14 @@ func init() {
 		panic(err)
 	} else if abiContract, err = abi.JSON(bytes.NewReader(buildInfo.ABI)); err != nil {
 		panic(err)
+	} else {
+		for _, method := range abiContract.Methods {
+			fmt.Printf("%x: %s\n", method.ID, method.Sig)
+		}
+		for _, evt := range abiContract.Events {
+			fmt.Printf("%x: %s\n", evt.ID, evt.Sig)
+		}
 	}
-	//else {
-	//	for _, method := range abiContract.Methods {
-	//		fmt.Printf("%x: %s\n", method.ID, method.Sig)
-	//	}
-	//}
 
 	os.RemoveAll(dbPath)
 	rigoEVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger())

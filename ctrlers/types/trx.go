@@ -29,6 +29,7 @@ const (
 	EVENT_ATTR_TXSENDER = "sender"
 	EVENT_ATTR_TXRECVER = "receiver"
 	EVENT_ATTR_ADDRPAIR = "addrpair"
+	EVENT_ATTR_AMOUNT   = "amount"
 )
 
 type trxRPL struct {
@@ -218,7 +219,7 @@ func (tx *Trx) TypeString() string {
 	case TRX_VOTING:
 		return "voting"
 	case TRX_CONTRACT:
-		return "execution"
+		return "contract"
 	case TRX_SETDOC:
 		return "setdoc"
 	}

@@ -312,22 +312,25 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 	} else {
 
 		ctrler.currBlockCtx.AddGas(txctx.GasUsed)
+
+		// add event
+		txctx.Events = append(txctx.Events, abcitypes.Event{
+			Type: "tx",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte(types2.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+				{Key: []byte(types2.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+				{Key: []byte(types2.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
+				{Key: []byte(types2.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
+				{Key: []byte(types2.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+			},
+		})
+
 		return abcitypes.ResponseDeliverTx{
 			Code:      abcitypes.CodeTypeOK,
 			GasWanted: int64(txctx.Tx.Gas.Uint64()),
 			GasUsed:   int64(txctx.GasUsed.Uint64()),
 			Data:      txctx.RetData,
-			Events: []abcitypes.Event{
-				{
-					Type: "tx",
-					Attributes: []abcitypes.EventAttribute{
-						{Key: []byte(types2.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-						{Key: []byte(types2.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-						{Key: []byte(types2.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
-						{Key: []byte(types2.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
-					},
-				},
-			},
+			Events:    txctx.Events,
 		}
 	}
 }

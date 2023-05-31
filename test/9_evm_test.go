@@ -3,15 +3,21 @@ package test
 import (
 	"fmt"
 	"github.com/holiman/uint256"
+	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/libs/web3/vm"
+	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	"sync"
 	"testing"
 )
 
 var (
 	evmContract *vm.EVMContract
+	creator     *web3.Wallet
 )
 
 func TestERC20_Deploy(t *testing.T) {
@@ -25,10 +31,15 @@ func TestERC20_Payable(t *testing.T) {
 	testPayable(t)
 }
 
+func TestERC20_Event(t *testing.T) {
+	testDeploy(t)
+	testEvents(t)
+}
+
 func testDeploy(t *testing.T) {
 	rweb3 := randRigoWeb3()
 
-	creator := randCommonWallet()
+	creator = randCommonWallet()
 	require.NoError(t, creator.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
 
 	require.NoError(t, creator.SyncAccount(rweb3))
@@ -101,7 +112,6 @@ func testPayable(t *testing.T) {
 	//
 	randAmt := bytes.RandU256IntN(sender.GetBalance())
 	_ = randAmt.Sub(randAmt, gas10)
-	_ = randAmt.Sub(randAmt, gas10)
 
 	ret, err := sender.TransferSync(evmContract.GetAddress(), gas10, randAmt, rweb3)
 	require.NoError(t, err)
@@ -145,8 +155,48 @@ func testPayable(t *testing.T) {
 	expectedAmt = new(uint256.Int).Sub(contAcct.GetBalance(), refundAmt)
 	contAcct, err = rweb3.GetAccount(evmContract.GetAddress())
 	require.NoError(t, err)
-	require.Equal(t, expectedAmt, contAcct.Balance)
+	require.Equal(t, expectedAmt, contAcct.GetBalance())
 
 	fmt.Println("after refund", "sender", sender.Address(), "balance", sender.GetBalance())
 	fmt.Println("after refund", "contAcct", contAcct.Address, "balance", contAcct.GetBalance())
+}
+
+func testEvents(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
+	require.NoError(t, creator.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
+	require.NoError(t, creator.SyncAccount(rweb3))
+
+	// subcribe events
+	subWg := &sync.WaitGroup{}
+	sub, err := web3.NewSubscriber(defaultRpcNode.WSEnd)
+	defer func() {
+		sub.Stop()
+	}()
+	require.NoError(t, err)
+	query := fmt.Sprintf("tx.type='contract' AND evm.topic.0='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'")
+	err = sub.Start(query, func(sub *web3.Subscriber, result []byte) {
+		event := &coretypes.ResultEvent{}
+		err := tmjson.Unmarshal(result, event)
+		require.NoError(t, err)
+
+		subWg.Done()
+	})
+	require.NoError(t, err)
+
+	// broadcast tx
+	subWg.Add(1)
+
+	rAddr := types.RandAddress()
+	// Transfer Event sig: ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
+	ret, err := evmContract.Exec("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), gasMax, uint256.NewInt(0), rweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+
+	txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
+
+	subWg.Wait()
+
 }

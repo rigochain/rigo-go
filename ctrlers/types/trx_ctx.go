@@ -4,6 +4,7 @@ import (
 	"github.com/holiman/uint256"
 	bytes2 "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/types"
 )
 
@@ -21,6 +22,7 @@ type TrxContext struct {
 	NeedAmt      *uint256.Int
 	GasUsed      *uint256.Int
 	RetData      []byte
+	Events       []abcitypes.Event
 
 	TrxGovHandler   ITrxHandler
 	TrxAcctHandler  ITrxHandler
