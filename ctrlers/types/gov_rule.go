@@ -60,14 +60,14 @@ func DefaultGovRule() *GovRule {
 		//			= 149,999,999,982,192,000 [per 1RIGO, 1Y]
 		// , it's about 15% of 1 power
 		rewardPerPower:         4_756_468_797,
-		lazyRewardBlocks:       2592000, // = 60 * 60 * 24 * 30 => 30 days
-		lazyApplyingBlocks:     259200,  // = 60 * 60 * 24 * 3 => 3 days
-		minTrxFee:              uint256.NewInt(10),
-		minVotingPeriodBlocks:  259200,  // = 60 * 60 * 24 * 3 => 3 days
-		maxVotingPeriodBlocks:  2592000, // = 60 * 60 * 24 * 30 => 30 days
-		minSelfStakeRatio:      50,      // 50%
-		maxUpdatableStakeRatio: 30,      // 30%
-		slashRatio:             50,      // 50%
+		lazyRewardBlocks:       2592000,                               // = 60 * 60 * 24 * 30 => 30 days
+		lazyApplyingBlocks:     259200,                                // = 60 * 60 * 24 * 3 => 3 days
+		minTrxFee:              uint256.NewInt(1_000_000_000_000_000), // 0.001 RIGO
+		minVotingPeriodBlocks:  259200,                                // = 60 * 60 * 24 * 3 => 3 days
+		maxVotingPeriodBlocks:  2592000,                               // = 60 * 60 * 24 * 30 => 30 days
+		minSelfStakeRatio:      50,                                    // 50%
+		maxUpdatableStakeRatio: 30,                                    // 30%
+		slashRatio:             50,                                    // 50%
 	}
 }
 
@@ -81,7 +81,7 @@ func Test1GovRule() *GovRule {
 		rewardPerPower:         2_000_000_000,
 		lazyRewardBlocks:       10,
 		lazyApplyingBlocks:     10,
-		minTrxFee:              uint256.NewInt(20),
+		minTrxFee:              uint256.NewInt(10),
 		minVotingPeriodBlocks:  10,
 		maxVotingPeriodBlocks:  10,
 		minSelfStakeRatio:      50, // 50%

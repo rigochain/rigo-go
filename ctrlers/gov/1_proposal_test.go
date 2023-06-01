@@ -35,19 +35,19 @@ func init() {
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 
 	tx1 := web3.NewTrxProposal( // no right
-		stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, uint256.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 
 	tx3 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
 		"test govrule proposal", 10, 159200, proposal.PROPOSAL_GOVRULE, bzOpt) // wrong period
 
 	tx4 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // it will be used to test wrong start height
 
 	tx5 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
 		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // all right
 
 	cases1 = []*Case{
@@ -60,7 +60,7 @@ func init() {
 	}
 
 	tx6 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
 		"test govrule proposal2", 11, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 	cases2 = []*Case{
 		// the tx6 will be submitted two times.
@@ -107,7 +107,7 @@ func TestOverflowBlockHeight(t *testing.T) {
 	require.NoError(t, err)
 
 	tx := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(10),
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
 		"test govrule proposal", math.MaxInt64, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 	xerr := runTrx(makeTrxCtx(tx, 1, true))
 	require.Error(t, xerr)

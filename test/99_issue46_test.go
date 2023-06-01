@@ -95,7 +95,7 @@ func TestPoCEncode(t *testing.T) {
 	nonce := currentNonce.Uint64()
 
 	gas := big.NewInt(0)
-	gas.SetString("10000000", 10)
+	gas.SetString("10000000000000000", 10)
 	gasEncode, _ := uint256.FromBig(gas)
 
 	moneyCopyAmt := big.NewInt(0)

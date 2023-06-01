@@ -44,14 +44,14 @@ func TestMinSelfStakeRatio(t *testing.T) {
 
 	// get allowed delegating
 	maxAllowedAmt := valStakes.TotalAmount
-	ret, err := sender.StakingSync(valWal.Address(), gas10, maxAllowedAmt, rweb3)
+	ret, err := sender.StakingSync(valWal.Address(), baseFee, maxAllowedAmt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
 	sender.AddNonce()
 
 	// not allowed delegating, because `maxAllowedAmt` is already delegated.
-	ret, err = sender.StakingSync(valWal.Address(), gas10, uint256.NewInt(1_000_000_000_000_000_000), rweb3)
+	ret, err = sender.StakingSync(valWal.Address(), baseFee, uint256.NewInt(1_000_000_000_000_000_000), rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
@@ -65,7 +65,7 @@ func TestMinSelfStakeRatio(t *testing.T) {
 
 	require.NoError(t, valWal.SyncAccount(rweb3))
 	require.NoError(t, valWal.Unlock(defaultRpcNode.Pass))
-	ret, err = valWal.StakingSync(valWal.Address(), gas10, allowedMinStake, rweb3)
+	ret, err = valWal.StakingSync(valWal.Address(), baseFee, allowedMinStake, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, allowedMinStake.Dec())
 
@@ -84,14 +84,14 @@ func TestInvalidStakeAmount(t *testing.T) {
 	// too small
 	stakeAmt := uint256.MustFromDecimal("1111")
 
-	ret, err := w.StakingSync(w.Address(), gas10, stakeAmt, rweb3)
+	ret, err := w.StakingSync(w.Address(), baseFee, stakeAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
 	// not multiple
 	stakeAmt = uint256.MustFromDecimal("1000000000000000001")
 
-	ret, err = w.StakingSync(w.Address(), gas10, stakeAmt, rweb3)
+	ret, err = w.StakingSync(w.Address(), baseFee, stakeAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 }
@@ -122,7 +122,7 @@ func TestDelegating(t *testing.T) {
 	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
 
 	// self staking
-	ret, err := w.StakingSync(valAddr, gas10, stakeAmt, rweb3)
+	ret, err := w.StakingSync(valAddr, baseFee, stakeAmt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	txHash := ret.Hash
@@ -131,7 +131,7 @@ func TestDelegating(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 	require.Equal(t, txHash, txRet.Hash)
-	require.Equal(t, gas10, txRet.TxDetail.Gas)
+	require.Equal(t, baseFee, txRet.TxDetail.Gas)
 	require.Equal(t, stakeAmt, txRet.TxDetail.Amount)
 
 	// check stakes
@@ -174,7 +174,7 @@ func TestMinValidatorStake(t *testing.T) {
 
 	minValidatorStake := govRule.MinValidatorStake()
 	_amt := new(uint256.Int).Sub(minValidatorStake, ctrlertypes.AmountPerPower())
-	ret, err := sender.StakingSync(sender.Address(), gas10, _amt, rweb3)
+	ret, err := sender.StakingSync(sender.Address(), baseFee, _amt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
 	require.Contains(t, ret.Log, "too small stake to become validator", ret.Log)
