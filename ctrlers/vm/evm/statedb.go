@@ -10,7 +10,6 @@ import (
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	types2 "github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
-	"github.com/rigochain/rigo-go/types/xerrors"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/big"
 	"sync"
@@ -46,7 +45,7 @@ func NewStateDBWrapper(db ethdb.Database, lastRootHash []byte, acctHandler ctrle
 	}, nil
 }
 
-func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to types2.Address, exec bool) xerrors.XError {
+func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to types2.Address, exec bool) {
 	s.exec = exec
 	s.snapshot = 0
 	s.StateDB.Prepare(txhash.Array32(), txidx)
@@ -55,25 +54,19 @@ func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to type
 	if !types2.IsZeroAddress(to) {
 		s.AddAddressToAccessList(to.Array20())
 	}
-
-	return nil
 }
 
-func (s *StateDBWrapper) Finish() xerrors.XError {
+func (s *StateDBWrapper) Finish() {
 	for addr, _ := range s.accessedObjAddrs {
-		if s.Exist(addr) {
-			amt := uint256.MustFromBig(s.StateDB.GetBalance(addr))
-			nonce := s.StateDB.GetNonce(addr)
+		amt := uint256.MustFromBig(s.StateDB.GetBalance(addr))
+		nonce := s.StateDB.GetNonce(addr)
 
-			acct := s.acctLedger.FindOrNewAccount(addr[:], s.exec)
-			acct.SetBalance(amt)
-			acct.SetNonce(nonce)
+		acct := s.acctLedger.FindOrNewAccount(addr[:], s.exec)
+		acct.SetBalance(amt)
+		acct.SetNonce(nonce)
 
-			_ = s.acctLedger.SetAccountCommittable(acct, s.exec)
-		}
+		_ = s.acctLedger.SetAccountCommittable(acct, s.exec)
 	}
-
-	return nil
 }
 
 func (s *StateDBWrapper) Close() error {
