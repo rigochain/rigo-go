@@ -174,6 +174,15 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		if logs != nil && len(logs) > 0 {
 			var attrs []abcitypes.EventAttribute
 			for _, l := range logs {
+				// Address
+				strVal := hex.EncodeToString(l.Address[:])
+				attrs = append(attrs, abcitypes.EventAttribute{
+					Key:   []byte("contract"),
+					Value: []byte(strVal),
+					Index: true,
+				})
+
+				// Topics
 				for i, t := range l.Topics {
 					strVal := hex.EncodeToString(t.Bytes())
 					attrs = append(attrs, abcitypes.EventAttribute{
@@ -182,6 +191,8 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 						Index: true,
 					})
 				}
+
+				// Data
 				if l.Data != nil && len(l.Data) > 0 {
 					strVal := hex.EncodeToString(l.Data)
 					attrs = append(attrs, abcitypes.EventAttribute{
@@ -190,6 +201,17 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 						Index: false,
 					})
 				}
+
+				// Removed
+				strVal = "false"
+				if l.Removed {
+					strVal = "true"
+				}
+				attrs = append(attrs, abcitypes.EventAttribute{
+					Key:   []byte("removed"),
+					Value: []byte(strVal),
+					Index: false,
+				})
 			}
 			ctx.Events = append(ctx.Events, abcitypes.Event{
 				Type:       "evm",
