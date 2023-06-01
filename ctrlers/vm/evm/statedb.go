@@ -21,8 +21,8 @@ type StateDBWrapper struct {
 	acctLedger ctrlertypes.IAccountHandler
 	immutable  bool
 
-	//txctx            *ctrlertypes.TrxContext
 	accessedObjAddrs map[common.Address]int
+	snapshot         int
 	exec             bool
 
 	logger tmlog.Logger
@@ -48,6 +48,7 @@ func NewStateDBWrapper(db ethdb.Database, lastRootHash []byte, acctHandler ctrle
 
 func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to types2.Address, exec bool) xerrors.XError {
 	s.exec = exec
+	s.snapshot = 0
 	s.StateDB.Prepare(txhash.Array32(), txidx)
 
 	s.AddAddressToAccessList(from.Array20())
@@ -58,7 +59,7 @@ func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to type
 	return nil
 }
 
-func (s *StateDBWrapper) ApplyTo() xerrors.XError {
+func (s *StateDBWrapper) Finish() xerrors.XError {
 	for addr, _ := range s.accessedObjAddrs {
 		if s.Exist(addr) {
 			amt := uint256.MustFromBig(s.StateDB.GetBalance(addr))
@@ -69,8 +70,6 @@ func (s *StateDBWrapper) ApplyTo() xerrors.XError {
 			acct.SetNonce(nonce)
 
 			_ = s.acctLedger.SetAccountCommittable(acct, s.exec)
-
-			//s.logger.Debug("ApplyTo", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec())
 		}
 	}
 
@@ -84,56 +83,27 @@ func (s *StateDBWrapper) Close() error {
 }
 
 func (s *StateDBWrapper) CreateAccount(addr common.Address) {
-	//_ = s.acctLedger.FindOrNewAccount(addr[:], s.txctx.Exec)
 	s.StateDB.CreateAccount(addr)
-	s.logger.Debug("Create account", "address", addr)
 }
 
 func (s *StateDBWrapper) SubBalance(addr common.Address, amt *big.Int) {
 	s.StateDB.SubBalance(addr, amt)
-	//if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
-	//	if err := acct.SubBalance(uint256.MustFromBig(amt)); err != nil {
-	//		panic(err)
-	//	}
-	//	s.logger.Debug("SubBalance", "address", addr, "sub.amount", amt, "balance", acct.Balance.Dec(), "exec", s.exec)
-	//	s.acctLedger.SetAccountCommittable(acct, s.exec)
-	//}
 }
 
 func (s *StateDBWrapper) AddBalance(addr common.Address, amt *big.Int) {
 	s.StateDB.AddBalance(addr, amt)
-	//if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
-	//	if err := acct.AddBalance(uint256.MustFromBig(amt)); err != nil {
-	//		panic(err)
-	//	}
-	//	s.logger.Debug("AddBalance", "address", addr, "add.amount", amt, "balance", acct.Balance.Dec(), "exec", s.exec)
-	//	s.acctLedger.SetAccountCommittable(acct, s.exec)
-	//}
 }
 
 func (s *StateDBWrapper) GetBalance(addr common.Address) *big.Int {
 	return s.StateDB.GetBalance(addr)
-	//if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
-	//	return acct.GetBalance().ToBig()
-	//}
-	//return big.NewInt(0)
 }
 
 func (s *StateDBWrapper) GetNonce(addr common.Address) uint64 {
 	return s.StateDB.GetNonce(addr)
-	//if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
-	//	return acct.GetNonce()
-	//}
-	//return 0
 }
 
 func (s *StateDBWrapper) SetNonce(addr common.Address, n uint64) {
 	s.StateDB.SetNonce(addr, n)
-	//s.logger.Debug("SetNonce", "address", addr, "nonce", n)
-	//if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
-	//	acct.SetNonce(n)
-	//	s.acctLedger.SetAccountCommittable(acct, s.exec)
-	//}
 }
 
 func (s *StateDBWrapper) GetCodeHash(addr common.Address) common.Hash {
@@ -178,15 +148,6 @@ func (s *StateDBWrapper) SetState(addr common.Address, key, value common.Hash) {
 
 func (s *StateDBWrapper) Suicide(addr common.Address) bool {
 	return s.StateDB.Suicide(addr)
-	//ret := s.StateDB.Suicide(addr)
-	//if ret {
-	//	if acct := s.acctLedger.FindAccount(addr[:], s.exec); acct != nil {
-	//		acct.Balance = uint256.NewInt(0)
-	//		s.logger.Debug("Suicide", "address", addr, "balance", acct.Balance.Dec(), "exec", s.exec)
-	//		s.acctLedger.SetAccountCommittable(acct, s.exec)
-	//	}
-	//}
-	//return ret
 }
 
 func (s *StateDBWrapper) HasSuicided(addr common.Address) bool {
@@ -202,15 +163,15 @@ func (s *StateDBWrapper) Empty(addr common.Address) bool {
 }
 
 func (s *StateDBWrapper) PrepareAccessList(addr common.Address, dest *common.Address, precompiles []common.Address, txAccesses types.AccessList) {
-	s.addAddressToAccessList(addr)
+	s.addAccessedObjAddr(addr)
 	if dest != nil {
-		s.addAddressToAccessList(*dest)
+		s.addAccessedObjAddr(*dest)
 	}
 	for _, preaddr := range precompiles {
-		s.addAddressToAccessList(preaddr)
+		s.addAccessedObjAddr(preaddr)
 	}
 	for _, el := range txAccesses {
-		s.addAddressToAccessList(el.Address)
+		s.addAccessedObjAddr(el.Address)
 		for _, key := range el.StorageKeys {
 			s.AddSlotToAccessList(el.Address, key)
 		}
@@ -228,18 +189,19 @@ func (s *StateDBWrapper) SlotInAccessList(addr common.Address, slot common.Hash)
 }
 
 func (s *StateDBWrapper) AddAddressToAccessList(addr common.Address) {
-	s.addAddressToAccessList(addr)
+	s.addAccessedObjAddr(addr)
 	s.StateDB.AddAddressToAccessList(addr)
 }
 
-func (s *StateDBWrapper) addAddressToAccessList(addr common.Address) {
+func (s *StateDBWrapper) addAccessedObjAddr(addr common.Address) {
 	if _, ok := s.accessedObjAddrs[addr]; !ok {
 		stateObject := s.GetOrNewStateObject(addr)
 		if stateObject != nil {
 			rigoAcct := s.acctLedger.FindOrNewAccount(addr[:], s.exec)
 			stateObject.SetNonce(rigoAcct.Nonce)
 			stateObject.SetBalance(rigoAcct.Balance.ToBig())
-			s.accessedObjAddrs[addr] = 1
+
+			s.accessedObjAddrs[addr] = s.snapshot + 1
 		}
 	}
 }
@@ -249,11 +211,26 @@ func (s *StateDBWrapper) AddSlotToAccessList(addr common.Address, slot common.Ha
 }
 
 func (s *StateDBWrapper) RevertToSnapshot(revid int) {
+	s.revertAccessedObjAddr(revid)
 	s.StateDB.RevertToSnapshot(revid)
 }
 
+func (s *StateDBWrapper) revertAccessedObjAddr(snapshot int) {
+	var revertAddrs []common.Address
+	for k, v := range s.accessedObjAddrs {
+		if snapshot < v {
+			revertAddrs = append(revertAddrs, k)
+		}
+	}
+
+	for _, addr := range revertAddrs {
+		delete(s.accessedObjAddrs, addr)
+	}
+}
+
 func (s *StateDBWrapper) Snapshot() int {
-	return s.StateDB.Snapshot()
+	s.snapshot = s.StateDB.Snapshot()
+	return s.snapshot
 }
 
 func (s *StateDBWrapper) AddLog(log *types.Log) {
