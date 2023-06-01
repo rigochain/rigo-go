@@ -81,11 +81,6 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 
 	logger = logger.With("module", "rigo_EVMCtrler")
 
-	//
-	//stdb, err := NewStateDBWrapper(path, hash, acctHandler, logger)
-	//if err != nil {
-	//	panic(err)
-	//}
 	return &EVMCtrler{
 		ethChainConfig:  RIGOMainnetEVMCtrlerChainConfig,
 		ethDB:           db,
@@ -143,10 +138,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	snap := ctrler.stateDBWrapper.Snapshot()
 
 	defer func() {
-		if !ctx.Exec {
-			ctrler.stateDBWrapper.RevertToSnapshot(snap)
-		}
-		ctrler.stateDBWrapper.ApplyTo()
+		ctrler.stateDBWrapper.Finish()
 	}()
 
 	ret, xerr := ctrler.execVM(
@@ -158,13 +150,24 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data,
 		ctx.Height,
 		ctx.BlockTime,
+		ctx.Exec,
 	)
 	if xerr != nil {
 		ctrler.stateDBWrapper.RevertToSnapshot(snap)
 		return xerr
 	}
-	if ret.Err != nil {
+
+	if ret.Failed() {
+		ctrler.stateDBWrapper.RevertToSnapshot(snap)
 		return xerrors.From(ret.Err)
+	}
+
+	// Update the state with pending changes.
+	blockNumber := uint256.NewInt(uint64(ctx.Height)).ToBig()
+	if ctrler.ethChainConfig.IsByzantium(blockNumber) {
+		ctrler.stateDBWrapper.Finalise(true)
+	} else {
+		ctrler.lastRootHash = ctrler.stateDBWrapper.IntermediateRoot(ctrler.ethChainConfig.IsEIP158(blockNumber)).Bytes()
 	}
 
 	ctx.RetData = ret.ReturnData
@@ -179,7 +182,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		if logs != nil && len(logs) > 0 {
 			var attrs []abcitypes.EventAttribute
 			for _, l := range logs {
-				// Address
+				// Contract Address
 				strVal := hex.EncodeToString(l.Address[:])
 				attrs = append(attrs, abcitypes.EventAttribute{
 					Key:   []byte("contract"),
@@ -187,7 +190,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 					Index: true,
 				})
 
-				// Topics
+				// Topics (indexed)
 				for i, t := range l.Topics {
 					strVal := hex.EncodeToString(t.Bytes())
 					attrs = append(attrs, abcitypes.EventAttribute{
@@ -197,7 +200,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 					})
 				}
 
-				// Data
+				// Data (not indexed)
 				if l.Data != nil && len(l.Data) > 0 {
 					strVal := hex.EncodeToString(l.Data)
 					attrs = append(attrs, abcitypes.EventAttribute{
@@ -228,7 +231,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, amt *uint256.Int, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
+func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, amt *uint256.Int, data []byte, height, blockTime int64, exec bool) (*core.ExecutionResult, xerrors.XError) {
 	var sender common.Address
 	var toAddr *common.Address
 	copy(sender[:], from)
@@ -250,11 +253,10 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, amt *
 		return nil, xerrors.From(err)
 	}
 
-	if vmmsg.To() == nil {
+	if vmmsg.To() == nil && !result.Failed() {
 		contractAddr := crypto.CreateAddress(vmevm.TxContext.Origin, vmmsg.Nonce())
 		result.ReturnData = contractAddr[:]
-
-		ctrler.logger.Debug("Create contract", "address", contractAddr)
+		//ctrler.logger.Debug("Create contract", "address", contractAddr)
 	}
 
 	return result, nil
