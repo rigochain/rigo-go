@@ -10,7 +10,10 @@ import (
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/stretchr/testify/require"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -187,4 +190,81 @@ func TestPoC2(t *testing.T) {
 	fmt.Printf("victim balance: %s\n", victimAcData.Balance)
 
 	require.Equal(t, "10000000000000001", victimAcData.Balance)
+}
+
+func TestPoc3(t *testing.T) {
+	wallet := randWallet()
+	require.NoError(t, wallet.Unlock(defaultRpcNode.Pass))
+
+	accountData := getAccountData(wallet.Address())
+	currentNonce := new(big.Int)
+	currentNonce, _ = currentNonce.SetString(accountData.Nonce, 10)
+
+	fromAddr := wallet.Address()
+	nonce := currentNonce.Uint64()
+
+	gas := big.NewInt(0)
+	gas.SetString("10000000000000000", 10)
+	gasEncode, _ := uint256.FromBig(gas)
+
+	selfdestructContract, _ := hex.DecodeString("6080604052608b8060116000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063f2a75fe414602d575b600080fd5b60336035565b005b600061fefe90508073ffffffffffffffffffffffffffffffffffffffff16fffea264697066735822122006ac63568a8a89b4d90fe512fe76fb87c6f6f951443e0302939b87e795198d7264736f6c63430008100033")
+	trxObj := web3.NewTrxContract(fromAddr, types.ZeroAddress(), nonce, gasEncode, uint256.NewInt(0), selfdestructContract)
+	retbz := submitTrx(wallet, trxObj)
+
+	resp := &struct {
+		Version string          `json:"version"`
+		Id      float64         `json:"id"`
+		Result  json.RawMessage `json:"result"`
+		Error   json.RawMessage `json:"error"`
+	}{}
+
+	err := tmjson.Unmarshal(retbz, resp)
+	require.NoError(t, err)
+	resp2 := &coretypes.ResultBroadcastTxCommit{}
+	err = tmjson.Unmarshal(resp.Result, resp2)
+	require.NoError(t, err)
+
+	contractAddr := bytes.HexBytes(resp2.DeliverTx.Data)
+	fmt.Println("contract address", contractAddr)
+
+	nonce++
+	transferTrx := web3.NewTrxTransfer(fromAddr, contractAddr, nonce, gasEncode, gasEncode)
+	retbz = submitTrx(wallet, transferTrx)
+	err = tmjson.Unmarshal(retbz, resp)
+	require.NoError(t, err)
+	resp2 = &coretypes.ResultBroadcastTxCommit{}
+	err = tmjson.Unmarshal(resp.Result, resp2)
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	contAcct := getAccountData(contractAddr)
+	fmt.Println("contract balance", contAcct.Balance)
+
+	someoneAddr, _ := types.HexToAddress("0x000000000000000000000000000000000000FEfe")
+	someoneAcct := getAccountData(someoneAddr)
+	fmt.Println("someoneAddr balance", someoneAcct.Balance)
+	time.Sleep(1 * time.Second)
+
+	data := bytes.HexBytes(crypto.Keccak256([]byte("empty()")))
+	data = data[:4]
+
+	nonce++
+	tx := web3.NewTrxContract(fromAddr, contractAddr, nonce, gasEncode, uint256.NewInt(0), data)
+	retbz = submitTrx(wallet, tx)
+	err = tmjson.Unmarshal(retbz, resp)
+	require.NoError(t, err)
+	resp2 = &coretypes.ResultBroadcastTxCommit{}
+	err = tmjson.Unmarshal(resp.Result, resp2)
+	require.NoError(t, err)
+	time.Sleep(1 * time.Second)
+
+	contAcct = getAccountData(contractAddr)
+	fmt.Println("contract balance", contAcct.Balance)
+	require.Equal(t, "0", contAcct.Balance)
+	time.Sleep(1 * time.Second)
+
+	someoneAcct = getAccountData(someoneAddr)
+	fmt.Println("someoneAddr balance", someoneAcct.Balance)
+	require.Equal(t, gasEncode.Dec(), someoneAcct.Balance)
 }

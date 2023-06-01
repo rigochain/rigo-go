@@ -132,14 +132,8 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	}
 
 	// issue #48
-	if xerr := ctrler.stateDBWrapper.Prepare(ctx.TxHash, ctx.TxIdx, ctx.Tx.From, ctx.Tx.To, ctx.Exec); xerr != nil {
-		return xerr
-	}
+	ctrler.stateDBWrapper.Prepare(ctx.TxHash, ctx.TxIdx, ctx.Tx.From, ctx.Tx.To, ctx.Exec)
 	snap := ctrler.stateDBWrapper.Snapshot()
-
-	defer func() {
-		ctrler.stateDBWrapper.Finish()
-	}()
 
 	ret, xerr := ctrler.execVM(
 		ctx.Tx.From,
@@ -154,13 +148,17 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	)
 	if xerr != nil {
 		ctrler.stateDBWrapper.RevertToSnapshot(snap)
+		ctrler.stateDBWrapper.Finish()
 		return xerr
 	}
 
 	if ret.Failed() {
 		ctrler.stateDBWrapper.RevertToSnapshot(snap)
+		ctrler.stateDBWrapper.Finish()
 		return xerrors.From(ret.Err)
 	}
+
+	ctrler.stateDBWrapper.Finish()
 
 	// Update the state with pending changes.
 	blockNumber := uint256.NewInt(uint64(ctx.Height)).ToBig()
@@ -256,7 +254,7 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, amt *
 	if vmmsg.To() == nil && !result.Failed() {
 		contractAddr := crypto.CreateAddress(vmevm.TxContext.Origin, vmmsg.Nonce())
 		result.ReturnData = contractAddr[:]
-		//ctrler.logger.Debug("Create contract", "address", contractAddr)
+		ctrler.logger.Debug("Create contract", "address", contractAddr)
 	}
 
 	return result, nil

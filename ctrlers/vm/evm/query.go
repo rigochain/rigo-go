@@ -64,10 +64,8 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 	if xerr != nil {
 		return nil, xerr
 	}
-	xerr = state.Prepare(nil, 0, from, to, false)
-	if xerr != nil {
-		return nil, xerr
-	}
+
+	state.Prepare(nil, 0, from, to, false)
 	defer func() { state = nil }()
 
 	var sender common.Address
