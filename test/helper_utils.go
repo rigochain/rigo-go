@@ -27,9 +27,9 @@ var (
 	W0               *rigoweb3.Wallet
 	W1               *rigoweb3.Wallet
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
-	gas10            = uint256.NewInt(10)
-	gas09            = uint256.NewInt(9)
-	gasMax           = uint256.NewInt(15_000_000)
+	baseFee          = uint256.NewInt(1_000_000_000_000_000)
+	smallFee         = uint256.NewInt(999_999_999_999_999)
+	limitFee         = uint256.NewInt(15_000_000_000_000_000)
 	defaultRpcNode   *PeerMock
 )
 

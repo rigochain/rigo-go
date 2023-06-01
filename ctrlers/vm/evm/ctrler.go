@@ -26,8 +26,9 @@ import (
 )
 
 var (
-	lastBlockHeightKey       = []byte("lbh")
-	RIGOEVMCtrlerChainConfig = &params.ChainConfig{big.NewInt(220819), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil}
+	lastBlockHeightKey              = []byte("lbh")
+	RIGOTestnetEVMCtrlerChainConfig = &params.ChainConfig{big.NewInt(220818), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil}
+	RIGOMainnetEVMCtrlerChainConfig = &params.ChainConfig{big.NewInt(220819), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil}
 )
 
 func blockKey(h int64) []byte {
@@ -86,7 +87,7 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 	//	panic(err)
 	//}
 	return &EVMCtrler{
-		ethChainConfig:  RIGOEVMCtrlerChainConfig,
+		ethChainConfig:  RIGOMainnetEVMCtrlerChainConfig,
 		ethDB:           db,
 		metadb:          metadb,
 		acctLedger:      acctHandler,
@@ -139,15 +140,20 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	if xerr := ctrler.stateDBWrapper.Prepare(ctx.TxHash, ctx.TxIdx, ctx.Tx.From, ctx.Tx.To, ctx.Exec); xerr != nil {
 		return xerr
 	}
-	defer ctrler.stateDBWrapper.ApplyTo()
-
 	snap := ctrler.stateDBWrapper.Snapshot()
+
+	defer func() {
+		if !ctx.Exec {
+			ctrler.stateDBWrapper.RevertToSnapshot(snap)
+		}
+		ctrler.stateDBWrapper.ApplyTo()
+	}()
 
 	ret, xerr := ctrler.execVM(
 		ctx.Tx.From,
 		ctx.Tx.To,
 		ctx.Tx.Nonce,
-		ctx.Tx.Gas,
+		feeToGas(ctx.Tx.Gas),
 		ctx.Tx.Amount,
 		ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data,
 		ctx.Height,
@@ -165,11 +171,10 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 	// Gas is already applied in EVM.
 	// the `EVM` handles nonce, amount and gas.
-	ctx.GasUsed = new(uint256.Int).Add(ctx.GasUsed, uint256.NewInt(ret.UsedGas))
+	ctx.GasUsed = new(uint256.Int).Add(ctx.GasUsed, gasToFee(ret.UsedGas))
 
-	if !ctx.Exec {
-		ctrler.stateDBWrapper.RevertToSnapshot(snap)
-	} else {
+	// Add events from evm.
+	if ctx.Exec {
 		logs := ctrler.stateDBWrapper.GetLogs(ctx.TxHash.Array32(), common.Hash{})
 		if logs != nil && len(logs) > 0 {
 			var attrs []abcitypes.EventAttribute
@@ -223,7 +228,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, gas, amt *uint256.Int, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
+func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, amt *uint256.Int, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
 	var sender common.Address
 	var toAddr *common.Address
 	copy(sender[:], from)
@@ -233,7 +238,7 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, gas, amt *
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, nonce, gas.Uint64(), amt, data, false)
+	vmmsg := evmMessage(sender, toAddr, nonce, gas, amt, data, false)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)

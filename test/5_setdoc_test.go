@@ -20,11 +20,11 @@ func TestSetDoc(t *testing.T) {
 	name := "test account"
 	url := "https://www.my.site/doc"
 
-	ret, err := w.SetDocSync(name, url, gas09, rweb3)
+	ret, err := w.SetDocSync(name, url, smallFee, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
 
-	ret, err = w.SetDocSync(name, url, gas10, rweb3)
+	ret, err = w.SetDocSync(name, url, baseFee, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code)
 
@@ -39,7 +39,7 @@ func TestSetDoc(t *testing.T) {
 	require.Equal(t, url, w.GetAccount().DocURL)
 
 	tooLongName := rand.Str(types.MAX_ACCT_NAME + 1)
-	ret, err = w.SetDocSync(tooLongName, url, gas10, rweb3)
+	ret, err = w.SetDocSync(tooLongName, url, baseFee, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
