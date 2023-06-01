@@ -176,6 +176,7 @@ func (ctrler *AcctCtrler) Close() xerrors.XError {
 		if xerr := ctrler.acctLedger.Close(); xerr != nil {
 			ctrler.logger.Error("AcctCtrler", "acctLedger.Close() returns error", xerr.Error())
 		}
+		ctrler.logger.Debug("AcctCtrler - close ledgers")
 		ctrler.acctLedger = nil
 	}
 	return nil

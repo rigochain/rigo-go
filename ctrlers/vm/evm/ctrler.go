@@ -39,6 +39,7 @@ type EVMCtrler struct {
 	ethDB          ethdb.Database
 	stateDBWrapper *StateDBWrapper
 	acctLedger     ctrlertypes.IAccountHandler
+	blockGasPool   *core.GasPool
 
 	metadb          tmdb.DB
 	lastRootHash    []byte
@@ -111,6 +112,7 @@ func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 	}
 
 	ctrler.stateDBWrapper = stdb
+	ctrler.blockGasPool = new(core.GasPool).AddGas(gasLimit)
 	return nil, nil
 }
 
@@ -209,15 +211,14 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, gas, amt *
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, nonce, gas.Uint64(), amt, data)
+	vmmsg := evmMessage(sender, toAddr, nonce, gas.Uint64(), amt, data, false)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)
 
 	vmevm := vm.NewEVM(blockContext, txContext, ctrler.stateDBWrapper, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
-	gp := new(core.GasPool).AddGas(vmmsg.Gas())
-	result, err := core.ApplyMessage(vmevm, vmmsg, gp)
+	result, err := core.ApplyMessage(vmevm, vmmsg, ctrler.blockGasPool)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
@@ -233,16 +234,17 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce uint64, gas, amt *
 }
 
 func (ctrler *EVMCtrler) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	ctrler.blockGasPool = new(core.GasPool).AddGas(gasLimit)
 	return nil, nil
 }
 
 func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	rootHash, err := ctrler.stateDBWrapper.Commit(true)
 	if err != nil {
-		return nil, 0, xerrors.From(err)
+		panic(err)
 	}
 	if err := ctrler.stateDBWrapper.Database().TrieDB().Commit(rootHash, true, nil); err != nil {
-		return nil, 0, xerrors.From(err)
+		panic(err)
 	}
 	ctrler.lastBlockHeight++
 	ctrler.lastRootHash = rootHash[:]
@@ -252,6 +254,13 @@ func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	batch.Set(blockKey(ctrler.lastBlockHeight), ctrler.lastRootHash)
 	batch.WriteSync()
 	batch.Close()
+
+	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, ctrler.acctLedger, ctrler.logger)
+	if err != nil {
+		panic(err)
+	}
+
+	ctrler.stateDBWrapper = stdb
 
 	return rootHash[:], ctrler.lastBlockHeight, nil
 }

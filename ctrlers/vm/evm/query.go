@@ -79,14 +79,13 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 		copy(toAddr[:], to)
 	}
 
-	nonce := state.GetNonce(from.Array20())
-	vmmsg := evmMessage(sender, toAddr, nonce, uint64(0), uint256.NewInt(0), data)
+	vmmsg := evmMessage(sender, toAddr, 0, gasLimit, uint256.NewInt(0), data, true)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
-	gp := new(core.GasPool).AddGas(vmmsg.Gas())
+	gp := new(core.GasPool).AddGas(gasLimit)
 	result, err := core.ApplyMessage(vmevm, vmmsg, gp)
 	if err != nil {
 		return nil, xerrors.From(err)

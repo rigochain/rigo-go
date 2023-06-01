@@ -29,7 +29,7 @@ var (
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
 	gas10            = uint256.NewInt(10)
 	gas09            = uint256.NewInt(9)
-	gasMax           = uint256.NewInt(25000000)
+	gasMax           = uint256.NewInt(15_000_000)
 	defaultRpcNode   *PeerMock
 )
 
