@@ -120,14 +120,24 @@ func (prop *GovProposal) DoPunish(addr types.Address, ratio int64) (int64, xerro
 		return 0, xerrors.ErrNotFoundVoter
 	}
 
+	choice := voter.Choice
+	if choice >= 0 {
+		// if voter already finishes selection, cancel it.
+		prop.cancelVote(voter)
+	}
+
 	_p0 := uint256.NewInt(uint64(voter.Power))
 	_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
 	_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
 	slashingPower := int64(_p0.Uint64())
 
 	voter.Power -= slashingPower
+
 	if voter.Power <= 0 {
 		delete(prop.Voters, addr.String())
+	} else if choice >= 0 {
+		// vote again with slashed power
+		prop.doVote(voter, choice)
 	}
 	prop.TotalVotingPower -= slashingPower
 	prop.MajorityPower = (prop.TotalVotingPower * 2) / 3
