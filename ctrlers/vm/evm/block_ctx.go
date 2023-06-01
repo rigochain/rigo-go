@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	gasLimit  = uint64(25000000) // issue #44
+	gasLimit  = uint64(25_000_000) // issue #44
 	gasPrice  = uint256.NewInt(1)
 	gasFeeCap = uint256.NewInt(0)
 	gasTipCap = uint256.NewInt(0)
@@ -47,12 +47,7 @@ func evmBlockContext(sender common.Address, bn int64, tm int64) vm.BlockContext 
 	}
 }
 
-func evmMessage(_from common.Address, _to *common.Address, nonce, gas uint64, amt *uint256.Int, data []byte) types.Message {
-
-	if gas > gasLimit || gas == 0 {
-		gas = gasLimit
-	}
-
+func evmMessage(_from common.Address, _to *common.Address, nonce, gas uint64, amt *uint256.Int, data []byte, isFake bool) types.Message {
 	return types.NewMessage(
 		_from,
 		_to,
@@ -64,6 +59,6 @@ func evmMessage(_from common.Address, _to *common.Address, nonce, gas uint64, am
 		gasTipCap.ToBig(),
 		data,
 		nil,
-		false,
+		isFake,
 	)
 }

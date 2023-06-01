@@ -263,10 +263,9 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 		"hash", req.Hash,
 		"prev.hash", req.Header.LastBlockId.Hash)
 
-	// save the block fee info. - it will be used for rewarding
-	ctrler.mtx.Lock()
+	ctrler.mtx.Lock() // this lock will be unlocked at Commit
+
 	ctrler.currBlockCtx = types2.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
-	ctrler.mtx.Unlock()
 
 	ev0, _ := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
 	ev1, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
@@ -417,11 +416,13 @@ func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 	ev0, _ := ctrler.govCtrler.EndBlock(ctrler.currBlockCtx)
 	ev1, _ := ctrler.acctCtrler.EndBlock(ctrler.currBlockCtx)
 	ev2, _ := ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
+	ev3, _ := ctrler.vmCtrler.EndBlock(ctrler.currBlockCtx)
 
 	var ev []abcitypes.Event
 	ev = append(ev, ev0...)
 	ev = append(ev, ev1...)
 	ev = append(ev, ev2...)
+	ev = append(ev, ev3...)
 
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates: ctrler.currBlockCtx.ValUpdates,
@@ -430,9 +431,7 @@ func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 }
 
 func (ctrler *RigoApp) Commit() abcitypes.ResponseCommit {
-
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
+	defer ctrler.mtx.Unlock() // this was locked at BeginBlock
 
 	appHash0, ver0, err := ctrler.govCtrler.Commit()
 	if err != nil {
