@@ -27,6 +27,7 @@ func requestHttp(url string) []byte {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -95,8 +96,9 @@ func TestPoC1(t *testing.T) {
 	currentNonce := new(big.Int)
 	currentNonce, _ = currentNonce.SetString(accountData.Nonce, 10)
 
+	require.NoError(t, wallet.SyncAccount(randRigoWeb3()))
 	fromAddr := wallet.Address()
-	nonce := currentNonce.Uint64()
+	nonce := wallet.GetNonce()
 
 	gas := big.NewInt(0)
 	gas.SetString("10000000000000000", 10)
@@ -128,7 +130,7 @@ func TestPoC1(t *testing.T) {
 	fmt.Printf("my balance: %s\n", accountData2.Balance)
 
 	cmpBal := new(uint256.Int).Sub(uint256.MustFromDecimal(accountData.Balance), uint256.MustFromDecimal(accountData2.Balance)).Sign()
-	require.True(t, cmpBal > 0)
+	require.True(t, cmpBal > 0, accountData.Balance, accountData2.Balance)
 }
 
 /**
@@ -164,8 +166,9 @@ func TestPoC2(t *testing.T) {
 	currentNonce := new(big.Int)
 	currentNonce, _ = currentNonce.SetString(accountData.Nonce, 10)
 
+	require.NoError(t, wallet.SyncAccount(randRigoWeb3()))
 	fromAddr := wallet.Address()
-	nonce := currentNonce.Uint64()
+	nonce := wallet.GetNonce()
 
 	gas := big.NewInt(0)
 	gas.SetString("10000000000000000", 10)
@@ -200,8 +203,9 @@ func TestPoc3(t *testing.T) {
 	currentNonce := new(big.Int)
 	currentNonce, _ = currentNonce.SetString(accountData.Nonce, 10)
 
+	require.NoError(t, wallet.SyncAccount(randRigoWeb3()))
 	fromAddr := wallet.Address()
-	nonce := currentNonce.Uint64()
+	nonce := wallet.GetNonce()
 
 	gas := big.NewInt(0)
 	gas.SetString("10000000000000000", 10)
@@ -213,16 +217,16 @@ func TestPoc3(t *testing.T) {
 
 	resp := &struct {
 		Version string          `json:"version"`
-		Id      float64         `json:"id"`
+		Id      int32           `json:"id"`
 		Result  json.RawMessage `json:"result"`
 		Error   json.RawMessage `json:"error"`
 	}{}
 
 	err := tmjson.Unmarshal(retbz, resp)
-	require.NoError(t, err)
+	require.NoError(t, err, string(retbz))
 	resp2 := &coretypes.ResultBroadcastTxCommit{}
 	err = tmjson.Unmarshal(resp.Result, resp2)
-	require.NoError(t, err)
+	require.NoError(t, err, string(resp.Result))
 
 	contractAddr := bytes.HexBytes(resp2.DeliverTx.Data)
 	fmt.Println("contract address", contractAddr)
@@ -236,15 +240,12 @@ func TestPoc3(t *testing.T) {
 	err = tmjson.Unmarshal(resp.Result, resp2)
 	require.NoError(t, err)
 
-	time.Sleep(1 * time.Second)
-
 	contAcct := getAccountData(contractAddr)
 	fmt.Println("contract balance", contAcct.Balance)
 
 	someoneAddr, _ := types.HexToAddress("0x000000000000000000000000000000000000FEfe")
 	someoneAcct := getAccountData(someoneAddr)
 	fmt.Println("someoneAddr balance", someoneAcct.Balance)
-	time.Sleep(1 * time.Second)
 
 	data := bytes.HexBytes(crypto.Keccak256([]byte("empty()")))
 	data = data[:4]
@@ -257,12 +258,10 @@ func TestPoc3(t *testing.T) {
 	resp2 = &coretypes.ResultBroadcastTxCommit{}
 	err = tmjson.Unmarshal(resp.Result, resp2)
 	require.NoError(t, err)
-	time.Sleep(1 * time.Second)
 
 	contAcct = getAccountData(contractAddr)
 	fmt.Println("contract balance", contAcct.Balance)
 	require.Equal(t, "0", contAcct.Balance)
-	time.Sleep(1 * time.Second)
 
 	someoneAcct = getAccountData(someoneAddr)
 	fmt.Println("someoneAddr balance", someoneAcct.Balance)

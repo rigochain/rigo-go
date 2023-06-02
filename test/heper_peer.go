@@ -160,6 +160,10 @@ func runPeers(n int) {
 			panic(err)
 		}
 
+		fmt.Printf("peer_%d: %s\n", i, _peer.Config.RootDir)
 		peers = append(peers, _peer)
+
+		time.Sleep(time.Second)
 	}
+	time.Sleep(time.Second)
 }

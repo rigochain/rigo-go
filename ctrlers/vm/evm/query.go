@@ -77,7 +77,7 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, 0, gasLimit, uint256.NewInt(0), data, true)
+	vmmsg := evmMessage(sender, toAddr, 0, gasLimit, uint256.NewInt(1), uint256.NewInt(0), data, true)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)

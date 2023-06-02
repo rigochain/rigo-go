@@ -9,18 +9,17 @@ import (
 )
 
 var (
-	gasLimit  = uint64(25_000_000)            // issue #44
-	gasPrice  = uint256.NewInt(1_000_000_000) // 1Gwei
+	gasLimit  = uint64(25_000_000) // issue #44
 	gasFeeCap = uint256.NewInt(0)
 	gasTipCap = uint256.NewInt(0)
 )
 
-func feeToGas(fee *uint256.Int) uint64 {
+func feeToGas(fee, gasPrice *uint256.Int) uint64 {
 	gas := new(uint256.Int).Div(fee, gasPrice)
 	return gas.Uint64()
 }
 
-func gasToFee(gas uint64) *uint256.Int {
+func gasToFee(gas uint64, gasPrice *uint256.Int) *uint256.Int {
 	return new(uint256.Int).Mul(uint256.NewInt(gas), gasPrice)
 }
 
@@ -56,7 +55,7 @@ func evmBlockContext(sender common.Address, bn int64, tm int64) vm.BlockContext 
 	}
 }
 
-func evmMessage(_from common.Address, _to *common.Address, nonce, gas uint64, amt *uint256.Int, data []byte, isFake bool) types.Message {
+func evmMessage(_from common.Address, _to *common.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data []byte, isFake bool) types.Message {
 	return types.NewMessage(
 		_from,
 		_to,

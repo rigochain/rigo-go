@@ -139,7 +139,8 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctx.Tx.From,
 		ctx.Tx.To,
 		ctx.Tx.Nonce,
-		feeToGas(ctx.Tx.Gas),
+		feeToGas(ctx.Tx.Gas, ctx.GovHandler.GasPrice()),
+		ctx.GovHandler.GasPrice(),
 		ctx.Tx.Amount,
 		ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data,
 		ctx.Height,
@@ -172,7 +173,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 	// Gas is already applied in EVM.
 	// the `EVM` handles nonce, amount and gas.
-	ctx.GasUsed = new(uint256.Int).Add(ctx.GasUsed, gasToFee(ret.UsedGas))
+	ctx.GasUsed = new(uint256.Int).Add(ctx.GasUsed, gasToFee(ret.UsedGas, ctx.GovHandler.GasPrice()))
 
 	// Add events from evm.
 	if ctx.Exec {
@@ -229,7 +230,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, amt *uint256.Int, data []byte, height, blockTime int64, exec bool) (*core.ExecutionResult, xerrors.XError) {
+func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data []byte, height, blockTime int64, exec bool) (*core.ExecutionResult, xerrors.XError) {
 	var sender common.Address
 	var toAddr *common.Address
 	copy(sender[:], from)
@@ -239,7 +240,7 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, amt *
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, nonce, gas, amt, data, false)
+	vmmsg := evmMessage(sender, toAddr, nonce, gas, gasPrice, amt, data, false)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)
