@@ -46,7 +46,7 @@ func TestSlashAll(t *testing.T) {
 		blocks := int64(100)
 		totalReward0 := uint256.NewInt(0)
 		for i := stakesCnt; i < (stakesCnt + blocks); i++ {
-			r := delegatee.DoReward(i+1, ctrlertypes.AmountPerPower(), govHelper.RewardPerPower())
+			r := delegatee.DoReward(i+1, ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
 			require.Greater(t, r.Sign(), 0, fmt.Sprintf("at height %d", i))
 			_ = totalReward0.Add(totalReward0, r)
 		}
@@ -65,13 +65,13 @@ func TestSlashAll(t *testing.T) {
 			oriStakes[i] = s0.Clone()
 		}
 
-		totalSlashedPower0 := delegatee.DoSlash(govHelper.SlashRatio(), ctrlertypes.AmountPerPower(), govHelper.RewardPerPower(), true)
+		totalSlashedPower0 := delegatee.DoSlash(govParams.SlashRatio(), ctrlertypes.AmountPerPower(), govParams.RewardPerPower(), true)
 
 		expectedTotalSlashedPower0 := int64(0)
 		expectedTotalReceivedReward := uint256.NewInt(0)
 		for _, s0 := range oriStakes {
 			p0 := uint256.NewInt(uint64(s0.Power))
-			_ = p0.Mul(p0, uint256.NewInt(uint64(govHelper.SlashRatio())))
+			_ = p0.Mul(p0, uint256.NewInt(uint64(govParams.SlashRatio())))
 			_ = p0.Div(p0, uint256.NewInt(uint64(100)))
 			slashedPower := int64(p0.Uint64())
 			if slashedPower < 1 {
@@ -86,7 +86,7 @@ func TestSlashAll(t *testing.T) {
 			expectedAmt := new(uint256.Int).Mul(ctrlertypes.AmountPerPower(), uint256.NewInt(uint64(expectedPower)))
 			require.NotEqual(t, expectedAmt.Dec(), s0.Amount.Dec())
 
-			expectedReceivedReward := new(uint256.Int).Mul(s0.ReceivedReward, uint256.NewInt(uint64(govHelper.SlashRatio())))
+			expectedReceivedReward := new(uint256.Int).Mul(s0.ReceivedReward, uint256.NewInt(uint64(govParams.SlashRatio())))
 			_ = expectedReceivedReward.Div(expectedReceivedReward, uint256.NewInt(uint64(100)))
 			require.NotEqual(t, expectedReceivedReward.Dec(), s0.ReceivedReward.Dec())
 
@@ -166,18 +166,18 @@ func TestDoReward_Delegatee(t *testing.T) {
 		),
 	)
 	// not rewarded - height0 is not enough
-	reward0 := delegatee.DoReward(height0, ctrlertypes.AmountPerPower(), govHelper.RewardPerPower())
+	reward0 := delegatee.DoReward(height0, ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
 	require.Equal(t, 0, delegatee.GetTotalRewardAmount().Sign())
 	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalRewardAmount())
 
 	// first reward
-	reward1 := delegatee.DoReward(height0+1, ctrlertypes.AmountPerPower(), govHelper.RewardPerPower())
+	reward1 := delegatee.DoReward(height0+1, ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
 	require.Equal(t, new(uint256.Int).Add(reward0, reward1), delegatee.GetTotalRewardAmount())
 	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalRewardAmount())
 	require.True(t, delegatee.GetTotalRewardAmount().Sign() > 0)
 
 	// first reward
-	reward2 := delegatee.DoReward(height0+2, ctrlertypes.AmountPerPower(), govHelper.RewardPerPower())
+	reward2 := delegatee.DoReward(height0+2, ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
 	require.Equal(t, reward1, reward2)
 	require.Equal(t, new(uint256.Int).Add(reward1, reward2), delegatee.GetTotalRewardAmount())
 	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalRewardAmount())
@@ -202,7 +202,7 @@ func BenchmarkApplyReward(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rewarded := delegatee.DoReward(int64(i+1), ctrlertypes.AmountPerPower(), govHelper.RewardPerPower())
+		rewarded := delegatee.DoReward(int64(i+1), ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
 		require.True(b, rewarded.Sign() > 0)
 	}
 }

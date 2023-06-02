@@ -144,12 +144,12 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
 		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrlertypes.AmountPerPower(), new(uint256.Int))
-		// `ctx.Tx.Amount` MUST be greater than or equal to `ctrler.govHelper.AmountPerPower()`
+		// `ctx.Tx.Amount` MUST be greater than or equal to `AmountPerPower()`
 		//    ==> q.Sign() > 0
 		if q.Sign() <= 0 {
 			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be greater than %v", ctrlertypes.AmountPerPower())
 		}
-		// `ctx.Tx.Amount` MUST be multiple to `ctrler.govHelper.AmountPerPower()`
+		// `ctx.Tx.Amount` MUST be multiple to `AmountPerPower()`
 		//    ==> r.Sign() == 0
 		if r.Sign() != 0 {
 			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be multiple of %v", ctrlertypes.AmountPerPower())

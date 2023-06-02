@@ -24,6 +24,7 @@ type GovRule struct {
 	rewardPerPower        int64
 	lazyRewardBlocks      int64
 	lazyApplyingBlocks    int64
+	gasPrice              *uint256.Int
 	minTrxFee             *uint256.Int
 	minVotingPeriodBlocks int64
 	maxVotingPeriodBlocks int64
@@ -62,7 +63,8 @@ func DefaultGovRule() *GovRule {
 		rewardPerPower:         4_756_468_797,
 		lazyRewardBlocks:       2592000,                               // = 60 * 60 * 24 * 30 => 30 days
 		lazyApplyingBlocks:     259200,                                // = 60 * 60 * 24 * 3 => 3 days
-		minTrxFee:              uint256.NewInt(1_000_000_000_000_000), // 0.001 RIGO
+		gasPrice:               uint256.NewInt(1_000_000_000),         // 1Gwei
+		minTrxFee:              uint256.NewInt(1_000_000_000_000_000), // 0.001 RIGO = 10^15 wei
 		minVotingPeriodBlocks:  259200,                                // = 60 * 60 * 24 * 3 => 3 days
 		maxVotingPeriodBlocks:  2592000,                               // = 60 * 60 * 24 * 30 => 30 days
 		minSelfStakeRatio:      50,                                    // 50%
@@ -77,10 +79,11 @@ func Test1GovRule() *GovRule {
 	return &GovRule{
 		version:                1,
 		maxValidatorCnt:        10,
-		minValidatorStake:      uint256.MustFromDecimal("10000000000000000000"), // 10 RIGO
+		minValidatorStake:      uint256.MustFromDecimal("1000000000000000000"), // 1 RIGO
 		rewardPerPower:         2_000_000_000,
 		lazyRewardBlocks:       10,
 		lazyApplyingBlocks:     10,
+		gasPrice:               uint256.NewInt(10),
 		minTrxFee:              uint256.NewInt(10),
 		minVotingPeriodBlocks:  10,
 		maxVotingPeriodBlocks:  10,
@@ -98,6 +101,7 @@ func Test2GovRule() *GovRule {
 		rewardPerPower:         2_000_000_000,
 		lazyRewardBlocks:       30,
 		lazyApplyingBlocks:     40,
+		gasPrice:               uint256.NewInt(20),
 		minTrxFee:              uint256.NewInt(20),
 		minVotingPeriodBlocks:  50,
 		maxVotingPeriodBlocks:  60,
@@ -146,6 +150,7 @@ func (r *GovRule) fromProto(pm *GovRuleProto) {
 	r.rewardPerPower = pm.RewardPerPower
 	r.lazyRewardBlocks = pm.LazyRewardBlocks
 	r.lazyApplyingBlocks = pm.LazyApplyingBlocks
+	r.gasPrice = new(uint256.Int).SetBytes(pm.XGasPrice)
 	r.minTrxFee = new(uint256.Int).SetBytes(pm.XMinTrxFee)
 	r.minVotingPeriodBlocks = pm.MinVotingPeriodBlocks
 	r.maxVotingPeriodBlocks = pm.MaxVotingPeriodBlocks
@@ -165,6 +170,7 @@ func (r *GovRule) toProto() *GovRuleProto {
 		RewardPerPower:         r.rewardPerPower,
 		LazyRewardBlocks:       r.lazyRewardBlocks,
 		LazyApplyingBlocks:     r.lazyApplyingBlocks,
+		XGasPrice:              r.gasPrice.Bytes(),
 		XMinTrxFee:             r.minTrxFee.Bytes(),
 		MinVotingPeriodBlocks:  r.minVotingPeriodBlocks,
 		MaxVotingPeriodBlocks:  r.maxVotingPeriodBlocks,
@@ -186,6 +192,7 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 		RewardPerPower         int64  `json:"rewardPerPower"`
 		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
 		LazyApplyingBlocks     int64  `json:"lazyApplyingBlocks"`
+		GasPrice               string `json:"gasPrice"`
 		MinTrxFee              string `json:"minTrxFee"`
 		MinVotingBlocks        int64  `json:"minVotingPeriodBlocks"`
 		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
@@ -199,6 +206,7 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 		RewardPerPower:         r.rewardPerPower,             // hex-string
 		LazyRewardBlocks:       r.lazyRewardBlocks,
 		LazyApplyingBlocks:     r.lazyApplyingBlocks,
+		GasPrice:               r.gasPrice.String(),
 		MinTrxFee:              r.minTrxFee.String(),
 		MinVotingBlocks:        r.minVotingPeriodBlocks,
 		MaxVotingBlocks:        r.maxVotingPeriodBlocks,
@@ -217,6 +225,7 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 		RewardPerPower         int64  `json:"rewardPerPower"`
 		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
 		LazyApplyingBlocks     int64  `json:"lazyApplyingBlocks"`
+		GasPrice               string `json:"gasPrice"`
 		MinTrxFee              string `json:"minTrxFee"`
 		MinVotingBlocks        int64  `json:"minVotingPeriodBlocks"`
 		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
@@ -242,6 +251,10 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 	r.rewardPerPower = tm.RewardPerPower
 	r.lazyRewardBlocks = tm.LazyRewardBlocks
 	r.lazyApplyingBlocks = tm.LazyApplyingBlocks
+	r.gasPrice, err = uint256.FromHex(tm.GasPrice)
+	if err != nil {
+		return err
+	}
 	r.minTrxFee, err = uint256.FromHex(tm.MinTrxFee)
 	if err != nil {
 		return err
@@ -294,6 +307,13 @@ func (r *GovRule) LazyApplyingBlocks() int64 {
 	defer r.mtx.RUnlock()
 
 	return r.lazyApplyingBlocks
+}
+
+func (r *GovRule) GasPrice() *uint256.Int {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return new(uint256.Int).Set(r.gasPrice)
 }
 
 func (r *GovRule) MinTrxFee() *uint256.Int {

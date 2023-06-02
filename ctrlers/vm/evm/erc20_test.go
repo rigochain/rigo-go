@@ -26,6 +26,7 @@ import (
 )
 
 var (
+	govParams    = ctrlertypes.DefaultGovRule()
 	contractAddr types.Address
 )
 
@@ -46,15 +47,16 @@ func Test_callEVM_Deploy(t *testing.T) {
 	require.NoError(t, xerr)
 
 	txctx := &ctrlertypes.TrxContext{
-		Height:    bctx.Height(),
-		BlockTime: time.Now().UnixNano(),
-		TxHash:    bytes2.RandBytes(32),
-		Tx:        web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(15_000_000_000_000_000), uint256.NewInt(0), deployInput),
-		TxIdx:     1,
-		Exec:      true,
-		Sender:    fromAcct,
-		Receiver:  nil,
-		GasUsed:   uint256.NewInt(0),
+		Height:     bctx.Height(),
+		BlockTime:  time.Now().UnixNano(),
+		TxHash:     bytes2.RandBytes(32),
+		Tx:         web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(15_000_000_000_000_000), uint256.NewInt(0), deployInput),
+		TxIdx:      1,
+		Exec:       true,
+		Sender:     fromAcct,
+		Receiver:   nil,
+		GasUsed:    uint256.NewInt(0),
+		GovHandler: govParams,
 	}
 
 	xerr = rigoEVM.ExecuteTrx(txctx)
@@ -171,15 +173,16 @@ func execMethod(from, to types.Address, nonce uint64, gas, amt *uint256.Int, bn,
 	fromAcct := acctHandler.FindAccount(from, true)
 	toAcct := acctHandler.FindAccount(to, true)
 	txctx := &ctrlertypes.TrxContext{
-		Height:    1,
-		BlockTime: time.Now().UnixNano(),
-		TxHash:    bytes2.RandBytes(32),
-		Tx:        web3.NewTrxContract(from, to, nonce, gas, amt, input),
-		TxIdx:     1,
-		Exec:      true,
-		Sender:    fromAcct,
-		Receiver:  toAcct,
-		GasUsed:   uint256.NewInt(0),
+		Height:     1,
+		BlockTime:  time.Now().UnixNano(),
+		TxHash:     bytes2.RandBytes(32),
+		Tx:         web3.NewTrxContract(from, to, nonce, gas, amt, input),
+		TxIdx:      1,
+		Exec:       true,
+		Sender:     fromAcct,
+		Receiver:   toAcct,
+		GasUsed:    uint256.NewInt(0),
+		GovHandler: govParams,
 	}
 	xerr := rigoEVM.ExecuteTrx(txctx)
 	if xerr != nil {

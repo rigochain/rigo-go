@@ -65,62 +65,6 @@ func FindWallet(addr types.Address) *web3.Wallet {
 	return nil
 }
 
-type govHandlerMock struct{}
-
-func (g *govHandlerMock) MinValidatorStake() *uint256.Int {
-	return uint256.NewInt(1_000_000_000_000_000_000)
-}
-
-func (g *govHandlerMock) Version() int64 {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (g *govHandlerMock) RewardPerPower() int64 {
-	return 10
-}
-
-func (g *govHandlerMock) MinTrxFee() *uint256.Int {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (g *govHandlerMock) MinVotingPeriodBlocks() int64 {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (g *govHandlerMock) MaxVotingPeriodBlocks() int64 {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (g *govHandlerMock) MaxValidatorCnt() int64 {
-	return 21
-}
-
-func (g *govHandlerMock) LazyRewardBlocks() int64 {
-	return 10
-}
-
-func (g *govHandlerMock) LazyApplyingBlocks() int64 {
-	return 10
-}
-
-func (g *govHandlerMock) MinSelfStakeRatio() int64 {
-	return 50
-}
-
-func (g *govHandlerMock) MaxUpdatableStakeRatio() int64 {
-	return 30
-}
-
-func (g *govHandlerMock) SlashRatio() int64 {
-	return 50
-}
-
-var _ ctrlertypes.IGovHandler = (*govHandlerMock)(nil)
-
 func makeTestWallets(n int) []*web3.Wallet {
 	wallets := make([]*web3.Wallet, n)
 	for i := 0; i < n; i++ {
@@ -173,7 +117,7 @@ func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*ctrlertypes.Trx
 		Receiver:     to.GetAccount(),
 		NeedAmt:      nil,
 		GasUsed:      nil,
-		GovHandler:   govHelper,
+		GovHandler:   govParams,
 	}, nil
 }
 
@@ -218,6 +162,6 @@ func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes) (*ct
 		SenderPubKey: from.GetPubKey(),
 		Sender:       from.GetAccount(),
 		Receiver:     to.GetAccount(),
-		GovHandler:   govHelper,
+		GovHandler:   govParams,
 	}, nil
 }

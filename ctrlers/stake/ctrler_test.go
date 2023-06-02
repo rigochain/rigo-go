@@ -23,8 +23,8 @@ import (
 var (
 	config      = cfg.DefaultConfig()
 	DBDIR       = filepath.Join(os.TempDir(), "stake-ctrler-unstaking-test")
+	govParams   = ctrlertypes.Test1GovRule()
 	acctHelper  = &acctHandlerMock{}
-	govHelper   = &govHandlerMock{}
 	stakeCtrler *stake.StakeCtrler
 
 	Wallets              []*web3.Wallet
@@ -43,9 +43,9 @@ func TestMain(m *testing.M) {
 	os.RemoveAll(DBDIR)
 
 	config.DBPath = DBDIR
-	stakeCtrler, _ = stake.NewStakeCtrler(config, govHelper, tmlog.NewNopLogger())
+	stakeCtrler, _ = stake.NewStakeCtrler(config, govParams, tmlog.NewNopLogger())
 
-	Wallets = makeTestWallets(100 + int(govHelper.MaxValidatorCnt()))
+	Wallets = makeTestWallets(100 + int(govParams.MaxValidatorCnt()))
 
 	for i := 0; i < 5; i++ {
 		if txctx, err := randMakeStakingToSelfTrxContext(); err != nil {
@@ -152,7 +152,7 @@ func TestTrxStakingByTx(t *testing.T) {
 }
 
 func TestDoReward(t *testing.T) {
-	valUps := stakeCtrler.UpdateValidators(int(govHelper.MaxValidatorCnt()))
+	valUps := stakeCtrler.UpdateValidators(int(govParams.MaxValidatorCnt()))
 	require.Greater(t, len(valUps), 0)
 
 	var votes []abcitypes.VoteInfo
@@ -183,7 +183,7 @@ func TestPunish(t *testing.T) {
 		require.Greater(t, selfPower0, int64(0))
 
 		_slashed := uint256.NewInt(uint64(selfPower0))
-		_ = _slashed.Mul(_slashed, uint256.NewInt(uint64(govHelper.SlashRatio())))
+		_ = _slashed.Mul(_slashed, uint256.NewInt(uint64(govParams.SlashRatio())))
 		_ = _slashed.Div(_slashed, uint256.NewInt(uint64(100)))
 		expectedSlashed := int64(_slashed.Uint64())
 		require.Greater(t, expectedSlashed, int64(0))
@@ -206,7 +206,7 @@ func TestPunish(t *testing.T) {
 						},
 					},
 				},
-			}, govHelper, nil, nil),
+			}, govParams, nil, nil),
 		)
 		require.NoError(t, xerr)
 		require.Equal(t, []byte("slashed"), ev[0].Attributes[3].Key)
@@ -220,7 +220,7 @@ func TestPunish(t *testing.T) {
 		expectedTotalReceivedReward := uint256.NewInt(0)
 		for _, s0 := range oriStakes {
 			p0 := uint256.NewInt(uint64(s0.Power))
-			_ = p0.Mul(p0, uint256.NewInt(uint64(govHelper.SlashRatio())))
+			_ = p0.Mul(p0, uint256.NewInt(uint64(govParams.SlashRatio())))
 			_ = p0.Div(p0, uint256.NewInt(uint64(100)))
 			slashedPower := int64(p0.Uint64())
 
@@ -235,7 +235,7 @@ func TestPunish(t *testing.T) {
 			expectedAmt := new(uint256.Int).Mul(ctrlertypes.AmountPerPower(), uint256.NewInt(uint64(expectedPower)))
 			require.NotEqual(t, expectedAmt.Dec(), s0.Amount.Dec())
 
-			expectedReceivedReward := new(uint256.Int).Mul(s0.ReceivedReward, uint256.NewInt(uint64(govHelper.SlashRatio())))
+			expectedReceivedReward := new(uint256.Int).Mul(s0.ReceivedReward, uint256.NewInt(uint64(govParams.SlashRatio())))
 			_ = expectedReceivedReward.Div(expectedReceivedReward, uint256.NewInt(uint64(100)))
 			require.NotEqual(t, expectedReceivedReward.Dec(), s0.ReceivedReward.Dec())
 
@@ -349,7 +349,7 @@ func TestUnfreezing(t *testing.T) {
 			new(uint256.Int).Add(s0.Amount, s0.ReceivedReward))
 	}
 
-	lastHeight += govHelper.LazyRewardBlocks()
+	lastHeight += govParams.LazyRewardBlocks()
 
 	// execute block at lastHeight
 	req := abcitypes.RequestBeginBlock{
@@ -357,7 +357,7 @@ func TestUnfreezing(t *testing.T) {
 			Height: lastHeight,
 		},
 	}
-	bctx := ctrlertypes.NewBlockContext(req, govHelper, acctHelper, nil)
+	bctx := ctrlertypes.NewBlockContext(req, govParams, acctHelper, nil)
 	bctx.AddGas(uint256.NewInt(10))
 	_, err := stakeCtrler.EndBlock(bctx)
 	require.NoError(t, err)

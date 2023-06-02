@@ -50,7 +50,7 @@ func TestApplyReward(t *testing.T) {
 	for n := 0; n < blocks; n++ {
 		i := rand.Int() % len(stakeTestObjs)
 		s0 := stakeTestObjs[i].s
-		rwd := stake.BlockRewardOf(s0.Amount, ctrlertypes.AmountPerPower(), govHelper.RewardPerPower())
+		rwd := stake.BlockRewardOf(s0.Amount, ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
 		s0.ApplyReward(int64(n+1), rwd)
 		stakeTestObjs[i].expectedReward.Add(stakeTestObjs[i].expectedReward, rwd)
 	}

@@ -21,6 +21,7 @@ type IGovHandler interface {
 	RewardPerPower() int64
 	LazyRewardBlocks() int64
 	LazyApplyingBlocks() int64
+	GasPrice() *uint256.Int
 	MinTrxFee() *uint256.Int
 	MinVotingPeriodBlocks() int64
 	MaxVotingPeriodBlocks() int64
