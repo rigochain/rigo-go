@@ -39,6 +39,11 @@ ifdef MAKECMDGOALS
 	endif
 endif
 
+#GITTAG=$(shell git describe --tags $(shell git rev-list --tags --max-count=1))
+GITCOMMIT=$(shell git log -1 --pretty=format:"%h")
+BUILD_FLAGS=-a -ldflags "-w -s -X 'github.com/rigochain/rigo-go/cmd/version.GitCommit=$(GITCOMMIT)'"
+
+
 BUILDDIR="./build/$(HOSTOS)"
 
 all: $(TARGETOS)
@@ -46,9 +51,9 @@ all: $(TARGETOS)
 $(TARGETOS):
 	@echo Build rigo for $(@) on $(HOSTOS)
 ifeq ($(HOSTOS), windows)
-	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(BUILDDIR)/rigo.exe ./cmd/
+	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(BUILDDIR)/rigo.exe $(BUILD_FLAGS)  ./cmd/
 else
-	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(BUILDDIR)/rigo ./cmd/
+	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(BUILDDIR)/rigo $(BUILD_FLAGS) ./cmd/
 endif
 
 pbm:

@@ -11,13 +11,13 @@ const (
 )
 
 var (
-	majorVer  uint64 = 0
+	majorVer  uint64 = 1
 	minorVer  uint64 = 0
-	patchVer  uint64 = 1
+	patchVer  uint64 = 0
 	commitVer uint64 = 0
 
 	// it is changed using ldflags.
-	//  ex) -ldflags "... -X 'github.com/rigochain/rigo-go/tynode/version.GitCommit=$(LVER)'"
+	//  ex) -ldflags "... -X 'github.com/rigochain/rigo-go/cmd/version.GitCommit=$(LVER)'"
 	GitCommit string
 )
 
