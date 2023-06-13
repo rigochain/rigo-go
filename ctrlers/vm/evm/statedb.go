@@ -45,9 +45,9 @@ func NewStateDBWrapper(db ethdb.Database, lastRootHash []byte, acctHandler ctrle
 	}, nil
 }
 
-func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to types2.Address, exec bool) {
+func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to types2.Address, snap int, exec bool) {
 	s.exec = exec
-	s.snapshot = 0
+	s.snapshot = snap
 	s.StateDB.Prepare(txhash.Array32(), txidx)
 
 	s.AddAddressToAccessList(from.Array20())

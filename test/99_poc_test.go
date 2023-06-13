@@ -10,6 +10,7 @@ import (
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
 	rigoweb3 "github.com/rigochain/rigo-go/libs/web3"
+	"github.com/rigochain/rigo-go/libs/web3/vm"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -300,24 +301,24 @@ func TestPoC4(t *testing.T) {
 
 	fmt.Println("[send gas fee]")
 	{
-		amt0 := uint256.MustFromDecimal("100000000000000000000")
+		amtx := uint256.MustFromDecimal("100000000000000000000")
 
-		ret, err := walletMain.TransferCommit(walletA.Address(), gasMin, amt0, rweb3)
+		ret, err := walletMain.TransferCommit(walletA.Address(), gasMin, amtx, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
 		_ = expectedMainBalance.Sub(expectedMainBalance, gasMin)
-		_ = expectedMainBalance.Sub(expectedMainBalance, amt0)
+		_ = expectedMainBalance.Sub(expectedMainBalance, amtx)
 
 		walletMain.AddNonce()
-		ret, err = walletMain.TransferCommit(walletB.Address(), gasMin, amt0, rweb3)
+		ret, err = walletMain.TransferCommit(walletB.Address(), gasMin, amtx, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
 		_ = expectedMainBalance.Sub(expectedMainBalance, gasMin)
-		_ = expectedMainBalance.Sub(expectedMainBalance, amt0)
+		_ = expectedMainBalance.Sub(expectedMainBalance, amtx)
 
 	}
 
@@ -400,4 +401,67 @@ func TestPoC4(t *testing.T) {
 	fmt.Println("after1 balance of walletMoneCopy: ", walletMoneCopy.GetBalance().Dec())
 	require.Equal(t, "0", walletMoneCopy.GetBalance().Dec())
 	return
+}
+
+func TestPoC5(t *testing.T) {
+	gasMin := uint256.NewInt(1_000_000_000_000_000)
+	rweb3 := rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(defaultRpcNode.RPCURL))
+
+	w0 := wallets[0]
+	require.NoError(t, w0.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, w0.SyncAccount(rweb3))
+
+	w1 := wallets[1]
+	require.NoError(t, w1.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, w1.SyncAccount(rweb3))
+
+	w2 := wallets[2]
+	require.NoError(t, w2.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, w2.SyncAccount(rweb3))
+
+	targetWallet := wallets[3]
+	require.NoError(t, targetWallet.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, targetWallet.SyncAccount(rweb3))
+	expectedTargetWalletBalance := targetWallet.GetBalance().Clone()
+
+	contract, err := vm.NewEVMContract("./PoC5.json")
+	require.NoError(t, err)
+
+	ret, err := contract.ExecCommit("", nil, w0, w0.GetNonce(), gasMin, uint256.NewInt(1_000_000), rweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+
+	fmt.Printf("Set contract address: %x\n", contract.GetAddress())
+
+	contAcct := getAccountData(ret.DeliverTx.Data)
+	fmt.Printf("Contract balance: %v\n", contAcct.Balance)
+
+	// first tx - evm tx
+	go func() {
+		w0.AddNonce()
+		_, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), gasMin, uint256.NewInt(123), rweb3)
+		require.NoError(t, err)
+		_ = expectedTargetWalletBalance.Add(expectedTargetWalletBalance, uint256.NewInt(123))
+	}()
+
+	// second tx - rigo account tx
+	go func() {
+		time.Sleep(10 * time.Millisecond) // tx order 2
+		_, err := w1.TransferAsync(targetWallet.Address(), gasMin, uint256.NewInt(123), rweb3)
+		require.NoError(t, err)
+		_ = expectedTargetWalletBalance.Add(expectedTargetWalletBalance, uint256.NewInt(123))
+	}()
+
+	// third tx - evm tx (revert)
+	go func() {
+		time.Sleep(20 * time.Millisecond) // tx order 2
+		_, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), gasMin, uint256.NewInt(0), rweb3)
+		require.NoError(t, err)
+	}()
+
+	time.Sleep(6 * time.Second)
+
+	require.NoError(t, targetWallet.SyncAccount(rweb3))
+	require.Equal(t, expectedTargetWalletBalance.Dec(), targetWallet.GetBalance().Dec())
 }

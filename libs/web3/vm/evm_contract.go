@@ -70,7 +70,37 @@ func (ec *EVMContract) Call(name string, args []interface{}, from types.Address,
 	return ec.unpack(name, ret0.ReturnData)
 }
 
-func (ec *EVMContract) Exec(name string, args []interface{}, from *web3.Wallet, nonce uint64, gas, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wallet, nonce uint64, gas, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	to := ec.addr
+
+	data, err := ec.pack(name, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	if name == "" {
+		// constructor
+		to = types.ZeroAddress()
+		data = append(ec.buildInfo.Bytecode, data...)
+	}
+	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, amt, data)
+	_, _, err = from.SignTrx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	ret, err := rweb3.SendTransactionAsync(tx)
+	if err != nil {
+		return nil, err
+	}
+	if ret.Code == xerrors.ErrCodeSuccess && len(ret.Data) == types.AddrSize {
+		ec.addr = types.Address(ret.Data)
+	}
+
+	return ret, nil
+}
+
+func (ec *EVMContract) ExecSync(name string, args []interface{}, from *web3.Wallet, nonce uint64, gas, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	to := ec.addr
 
 	data, err := ec.pack(name, args...)
@@ -95,6 +125,36 @@ func (ec *EVMContract) Exec(name string, args []interface{}, from *web3.Wallet, 
 	}
 	if ret.Code == xerrors.ErrCodeSuccess && len(ret.Data) == types.AddrSize {
 		ec.addr = types.Address(ret.Data)
+	}
+
+	return ret, nil
+}
+
+func (ec *EVMContract) ExecCommit(name string, args []interface{}, from *web3.Wallet, nonce uint64, gas, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+	to := ec.addr
+
+	data, err := ec.pack(name, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	if name == "" {
+		// constructor
+		to = types.ZeroAddress()
+		data = append(ec.buildInfo.Bytecode, data...)
+	}
+	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, amt, data)
+	_, _, err = from.SignTrx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	ret, err := rweb3.SendTransactionCommit(tx)
+	if err != nil {
+		return nil, err
+	}
+	if ret.DeliverTx.Code == xerrors.ErrCodeSuccess && len(ret.DeliverTx.Data) == types.AddrSize {
+		ec.addr = types.Address(ret.DeliverTx.Data)
 	}
 
 	return ret, nil

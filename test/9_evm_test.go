@@ -49,7 +49,7 @@ func testDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	// insufficient gas
-	ret, err := contract.Exec("", []interface{}{"RigoToken", "RGT"},
+	ret, err := contract.ExecSync("", []interface{}{"RigoToken", "RGT"},
 		creator, creator.GetNonce(), baseFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
@@ -60,7 +60,7 @@ func testDeploy(t *testing.T) {
 	require.Equal(t, beforeBalance0.Dec(), beforeBalance1.Dec())
 
 	// sufficient gas
-	ret, err = contract.Exec("", []interface{}{"RigoToken", "RGT"},
+	ret, err = contract.ExecSync("", []interface{}{"RigoToken", "RGT"},
 		creator, creator.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
@@ -139,7 +139,7 @@ func testPayable(t *testing.T) {
 	//
 
 	refundAmt := bytes.RandU256IntN(randAmt)
-	ret, err = evmContract.Exec("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
+	ret, err = evmContract.ExecSync("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
@@ -189,7 +189,7 @@ func testEvents(t *testing.T) {
 
 	rAddr := types.RandAddress()
 	// Transfer Event sig: ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
-	ret, err := evmContract.Exec("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
+	ret, err := evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
