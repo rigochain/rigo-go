@@ -67,6 +67,9 @@ func (s *StateDBWrapper) Finish() {
 
 		_ = s.acctLedger.SetAccountCommittable(acct, s.exec)
 	}
+
+	// issue #68
+	s.accessedObjAddrs = make(map[common.Address]int)
 }
 
 func (s *StateDBWrapper) Close() error {

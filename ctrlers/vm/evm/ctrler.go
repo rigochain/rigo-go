@@ -171,7 +171,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 	ctx.RetData = ret.ReturnData
 
-	// Gas is already applied in EVM.
+	// Gas is already applied by buyGas and refundGas of EVM.
 	// the `EVM` handles nonce, amount and gas.
 	ctx.GasUsed = new(uint256.Int).Add(ctx.GasUsed, gasToFee(ret.UsedGas, ctx.GovHandler.GasPrice()))
 

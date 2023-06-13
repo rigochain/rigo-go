@@ -1,7 +1,6 @@
 package web3
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
@@ -116,16 +115,43 @@ func (rweb3 *RigoWeb3) GetStakes(addr types.Address) ([]*stake.Stake, error) {
 }
 
 func (rweb3 *RigoWeb3) SendTransactionAsync(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
-	return rweb3.sendTransaction(tx, "broadcast_tx_async")
+	resp, err := rweb3.sendTransaction(tx, "broadcast_tx_async")
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &coretypes.ResultBroadcastTx{}
+	if err := tmjson.Unmarshal(resp.Result, ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 func (rweb3 *RigoWeb3) SendTransactionSync(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
-	return rweb3.sendTransaction(tx, "broadcast_tx_sync")
+	resp, err := rweb3.sendTransaction(tx, "broadcast_tx_sync")
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &coretypes.ResultBroadcastTx{}
+	if err := tmjson.Unmarshal(resp.Result, ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
-func (rweb3 *RigoWeb3) SendTransactionCommit(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
-	return rweb3.sendTransaction(tx, "broadcast_tx_commit")
+func (rweb3 *RigoWeb3) SendTransactionCommit(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTxCommit, error) {
+	resp, err := rweb3.sendTransaction(tx, "broadcast_tx_commit")
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &coretypes.ResultBroadcastTxCommit{}
+	if err := tmjson.Unmarshal(resp.Result, ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
-func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*coretypes.ResultBroadcastTx, error) {
+func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*rweb3types.JSONRpcResp, error) {
 
 	if txbz, err := tx.Encode(); err != nil {
 		return nil, err
@@ -136,20 +162,7 @@ func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*cor
 	} else if resp.Error != nil {
 		return nil, errors.New("provider error: " + string(resp.Error))
 	} else {
-		switch method {
-		case "broadcast_tx_async":
-			return nil, errors.New("not supported method: " + method)
-		case "broadcast_tx_sync":
-			ret := &coretypes.ResultBroadcastTx{}
-			if err := json.Unmarshal(resp.Result, ret); err != nil {
-				return nil, err
-			}
-			return ret, nil
-		case "broadcast_tx_commit":
-			return nil, errors.New("not supported method: " + method)
-		default:
-			return nil, errors.New("unknown method: " + method)
-		}
+		return resp, nil
 	}
 }
 
