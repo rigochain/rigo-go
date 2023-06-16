@@ -117,6 +117,18 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		}
 	}
 
+	// issue #54
+	// Reward validators for all blocks (including empty blocks):
+
+	// issue #70
+	// `doReward` must be called prior to `execUnstaking`.
+	// if `doReward` is called after `execUnstaking`,
+	// the last stake, that is removed at `execUnstaking`, is reloaded from disk(tree) and may be recreated.
+	// Because of that, the last stake will be not removed forever.
+	if xerr := ctrler.doReward(blockCtx.BlockInfo().Header.Height, blockCtx.BlockInfo().LastCommitInfo.Votes); xerr != nil {
+		return nil, xerr
+	}
+
 	return evts, nil
 }
 
@@ -138,6 +150,45 @@ func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64, a
 	_ = ctrler.delegateeLedger.SetFinality(delegatee)
 
 	return slashed, nil
+}
+
+func (ctrler *StakeCtrler) DoReward(height int64, votes []abcitypes.VoteInfo) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	return ctrler.doReward(height, votes)
+}
+
+// the following functions are called in EndBlock()
+//
+
+func (ctrler *StakeCtrler) doReward(height int64, votes []abcitypes.VoteInfo) xerrors.XError {
+	// doReward() rewards to NOT ctrler.lastValidators BUT `votes`.
+	// `votes` is from `RequestBeginBlock.LastCommitInfo` which is set of validators of previous block.
+	for _, vote := range votes {
+		if vote.SignedLastBlock == false {
+			ctrler.logger.Debug("Validator didn't sign the last block", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+			continue
+		}
+
+		delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(vote.Validator.Address))
+		if xerr != nil {
+			ctrler.logger.Error("Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+			continue
+		} else if delegatee == nil {
+			ctrler.logger.Debug("Not found validator", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+			continue
+		}
+
+		rwd := delegatee.DoReward(height, ctrlertypes.AmountPerPower(), ctrler.govParams.RewardPerPower())
+		ctrler.logger.Debug("Block Reward", "address", delegatee.Addr, "reward", rwd.Dec())
+
+		xerr = ctrler.delegateeLedger.SetFinality(delegatee)
+		if xerr != nil {
+			ctrler.logger.Error("Fail to finalize delegatee", "address", delegatee.Addr)
+		}
+	}
+	return nil
 }
 
 func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -309,11 +360,6 @@ func (ctrler *StakeCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// reward validators for all blocks (including empty blocks): issue #54
-	if xerr := ctrler.doReward(ctx.BlockInfo().Header.Height, ctx.BlockInfo().LastCommitInfo.Votes); xerr != nil {
-		return nil, xerr
-	}
-
 	if xerr := ctrler.unfreezingStakes(ctx.Height(), ctx.AcctHandler); xerr != nil {
 		return nil, xerr
 	}
@@ -321,44 +367,6 @@ func (ctrler *StakeCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 	ctx.SetValUpdates(ctrler.updateValidators(int(ctx.GovHandler.MaxValidatorCnt())))
 
 	return nil, nil
-}
-func (ctrler *StakeCtrler) DoReward(height int64, votes []abcitypes.VoteInfo) xerrors.XError {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	return ctrler.doReward(height, votes)
-}
-
-// the following functions are called in EndBlock()
-//
-
-func (ctrler *StakeCtrler) doReward(height int64, votes []abcitypes.VoteInfo) xerrors.XError {
-	// doReward() rewards to NOT ctrler.lastValidators BUT `votes`.
-	// `votes` is from `RequestBeginBlock.LastCommitInfo` which is set of validators of previous block.
-	for _, vote := range votes {
-		if vote.SignedLastBlock == false {
-			ctrler.logger.Debug("Validator didn't sign the last block", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-			continue
-		}
-
-		delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(vote.Validator.Address))
-		if xerr != nil {
-			ctrler.logger.Error("Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-			continue
-		} else if delegatee == nil {
-			ctrler.logger.Debug("Not found validator", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-			continue
-		}
-
-		rwd := delegatee.DoReward(height, ctrlertypes.AmountPerPower(), ctrler.govParams.RewardPerPower())
-		ctrler.logger.Debug("Block Reward", "address", delegatee.Addr, "reward", rwd.Dec())
-
-		xerr = ctrler.delegateeLedger.SetFinality(delegatee)
-		if xerr != nil {
-			ctrler.logger.Error("Fail to finalize delegatee", "address", delegatee.Addr)
-		}
-	}
-	return nil
 }
 
 func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertypes.IAccountHandler) xerrors.XError {
