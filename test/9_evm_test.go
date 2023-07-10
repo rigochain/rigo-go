@@ -49,10 +49,10 @@ func testDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	// insufficient gas
-	ret, err := contract.ExecSync("", []interface{}{"RigoToken", "RGT"},
+	ret, err := contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
 		creator, creator.GetNonce(), baseFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
-	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
 	// check balance - not changed
 	require.NoError(t, creator.SyncAccount(rweb3))
@@ -60,12 +60,12 @@ func testDeploy(t *testing.T) {
 	require.Equal(t, beforeBalance0.Dec(), beforeBalance1.Dec())
 
 	// sufficient gas
-	ret, err = contract.ExecSync("", []interface{}{"RigoToken", "RGT"},
+	ret, err = contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
 		creator, creator.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
-	require.NotNil(t, ret.Data)
-	require.Equal(t, 20, len(ret.Data))
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	require.NotNil(t, ret.DeliverTx.Data)
+	require.Equal(t, 20, len(ret.DeliverTx.Data))
 
 	txRet, err := waitTrxResult(ret.Hash, 30, rweb3)
 	require.NoError(t, err, err)

@@ -127,6 +127,11 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 }
 
 func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	if ctx.Exec == false {
+		// issue #71
+		// Execute a contract transaction only on `deliveryTx`
+		return nil
+	}
 	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
 		return xerrors.ErrUnknownTrxType
 	}

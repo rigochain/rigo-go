@@ -263,7 +263,7 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 		"hash", req.Hash,
 		"prev.hash", req.Header.LastBlockId.Hash)
 
-	ctrler.mtx.Lock() // this lock will be unlocked at Commit
+	ctrler.mtx.Lock() // this lock will be unlocked at EndBlock
 
 	ctrler.currBlockCtx = types2.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
 
@@ -413,6 +413,15 @@ func (ctrler *RigoApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Respo
 }
 
 func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+	ctrler.logger.Debug("Begin RigoApp::EndBlock",
+		"height", req.Height)
+
+	defer func() {
+		ctrler.mtx.Unlock() // this was locked at BeginBlock
+		ctrler.logger.Debug("Finish RigoApp::EndBlock",
+			"height", req.Height)
+	}()
+
 	ev0, _ := ctrler.govCtrler.EndBlock(ctrler.currBlockCtx)
 	ev1, _ := ctrler.acctCtrler.EndBlock(ctrler.currBlockCtx)
 	ev2, _ := ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
@@ -431,7 +440,10 @@ func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 }
 
 func (ctrler *RigoApp) Commit() abcitypes.ResponseCommit {
-	defer ctrler.mtx.Unlock() // this was locked at BeginBlock
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	ctrler.logger.Debug("RigoApp::Commit", "height", ctrler.currBlockCtx.Height())
 
 	appHash0, ver0, err := ctrler.govCtrler.Commit()
 	if err != nil {

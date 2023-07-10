@@ -36,15 +36,14 @@ type PeerMock struct {
 
 func NewPeerMock(chain, id string, p2pPort, rpcPort int, logLevel string) *PeerMock {
 	config := cfg.DefaultConfig()
-	config.P2P.AllowDuplicateIP = true
 	config.LogLevel = logLevel
+	config.P2P.AllowDuplicateIP = true
+	config.P2P.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", p2pPort)
+	config.RPC.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", rpcPort)
 	config.SetRoot(filepath.Join(os.TempDir(), "rigo_test_"+id))
 	os.RemoveAll(config.RootDir) // reset root directory
 	tmcfg.EnsureRoot(config.RootDir)
 
-	config.P2P.AllowDuplicateIP = true
-	config.P2P.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", p2pPort)
-	config.RPC.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", rpcPort)
 	if err := config.ValidateBasic(); err != nil {
 		panic(fmt.Errorf("error in rootConfig file: %v", err))
 	}
@@ -140,7 +139,7 @@ func randRigoWeb3() *rigoweb3.RigoWeb3 {
 func runPeers(n int) {
 	for i := 0; i < n; i++ {
 		ll := "*:error"
-		if i == n-1 {
+		if i == 0 {
 			ll = "rigo_AcctCtrler:debug,rigo_EVMCtrler:debug,*:error"
 		}
 		_peer := NewPeerMock("rigo_test_chain", strconv.FormatInt(int64(i), 10), 26656+i, 36657+i, ll)
@@ -165,5 +164,4 @@ func runPeers(n int) {
 
 		time.Sleep(time.Second)
 	}
-	time.Sleep(time.Second)
 }

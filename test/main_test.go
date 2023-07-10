@@ -26,6 +26,7 @@ func test_on_internal_node(m *testing.M) {
 		wg.Done()
 	}()
 	wg.Wait()
+	time.Sleep(time.Second)
 
 	defaultRpcNode = peers[len(peers)-1]
 	subWg, err := waitEvent("tm.event='NewBlock'", func(event *coretypes.ResultEvent, err error) bool {
@@ -41,7 +42,6 @@ func test_on_internal_node(m *testing.M) {
 	exitCode := m.Run()
 
 	for _, p := range peers {
-		time.Sleep(time.Second)
 		p.Stop()
 		time.Sleep(time.Second)
 		os.RemoveAll(p.Config.RootDir)

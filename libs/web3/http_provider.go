@@ -7,25 +7,27 @@ import (
 	"github.com/rigochain/rigo-go/libs/web3/types"
 	"io/ioutil"
 	"net/http"
-	"time"
+	"sync"
 )
 
 type HttpProvider struct {
-	url        string
-	httpClient *http.Client
+	url string
+	//httpClient *http.Client
+
+	mtx sync.RWMutex
 }
 
 func NewHttpProvider(url string, opts ...func(*HttpProvider)) *HttpProvider {
 	ret := &HttpProvider{
 		url: url,
-		httpClient: &http.Client{
-			//Timeout: time.Second * time.Duration(10), // for [connect ~ request ~ response] time
-			Transport: &http.Transport{
-				DisableKeepAlives: false,
-				IdleConnTimeout:   time.Minute,
-				MaxConnsPerHost:   100,
-			},
-		},
+		//httpClient: &http.Client{
+		//	//Timeout: time.Second * time.Duration(10), // for [connect ~ request ~ response] time
+		//	Transport: &http.Transport{
+		//		DisableKeepAlives: false,
+		//		IdleConnTimeout:   time.Minute,
+		//		MaxConnsPerHost:   100,
+		//	},
+		//},
 	}
 
 	for _, cb := range opts {
@@ -35,13 +37,16 @@ func NewHttpProvider(url string, opts ...func(*HttpProvider)) *HttpProvider {
 }
 
 func (client *HttpProvider) Call(req *types.JSONRpcReq) (*types.JSONRpcResp, error) {
+	client.mtx.Lock()
+	defer client.mtx.Unlock()
+
 	reqbz, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
 	httpBody := bytes.NewBuffer(reqbz)
-	httpResp, err := client.httpClient.Post(client.url, "application/json", httpBody)
+	httpResp, err := http.Post(client.url, "application/json", httpBody)
 	if err != nil {
 		return nil, err
 	}
