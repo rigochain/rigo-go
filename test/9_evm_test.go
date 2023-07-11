@@ -52,7 +52,7 @@ func testDeploy(t *testing.T) {
 	ret, err := contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
 		creator, creator.GetNonce(), baseFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
-	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 
 	// check balance - not changed
 	require.NoError(t, creator.SyncAccount(rweb3))
@@ -61,8 +61,9 @@ func testDeploy(t *testing.T) {
 
 	// sufficient gas
 	ret, err = contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
-		creator, creator.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
+		creator, creator.GetNonce(), bigFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 	require.NotNil(t, ret.DeliverTx.Data)
 	require.Equal(t, 20, len(ret.DeliverTx.Data))
@@ -139,7 +140,7 @@ func testPayable(t *testing.T) {
 	//
 
 	refundAmt := bytes.RandU256IntN(randAmt)
-	ret, err = evmContract.ExecSync("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
+	ret, err = evmContract.ExecSync("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), bigFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
@@ -189,7 +190,7 @@ func testEvents(t *testing.T) {
 
 	rAddr := types.RandAddress()
 	// Transfer Event sig: ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
-	ret, err := evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
+	ret, err := evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), bigFee, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 

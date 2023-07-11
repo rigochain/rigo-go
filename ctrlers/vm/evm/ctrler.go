@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	ethcore "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -40,7 +40,7 @@ type EVMCtrler struct {
 	ethDB          ethdb.Database
 	stateDBWrapper *StateDBWrapper
 	acctLedger     ctrlertypes.IAccountHandler
-	blockGasPool   *core.GasPool
+	blockGasPool   *ethcore.GasPool
 
 	metadb          tmdb.DB
 	lastRootHash    []byte
@@ -108,7 +108,7 @@ func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 	}
 
 	ctrler.stateDBWrapper = stdb
-	ctrler.blockGasPool = new(core.GasPool).AddGas(gasLimit)
+	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
 	return nil, nil
 }
 
@@ -123,6 +123,19 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	if payload.Data == nil || len(payload.Data) == 0 {
 		return xerrors.ErrInvalidTrxPayloadParams
 	}
+
+	// Check intrinsic gas if everything is correct
+	bn := big.NewInt(ctx.Height)
+	gas, err := ethcore.IntrinsicGas(payload.Data, nil, types.IsZeroAddress(ctx.Tx.To), ctrler.ethChainConfig.IsHomestead(bn), ctrler.ethChainConfig.IsIstanbul(bn))
+	if err != nil {
+		return xerrors.From(err)
+	}
+
+	needFee := gasToFee(gas, ctx.GovHandler.GasPrice())
+	if needFee.Cmp(ctx.Tx.Gas) > 0 {
+		return xerrors.ErrInsufficientFee
+	}
+
 	return nil
 }
 
@@ -239,7 +252,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data []byte, height, blockTime int64, exec bool) (*core.ExecutionResult, xerrors.XError) {
+func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data []byte, height, blockTime int64, exec bool) (*ethcore.ExecutionResult, xerrors.XError) {
 	var sender common.Address
 	var toAddr *common.Address
 	copy(sender[:], from)
@@ -252,11 +265,11 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPr
 	vmmsg := evmMessage(sender, toAddr, nonce, gas, gasPrice, amt, data, false)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
-	txContext := core.NewEVMTxContext(vmmsg)
+	txContext := ethcore.NewEVMTxContext(vmmsg)
 
 	vmevm := vm.NewEVM(blockContext, txContext, ctrler.stateDBWrapper, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
-	result, err := core.ApplyMessage(vmevm, vmmsg, ctrler.blockGasPool)
+	result, err := ethcore.ApplyMessage(vmevm, vmmsg, ctrler.blockGasPool)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
@@ -271,7 +284,7 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPr
 }
 
 func (ctrler *EVMCtrler) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	ctrler.blockGasPool = new(core.GasPool).AddGas(gasLimit)
+	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
 	return nil, nil
 }
 

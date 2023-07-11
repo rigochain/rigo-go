@@ -133,10 +133,6 @@ func TestPoC1(t *testing.T) {
 	fromAddr := wallet.Address()
 	nonce := wallet.GetNonce()
 
-	gas := big.NewInt(0)
-	gas.SetString("10000000000000000", 10)
-	gasEncode, _ := uint256.FromBig(gas)
-
 	moneyCopyAmt := big.NewInt(0)
 	moneyCopyAmt.SetString("1234567890", 10)
 	//amt.SetString("100", 10)
@@ -147,10 +143,11 @@ func TestPoC1(t *testing.T) {
 	// create selfdestructContract
 	selfdestructContract, _ := hex.DecodeString("6080604052600034604051610013906101a5565b6040518091039082f0905080158015610030573d6000803e3d6000fd5b50905060005b6064811015610123578173ffffffffffffffffffffffffffffffffffffffff16604051610062906101e2565b6000604051808303816000865af19150503d806000811461009f576040519150601f19603f3d011682016040523d82523d6000602084013e6100a4565b606091505b5050508173ffffffffffffffffffffffffffffffffffffffff16476040516100cb906101e2565b60006040518083038185875af1925050503d8060008114610108576040519150601f19603f3d011682016040523d82523d6000602084013e61010d565b606091505b505050808061011b90610230565b915050610036565b508073ffffffffffffffffffffffffffffffffffffffff16604051610147906101e2565b6000604051808303816000865af19150503d8060008114610184576040519150601f19603f3d011682016040523d82523d6000602084013e610189565b606091505b5050503373ffffffffffffffffffffffffffffffffffffffff16ff5b606d8061027983390190565b600081905092915050565b50565b60006101cc6000836101b1565b91506101d7826101bc565b600082019050919050565b60006101ed826101bf565b9150819050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000819050919050565b600061023b82610226565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361026d5761026c6101f7565b5b60018201905091905056fe6080604052605c8060116000396000f3fe6080604052600034116024573373ffffffffffffffffffffffffffffffffffffffff16ff5b00fea2646970667358221220b92a15064194560a6285b178c031a892ddbaba26382aeb676c12fa86377d938d64736f6c63430008130033")
 	copyAmtEncode, _ := uint256.FromBig(moneyCopyAmt)
-	trxObj := web3.NewTrxContract(fromAddr, types.ZeroAddress(), nonce, gasEncode, copyAmtEncode, selfdestructContract)
+	trxObj := web3.NewTrxContract(fromAddr, types.ZeroAddress(), nonce, bigFee, copyAmtEncode, selfdestructContract)
 
 	commitRet, err := wallet.SendTxCommit(trxObj, rweb3)
 	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, commitRet.CheckTx.Code, commitRet.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, commitRet.DeliverTx.Code, commitRet.DeliverTx.Log)
 	fmt.Println("TestPoC1", "used", commitRet.DeliverTx.GasUsed, "wanted", commitRet.DeliverTx.GasWanted)
 
@@ -220,6 +217,7 @@ func TestPoC2(t *testing.T) {
 	//submitTrx(wallet, transferTrx)
 	retCommit, err := wallet.SendTxCommit(transferTrx, rweb3)
 	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, retCommit.CheckTx.Code, retCommit.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retCommit.DeliverTx.Code, retCommit.DeliverTx.Log)
 
 	nonce += 1
@@ -234,6 +232,7 @@ func TestPoC2(t *testing.T) {
 	//submitTrx(wallet, trxObj)
 	retCommit, err = wallet.SendTxCommit(trxObj, rweb3)
 	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, retCommit.CheckTx.Code, retCommit.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retCommit.DeliverTx.Code, retCommit.DeliverTx.Log)
 
 	time.Sleep(1 * time.Second)
@@ -335,27 +334,25 @@ func TestPoC4(t *testing.T) {
 	fmt.Printf("walletB: %s\n", walletB.Address())
 	fmt.Printf("walletMoneCopy: %s\n", walletMoneCopy.Address())
 
-	gasMin := uint256.NewInt(1_000_000_000_000_000)
-
 	fmt.Println("[send gas fee]")
 	{
 		amtx := uint256.MustFromDecimal("100000000000000000000")
 
-		ret, err := walletMain.TransferCommit(walletA.Address(), gasMin, amtx, rweb3)
+		ret, err := walletMain.TransferCommit(walletA.Address(), baseFee, amtx, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
-		_ = expectedMainBalance.Sub(expectedMainBalance, gasMin)
+		_ = expectedMainBalance.Sub(expectedMainBalance, baseFee)
 		_ = expectedMainBalance.Sub(expectedMainBalance, amtx)
 
 		walletMain.AddNonce()
-		ret, err = walletMain.TransferCommit(walletB.Address(), gasMin, amtx, rweb3)
+		ret, err = walletMain.TransferCommit(walletB.Address(), baseFee, amtx, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
-		_ = expectedMainBalance.Sub(expectedMainBalance, gasMin)
+		_ = expectedMainBalance.Sub(expectedMainBalance, baseFee)
 		_ = expectedMainBalance.Sub(expectedMainBalance, amtx)
 
 	}
@@ -372,19 +369,19 @@ func TestPoC4(t *testing.T) {
 
 	// set accessedObjAddrs - walletMain
 	bytedata, _ := hex.DecodeString("1234")
-	trx1 := web3.NewTrxContract(walletB.Address(), walletMain.Address(), walletB.GetNonce(), gasMin, uint256.MustFromDecimal("1"), bytedata)
+	trx1 := web3.NewTrxContract(walletB.Address(), walletMain.Address(), walletB.GetNonce(), baseFee, uint256.MustFromDecimal("1"), bytedata)
 	_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
 
 	// transfer all money to walletMoneCopy with NewTrxTransfer
 	// now, rigo state is changed but evm state is not changed
-	amt0 := new(uint256.Int).Sub(walletMain.GetBalance(), gasMin)
-	trx2 := web3.NewTrxTransfer(walletMain.Address(), walletMoneCopy.Address(), walletMain.GetNonce(), gasMin, amt0)
-	_ = expectedMainBalance.Sub(expectedMainBalance, gasMin)
+	amt0 := new(uint256.Int).Sub(walletMain.GetBalance(), baseFee)
+	trx2 := web3.NewTrxTransfer(walletMain.Address(), walletMoneCopy.Address(), walletMain.GetNonce(), baseFee, amt0)
+	_ = expectedMainBalance.Sub(expectedMainBalance, baseFee)
 	_ = expectedMainBalance.Sub(expectedMainBalance, amt0)
 
 	// use evm stated(accessedObjAddrs[walletMain] is true)
 	// overwrite walletMain's state(balance)
-	trx3 := web3.NewTrxContract(walletA.Address(), walletMain.Address(), walletA.GetNonce(), gasMin, uint256.MustFromDecimal("1"), bytedata)
+	trx3 := web3.NewTrxContract(walletA.Address(), walletMain.Address(), walletA.GetNonce(), baseFee, uint256.MustFromDecimal("1"), bytedata)
 	_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
 
 	wg := sync.WaitGroup{}
@@ -445,8 +442,8 @@ func TestPoC4(t *testing.T) {
 	fmt.Println("after0 balance of walletMoneCopy: ", walletMoneCopy.GetBalance().Dec())
 
 	require.NoError(t, walletMoneCopy.Unlock(defaultRpcNode.Pass))
-	amt0 = new(uint256.Int).Sub(walletMoneCopy.GetBalance(), gasMin)
-	ret, err := walletMoneCopy.TransferCommit(walletMain.Address(), gasMin, amt0, rweb3)
+	amt0 = new(uint256.Int).Sub(walletMoneCopy.GetBalance(), baseFee)
+	ret, err := walletMoneCopy.TransferCommit(walletMain.Address(), baseFee, amt0, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
@@ -466,7 +463,6 @@ func TestPoC4(t *testing.T) {
 }
 
 func TestPoC5(t *testing.T) {
-	gasMin := uint256.NewInt(1_000_000_000_000_000)
 	rweb3 := rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(defaultRpcNode.RPCURL))
 
 	w0 := wallets[0]
@@ -493,7 +489,7 @@ func TestPoC5(t *testing.T) {
 	contract, err := vm.NewEVMContract("./PoC5.json")
 	require.NoError(t, err)
 
-	ret, err := contract.ExecCommit("", nil, w0, w0.GetNonce(), gasMin, uint256.NewInt(1_000_000), rweb3)
+	ret, err := contract.ExecCommit("", nil, w0, w0.GetNonce(), bigFee, uint256.NewInt(1_000_000), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
@@ -508,7 +504,7 @@ func TestPoC5(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		w0.AddNonce()
-		retAsync, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), gasMin, uint256.NewInt(123), rweb3)
+		retAsync, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), baseFee, uint256.NewInt(123), rweb3)
 		require.NoError(t, err)
 
 		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
@@ -525,7 +521,7 @@ func TestPoC5(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		time.Sleep(10 * time.Millisecond) // tx order 2
-		retAsync, err := w1.TransferAsync(targetWallet.Address(), gasMin, uint256.NewInt(123), rweb3)
+		retAsync, err := w1.TransferAsync(targetWallet.Address(), baseFee, uint256.NewInt(123), rweb3)
 		require.NoError(t, err)
 
 		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
@@ -542,7 +538,7 @@ func TestPoC5(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		time.Sleep(20 * time.Millisecond) // tx order 2
-		retAsync, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), gasMin, uint256.NewInt(0), rweb3)
+		retAsync, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), baseFee, uint256.NewInt(0), rweb3)
 		require.NoError(t, err)
 
 		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)

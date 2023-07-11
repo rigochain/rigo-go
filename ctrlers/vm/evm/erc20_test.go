@@ -50,7 +50,7 @@ func Test_callEVM_Deploy(t *testing.T) {
 		Height:     bctx.Height(),
 		BlockTime:  time.Now().UnixNano(),
 		TxHash:     bytes2.RandBytes(32),
-		Tx:         web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(15_000_000_000_000_000), uint256.NewInt(0), deployInput),
+		Tx:         web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(30_000_000_000_000_000), uint256.NewInt(0), deployInput),
 		TxIdx:      1,
 		Exec:       true,
 		Sender:     fromAcct,
@@ -106,7 +106,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 	_, xerr = rigoEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
-	ret, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(15_000_000_000_000_000), uint256.NewInt(0), bctx.Height(), time.Now().Unix(),
+	ret, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(30_000_000_000_000_000), uint256.NewInt(0), bctx.Height(), time.Now().Unix(),
 		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
 	fmt.Println("<transferred>")
