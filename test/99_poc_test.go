@@ -120,7 +120,7 @@ contract parent {
 } */
 
 func TestPoC1(t *testing.T) {
-	wallet := randWallet()
+	wallet := randCommonWallet() // don't use randWallet(). if the validator wallet is selected, balance check is fail.
 	require.NoError(t, wallet.Unlock(defaultRpcNode.Pass))
 
 	accountData := getAccountData(wallet.Address())
@@ -128,7 +128,8 @@ func TestPoC1(t *testing.T) {
 	currentNonce := new(big.Int)
 	currentNonce, _ = currentNonce.SetString(accountData.Nonce, 10)
 
-	require.NoError(t, wallet.SyncAccount(randRigoWeb3()))
+	rweb3 := randRigoWeb3()
+	require.NoError(t, wallet.SyncAccount(rweb3))
 	fromAddr := wallet.Address()
 	nonce := wallet.GetNonce()
 
@@ -137,7 +138,7 @@ func TestPoC1(t *testing.T) {
 	gasEncode, _ := uint256.FromBig(gas)
 
 	moneyCopyAmt := big.NewInt(0)
-	moneyCopyAmt.SetString("1", 10)
+	moneyCopyAmt.SetString("1234567890", 10)
 	//amt.SetString("100", 10)
 
 	fmt.Printf("my address: %s\n", fromAddr.String())
@@ -148,14 +149,13 @@ func TestPoC1(t *testing.T) {
 	copyAmtEncode, _ := uint256.FromBig(moneyCopyAmt)
 	trxObj := web3.NewTrxContract(fromAddr, types.ZeroAddress(), nonce, gasEncode, copyAmtEncode, selfdestructContract)
 
-	commitRet, err := wallet.SendTxCommit(trxObj, randRigoWeb3())
+	commitRet, err := wallet.SendTxCommit(trxObj, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, commitRet.DeliverTx.Code, commitRet.DeliverTx.Log)
+	fmt.Println("TestPoC1", "used", commitRet.DeliverTx.GasUsed, "wanted", commitRet.DeliverTx.GasWanted)
 
 	//submitTrx(wallet, trxObj)
 	//fmt.Printf("%s\n", submitTrx(wallet, trxObj))
-
-	time.Sleep(time.Second)
 
 	fmt.Println("[after]")
 	sdContractAddr := crypto.CreateAddress(wallet.Address().Array20(), nonce)
@@ -170,18 +170,6 @@ func TestPoC1(t *testing.T) {
 	fmt.Println("my balance(original)", accountData.Balance)
 
 	cmpBal := new(uint256.Int).Sub(uint256.MustFromDecimal(accountData.Balance), uint256.MustFromDecimal(accountData2.Balance)).Sign()
-	//require.True(t, cmpBal > 0, accountData.Balance, accountData2.Balance)
-	if cmpBal <= 0 {
-		fmt.Println("========================== Gas is not used!!! ==========================")
-		time.Sleep(time.Second)
-	}
-
-	accountData2 = getAccountData(wallet.Address())
-	fmt.Printf("my address: %s\n", fromAddr.String())
-	fmt.Printf("my balance: %s\n", accountData2.Balance)
-	fmt.Println("my balance(original)", accountData.Balance)
-
-	cmpBal = new(uint256.Int).Sub(uint256.MustFromDecimal(accountData.Balance), uint256.MustFromDecimal(accountData2.Balance)).Sign()
 	require.True(t, cmpBal > 0, accountData.Balance, accountData2.Balance)
 }
 
@@ -331,7 +319,7 @@ func TestPoc3(t *testing.T) {
 func TestPoC4(t *testing.T) {
 	rweb3 := rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(defaultRpcNode.RPCURL))
 
-	walletMain := randWallet() //walletMain, _ := web3.OpenWallet(libs.NewFileReader("/tmp/key")) // genesis wallet (balance: 100000000000000000000000000)
+	walletMain := randCommonWallet() // don't use randWallet(). if the validator wallet is selected, balance check is fail.
 	require.NoError(t, walletMain.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, walletMain.SyncAccount(rweb3))
 
@@ -372,8 +360,6 @@ func TestPoC4(t *testing.T) {
 
 	}
 
-	time.Sleep(time.Second)
-
 	require.NoError(t, walletMain.SyncAccount(rweb3))
 	require.Equal(t, expectedMainBalance.Dec(), walletMain.GetBalance().Dec())
 	fmt.Println("before balance of walletMain: ", walletMain.GetBalance().Dec())
@@ -406,34 +392,50 @@ func TestPoC4(t *testing.T) {
 	go func() {
 		// tx order 1
 		require.NoError(t, walletB.Unlock(defaultRpcNode.Pass))
-		ret, err := walletB.SendTxAsync(trx1, rweb3)
+		retAsync, err := walletB.SendTxAsync(trx1, rweb3)
 		require.NoError(t, err)
-		fmt.Println("tx order 1", ret.Hash)
 		//submitTrxAsync(walletB, trx1)
+
+		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
+
 		wg.Done()
+
+		fmt.Println("tx0", retTx.Hash, "height", retTx.Height)
 	}()
 	wg.Add(1)
 	go func() {
 		time.Sleep(10 * time.Millisecond) // tx order 2
-		ret, err := walletMain.SendTxAsync(trx2, rweb3)
+		retAsync, err := walletMain.SendTxAsync(trx2, rweb3)
 		require.NoError(t, err)
-		fmt.Println("tx order 2", ret.Hash)
 		//submitTrxAsync(walletMain, trx2)
+
+		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
+
 		wg.Done()
+		fmt.Println("tx1", retTx.Hash, "height", retTx.Height)
 	}()
 	wg.Add(1)
 	go func() {
 		time.Sleep(20 * time.Millisecond) // tx order 3
 		require.NoError(t, walletA.Unlock(defaultRpcNode.Pass))
-		ret, err := walletA.SendTxAsync(trx3, rweb3)
+
+		retAsync, err := walletA.SendTxAsync(trx3, rweb3)
 		require.NoError(t, err)
-		fmt.Println("tx order 3", ret.Hash)
 		//submitTrxAsync(walletA, trx3)
+
+		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
+
 		wg.Done()
+		fmt.Println("tx2", retTx.Hash, "height", retTx.Height)
 	}()
 
 	wg.Wait()
-	time.Sleep(6 * time.Second)
 
 	require.NoError(t, walletMain.SyncAccount(rweb3))
 	require.Equal(t, expectedMainBalance.Dec(), walletMain.GetBalance().Dec())
@@ -470,18 +472,22 @@ func TestPoC5(t *testing.T) {
 	w0 := wallets[0]
 	require.NoError(t, w0.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, w0.SyncAccount(rweb3))
+	fmt.Println("w0", w0.Address(), "balance", w0.GetBalance().Dec())
 
 	w1 := wallets[1]
 	require.NoError(t, w1.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, w1.SyncAccount(rweb3))
+	fmt.Println("w1", w1.Address(), "balance", w1.GetBalance().Dec())
 
 	w2 := wallets[2]
 	require.NoError(t, w2.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, w2.SyncAccount(rweb3))
+	fmt.Println("w2", w2.Address(), "balance", w2.GetBalance().Dec())
 
 	targetWallet := wallets[3]
 	require.NoError(t, targetWallet.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, targetWallet.SyncAccount(rweb3))
+	fmt.Println("targetWallet", targetWallet.Address(), "balance", targetWallet.GetBalance().Dec())
 	expectedTargetWalletBalance := targetWallet.GetBalance().Clone()
 
 	contract, err := vm.NewEVMContract("./PoC5.json")
@@ -502,34 +508,55 @@ func TestPoC5(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		w0.AddNonce()
-		_, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), gasMin, uint256.NewInt(123), rweb3)
+		retAsync, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), gasMin, uint256.NewInt(123), rweb3)
 		require.NoError(t, err)
+
+		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
+
 		_ = expectedTargetWalletBalance.Add(expectedTargetWalletBalance, uint256.NewInt(123))
 		wg.Done()
+
+		fmt.Println("tx0", retTx.Hash, "height", retTx.Height)
 	}()
 
 	// second tx - rigo account tx
 	wg.Add(1)
 	go func() {
 		time.Sleep(10 * time.Millisecond) // tx order 2
-		_, err := w1.TransferAsync(targetWallet.Address(), gasMin, uint256.NewInt(123), rweb3)
+		retAsync, err := w1.TransferAsync(targetWallet.Address(), gasMin, uint256.NewInt(123), rweb3)
 		require.NoError(t, err)
+
+		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
+
 		_ = expectedTargetWalletBalance.Add(expectedTargetWalletBalance, uint256.NewInt(123))
 		wg.Done()
+
+		fmt.Println("tx1", retTx.Hash, "height", retTx.Height)
 	}()
 
 	// third tx - evm tx (revert)
 	wg.Add(1)
 	go func() {
 		time.Sleep(20 * time.Millisecond) // tx order 2
-		_, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), gasMin, uint256.NewInt(0), rweb3)
+		retAsync, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), gasMin, uint256.NewInt(0), rweb3)
 		require.NoError(t, err)
+
+		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeDeliverTx, retTx.TxResult.Code, retTx.TxResult.Log)
+
 		wg.Done()
+
+		fmt.Println("tx2", retTx.Hash, "height", retTx.Height)
 	}()
 
 	wg.Wait()
-	time.Sleep(6 * time.Second)
 
 	require.NoError(t, targetWallet.SyncAccount(rweb3))
+	// Sometimes, expected: 93000004981025701000000246, actual: 93000004979811026000000246, diff: 1,214,675,000,000,000
 	require.Equal(t, expectedTargetWalletBalance.Dec(), targetWallet.GetBalance().Dec())
 }

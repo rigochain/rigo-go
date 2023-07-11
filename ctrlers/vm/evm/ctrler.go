@@ -136,6 +136,9 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		return xerrors.ErrUnknownTrxType
 	}
 
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	// issue #69 - in order to pass `snap` to `Prepare`, call `Snapshot` before `Prepare`
 	snap := ctrler.stateDBWrapper.Snapshot()
 	// issue #48 - prepare hash and index of tx

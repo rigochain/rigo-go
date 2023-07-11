@@ -101,12 +101,9 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 	defer ctrler.mtx.Unlock()
 
 	// ctx.NeedAmt = amount + fee
-	//ctrler.logger.Debug("AcctCtrler::ExecuteTrx - before SubBalance", "sender", ctx.Sender.Address, "balance", ctx.Sender.Balance.Dec(), "NeedAmt", ctx.NeedAmt.Dec())
 	if xerr := ctx.Sender.SubBalance(ctx.NeedAmt); xerr != nil {
 		return xerr
 	}
-	//ctrler.logger.Debug("AcctCtrler::ExecuteTrx - after SubBalance", "sender", ctx.Sender.Address, "balance", ctx.Sender.Balance.Dec(), "NeedAmt", ctx.NeedAmt.Dec())
-
 	if ctx.Tx.GetType() == atypes.TRX_TRANSFER && ctx.Receiver != nil {
 		if xerr := ctx.Receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
 			return xerr

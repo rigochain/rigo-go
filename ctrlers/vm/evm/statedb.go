@@ -57,7 +57,7 @@ func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to type
 }
 
 func (s *StateDBWrapper) Finish() {
-	for addr, _ := range s.accessedObjAddrs {
+	for addr, v := range s.accessedObjAddrs {
 		amt := uint256.MustFromBig(s.StateDB.GetBalance(addr))
 		nonce := s.StateDB.GetNonce(addr)
 
@@ -66,6 +66,8 @@ func (s *StateDBWrapper) Finish() {
 		acct.SetNonce(nonce)
 
 		_ = s.acctLedger.SetAccountCommittable(acct, s.exec)
+
+		s.logger.Debug("Finish", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec(), "snap", v)
 	}
 
 	// issue #68
@@ -198,6 +200,8 @@ func (s *StateDBWrapper) addAccessedObjAddr(addr common.Address) {
 			stateObject.SetBalance(rigoAcct.Balance.ToBig())
 
 			s.accessedObjAddrs[addr] = s.snapshot + 1
+
+			s.logger.Debug("addAccessedObjAddr", "address", rigoAcct.Address, "nonce", rigoAcct.Nonce, "balance", rigoAcct.Balance.Dec(), "snap", s.snapshot+1)
 		}
 	}
 }
@@ -216,6 +220,7 @@ func (s *StateDBWrapper) revertAccessedObjAddr(snapshot int) {
 	for k, v := range s.accessedObjAddrs {
 		if snapshot < v {
 			revertAddrs = append(revertAddrs, k)
+			s.logger.Debug("revertAccessedObjAddr", "to_snapshot", snapshot, "address", bytes.HexBytes(k[:]), "snap", v)
 		}
 	}
 
