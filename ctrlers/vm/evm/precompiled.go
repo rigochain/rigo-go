@@ -32,7 +32,7 @@ func (c *rigo_ecrecover) Run(input []byte) ([]byte, error) {
 
 	r := new(big.Int).SetBytes(input[64:96])
 	s := new(big.Int).SetBytes(input[96:128])
-	v := input[63] // - 27
+	v := input[63] // - 27 : it's only for ethereum.
 
 	// tighter sig s values input homestead only apply to tx sigs
 	if !allZero(input[32:63]) || !crypto.ValidateSignatureValues(v, r, s, false) {
@@ -53,8 +53,8 @@ func (c *rigo_ecrecover) Run(input []byte) ([]byte, error) {
 }
 
 func allZero(b []byte) bool {
-	for _, byte := range b {
-		if byte != 0 {
+	for _, b0 := range b {
+		if b0 != 0 {
 			return false
 		}
 	}
