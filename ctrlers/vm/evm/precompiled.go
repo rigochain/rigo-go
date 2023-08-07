@@ -49,7 +49,7 @@ func (c *rigo_ecrecover) Run(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return rigo_crypto.Pub2Addr(publicKey), nil
+	return common.LeftPadBytes(rigo_crypto.Pub2Addr(publicKey), 32), nil
 }
 
 func allZero(b []byte) bool {
