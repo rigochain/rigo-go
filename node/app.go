@@ -221,6 +221,7 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
 				_txctx.TrxEVMHandler = ctrler.vmCtrler
 				_txctx.GovHandler = ctrler.govCtrler
+				_txctx.AcctHandler = ctrler.acctCtrler
 				_txctx.StakeHandler = ctrler.stakeCtrler
 				return nil
 			})
@@ -291,6 +292,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
 			_txctx.TrxEVMHandler = ctrler.vmCtrler
 			_txctx.GovHandler = ctrler.govCtrler
+			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
 			return nil
 		})
@@ -351,6 +353,7 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
 			_txctx.TrxEVMHandler = ctrler.vmCtrler
 			_txctx.GovHandler = ctrler.govCtrler
+			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
 			// when the 'tx' is finished, it's called
 			_txctx.Callback = func(ctx *types2.TrxContext, xerr xerrors.XError) {

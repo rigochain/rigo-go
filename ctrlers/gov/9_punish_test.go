@@ -36,7 +36,7 @@ func TestPunish(t *testing.T) {
 	slashed, err := govCtrler.DoPunish(&abcitypes.Evidence{
 		Validator: abcitypes.Validator{
 			Address: valAddr,
-			Power:   stakeHelper.PowerOf(valAddr),
+			Power:   stakeHelper.TotalPowerOf(valAddr),
 		},
 	})
 	require.NoError(t, err)

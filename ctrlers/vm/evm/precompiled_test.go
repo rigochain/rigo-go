@@ -1,7 +1,7 @@
 package evm
 
 import (
-	"github.com/rigochain/rigo-go/types"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/rigochain/rigo-go/types/bytes"
 	rigo_crypto "github.com/rigochain/rigo-go/types/crypto"
 	"github.com/stretchr/testify/require"
@@ -38,6 +38,6 @@ func TestEcRecover(t *testing.T) {
 	ecr := &rigo_ecrecover{}
 	addr1, err := ecr.Run(ecr_input)
 	require.NoError(t, err)
-	require.Equal(t, addr0, types.Address(addr1))
-	require.Equal(t, expectedBTCAddr, bytes.HexBytes(addr1).String())
+	require.Equal(t, common.LeftPadBytes(addr0, 32), addr1)
+	require.Equal(t, expectedBTCAddr, bytes.HexBytes(common.TrimLeftZeroes(addr1)).String())
 }

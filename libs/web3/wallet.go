@@ -209,6 +209,21 @@ func (w *Wallet) StakingCommit(to types.Address, gas, amt *uint256.Int, rweb3 *R
 	return w.SendTxCommit(tx, rweb3)
 }
 
+func (w *Wallet) WithdrawAync(fee, req *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	tx := NewTrxWithdraw(w.Address(), w.Address(), w.acct.GetNonce(), fee, req)
+	return w.SendTxAsync(tx, rweb3)
+}
+
+func (w *Wallet) WithdrawSync(fee, req *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	tx := NewTrxWithdraw(w.Address(), w.Address(), w.acct.GetNonce(), fee, req)
+	return w.SendTxSync(tx, rweb3)
+}
+
+func (w *Wallet) WithdrawCommit(fee, req *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+	tx := NewTrxWithdraw(w.Address(), w.Address(), w.acct.GetNonce(), fee, req)
+	return w.SendTxCommit(tx, rweb3)
+}
+
 func (w *Wallet) SendTxAsync(tx *types2.Trx, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err

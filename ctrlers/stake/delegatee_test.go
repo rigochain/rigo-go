@@ -1,8 +1,6 @@
 package stake_test
 
 import (
-	"fmt"
-	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
@@ -13,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestSlashAll(t *testing.T) {
+func TestSlash(t *testing.T) {
 	for _, w := range Wallets[:21] {
 		delegatee := stake.NewDelegatee(w.Address(), w.GetPubKey())
 
@@ -22,187 +20,152 @@ func TestSlashAll(t *testing.T) {
 		stakesCnt := int64(tmrand.Intn(100) + 100)
 
 		for i := int64(0); i < stakesCnt; i++ {
-			stakeAmt := new(uint256.Int).Mul(ctrlertypes.AmountPerPower(), uint256.NewInt(uint64(tmrand.Int63n(100_000_000))))
-			stakePower := ctrlertypes.AmountToPower(stakeAmt)
-
+			stakePower := tmrand.Int63n(100_000_000)
 			totalPower0 += stakePower
+
 			fromAddr := types.RandAddress()
 			if tmrand.Int()%2 == 0 {
-				selfPower0 += stakePower
+				// self staking
 				fromAddr = delegatee.Addr
+				selfPower0 += stakePower
 			}
 
 			delegatee.AddStake(
-				stake.NewStakeWithAmount(
+				stake.NewStakeWithPower(
 					fromAddr,
 					delegatee.Addr,
-					stakeAmt,               // amount
+					stakePower,
 					i+1,                    // height
 					bytes.RandHexBytes(32), //txhash
 				),
 			)
 		}
-
-		blocks := int64(100)
-		totalReward0 := uint256.NewInt(0)
-		for i := stakesCnt; i < (stakesCnt + blocks); i++ {
-			r := delegatee.DoReward(i+1, ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
-			require.Greater(t, r.Sign(), 0, fmt.Sprintf("at height %d", i))
-			_ = totalReward0.Add(totalReward0, r)
-		}
-		require.Equal(t, totalReward0, delegatee.TotalRewardAmount)
-		require.Equal(t, totalReward0, delegatee.SumBlockRewardOf(nil))
-
 		require.Equal(t, selfPower0, delegatee.SelfPower)
-		require.Equal(t, ctrlertypes.PowerToAmount(selfPower0), delegatee.SumAmountOf(delegatee.Addr))
-		require.Equal(t, ctrlertypes.PowerToAmount(selfPower0), delegatee.SelfAmount)
 		require.Equal(t, totalPower0, delegatee.TotalPower)
-		require.Equal(t, ctrlertypes.PowerToAmount(totalPower0), delegatee.SumAmountOf(nil))
-		require.Equal(t, ctrlertypes.PowerToAmount(totalPower0), delegatee.TotalAmount)
 
 		oriStakes := make([]*stake.Stake, delegatee.StakesLen())
 		for i, s0 := range delegatee.GetAllStakes() {
 			oriStakes[i] = s0.Clone()
 		}
 
-		totalSlashedPower0 := delegatee.DoSlash(govParams.SlashRatio(), ctrlertypes.AmountPerPower(), govParams.RewardPerPower(), true)
+		slashedPower0 := delegatee.DoSlash(govParams.SlashRatio())
 
-		expectedTotalSlashedPower0 := int64(0)
-		expectedTotalReceivedReward := uint256.NewInt(0)
+		expectedSlashedPower := int64(0)
 		for _, s0 := range oriStakes {
-			p0 := uint256.NewInt(uint64(s0.Power))
-			_ = p0.Mul(p0, uint256.NewInt(uint64(govParams.SlashRatio())))
-			_ = p0.Div(p0, uint256.NewInt(uint64(100)))
-			slashedPower := int64(p0.Uint64())
+			slashedPower := (s0.Power * govParams.SlashRatio()) / int64(100)
 			if slashedPower < 1 {
 				slashedPower = s0.Power
-				expectedTotalSlashedPower0 += slashedPower
-				continue
 			}
 
 			expectedPower := s0.Power - slashedPower
 			require.NotEqual(t, expectedPower, s0.Power)
-
-			expectedAmt := new(uint256.Int).Mul(ctrlertypes.AmountPerPower(), uint256.NewInt(uint64(expectedPower)))
-			require.NotEqual(t, expectedAmt.Dec(), s0.Amount.Dec())
-
-			expectedReceivedReward := new(uint256.Int).Mul(s0.ReceivedReward, uint256.NewInt(uint64(govParams.SlashRatio())))
-			_ = expectedReceivedReward.Div(expectedReceivedReward, uint256.NewInt(uint64(100)))
-			require.NotEqual(t, expectedReceivedReward.Dec(), s0.ReceivedReward.Dec())
+			require.True(t, expectedPower >= 0)
 
 			_, s1 := delegatee.FindStake(s0.TxHash)
 
-			require.NotNil(t, s1)
-			require.Equal(t, s0.TxHash, s1.TxHash)
-			require.Equal(t, expectedPower, s1.Power)
-			require.Equal(t, expectedAmt.Dec(), s1.Amount.Dec())
-			require.Equal(t, expectedReceivedReward.Dec(), s1.ReceivedReward.Dec())
+			if expectedPower == 0 {
+				// removed
+				require.Nil(t, s1)
+			} else {
+				require.NotNil(t, s1)
+				require.Equal(t, s0.TxHash, s1.TxHash)
+				require.Equal(t, expectedPower, s1.Power)
+			}
 
-			expectedTotalSlashedPower0 += slashedPower
-			_ = expectedTotalReceivedReward.Add(expectedTotalReceivedReward, expectedReceivedReward)
+			expectedSlashedPower += slashedPower
 		}
-		require.Equal(t, expectedTotalSlashedPower0, totalSlashedPower0)
-		require.Equal(t, totalPower0-totalSlashedPower0, delegatee.TotalPower)
-		require.Equal(t, totalPower0-totalSlashedPower0, delegatee.SumPowerOf(nil))
-		require.Equal(t, expectedTotalReceivedReward.Dec(), delegatee.TotalRewardAmount.Dec())
+		require.Equal(t, expectedSlashedPower, slashedPower0)
+		require.Equal(t, totalPower0-slashedPower0, delegatee.TotalPower)
+		require.Equal(t, totalPower0-slashedPower0, delegatee.SumPowerOf(nil))
 	}
 }
 
 func TestAddStake(t *testing.T) {
 	delegatee := stake.NewDelegatee(Wallets[0].Address(), Wallets[0].GetPubKey())
 
-	amt0 := bytes.RandU256IntN(ctrlertypes.MaxStakeAmount())
-	power0 := ctrlertypes.AmountToPower(amt0)
+	power0 := bytes.RandInt64N(ctrlertypes.MaxTotalPower())
 	delegatee.AddStake(
-		stake.NewStakeWithAmount(
+		stake.NewStakeWithPower(
 			delegatee.Addr,
 			delegatee.Addr,
-			amt0,                   // amount
+			power0,
 			rand.Int63n(1_000_000), // height
 			bytes.RandHexBytes(32), //txhash
 		),
 	)
 
-	require.Equal(t, amt0.String(), delegatee.GetSelfAmount().String())
-	require.Equal(t, amt0.String(), delegatee.GetTotalAmount().String())
 	require.Equal(t, power0, delegatee.GetSelfPower())
 	require.Equal(t, power0, delegatee.GetTotalPower())
 
 	from1 := types.RandAddress()
-	amt1 := bytes.RandU256IntN(ctrlertypes.MaxStakeAmount())
-	power1 := ctrlertypes.AmountToPower(amt1)
+	power1 := bytes.RandInt64N(ctrlertypes.MaxTotalPower())
 	delegatee.AddStake(
-		stake.NewStakeWithAmount(
+		stake.NewStakeWithPower(
 			from1,
 			delegatee.Addr,
-			amt1,                   // amount
+			power1,
 			rand.Int63n(1_000_000), // height
 			bytes.RandHexBytes(32), //txhash
 		),
 	)
 
-	require.Equal(t, amt0.String(), delegatee.GetSelfAmount().String())
 	require.Equal(t, power0, delegatee.GetSelfPower())
-	require.Equal(t, amt1.String(), delegatee.SumAmountOf(from1).String())
 	require.Equal(t, power1, delegatee.SumPowerOf(from1))
-	require.Equal(t, new(uint256.Int).Add(amt0, amt1).String(), delegatee.GetTotalAmount().String())
 	require.Equal(t, power0+power1, delegatee.GetTotalPower())
 
 }
 
-func TestDoReward_Delegatee(t *testing.T) {
-	delegatee := stake.NewDelegatee(Wallets[1].Address(), Wallets[1].GetPubKey())
-
-	// staking
-	height0 := rand.Int63n(1_000_000)
-	amt0 := bytes.RandU256IntN(ctrlertypes.MaxStakeAmount())
-	delegatee.AddStake(
-		stake.NewStakeWithAmount(
-			delegatee.Addr,
-			delegatee.Addr,
-			amt0,                   // amount
-			height0+1,              // height
-			bytes.RandHexBytes(32), //txhash
-		),
-	)
-	// not rewarded - height0 is not enough
-	reward0 := delegatee.DoReward(height0, ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
-	require.Equal(t, 0, delegatee.GetTotalRewardAmount().Sign())
-	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalRewardAmount())
-
-	// first reward
-	reward1 := delegatee.DoReward(height0+1, ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
-	require.Equal(t, new(uint256.Int).Add(reward0, reward1), delegatee.GetTotalRewardAmount())
-	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalRewardAmount())
-	require.True(t, delegatee.GetTotalRewardAmount().Sign() > 0)
-
-	// first reward
-	reward2 := delegatee.DoReward(height0+2, ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
-	require.Equal(t, reward1, reward2)
-	require.Equal(t, new(uint256.Int).Add(reward1, reward2), delegatee.GetTotalRewardAmount())
-	require.Equal(t, delegatee.SumBlockReward(), delegatee.GetTotalRewardAmount())
-	require.True(t, delegatee.GetTotalRewardAmount().Sign() > 0)
-}
-
-func BenchmarkApplyReward(b *testing.B) {
-	delegatee := stake.NewDelegatee(Wallets[1].Address(), Wallets[1].GetPubKey())
-	for i := 0; i < 10000; i++ {
-		// staking
-		power := rand.Int63n(1000000000)
-		delegatee.AddStake(
-			stake.NewStakeWithPower(
-				types.RandAddress(),
-				delegatee.Addr,
-				power,                  // power
-				rand.Int63n(1),         // height
-				bytes.RandHexBytes(32), //txhash
-			),
-		)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		rewarded := delegatee.DoReward(int64(i+1), ctrlertypes.AmountPerPower(), govParams.RewardPerPower())
-		require.True(b, rewarded.Sign() > 0)
-	}
-}
+//func TestDoReward_Delegatee(t *testing.T) {
+//	delegatee := stake.NewDelegatee(Wallets[1].Address(), Wallets[1].GetPubKey())
+//
+//	// staking
+//	height0 := rand.Int63n(1_000_000)
+//	power0 := bytes.RandInt64N(ctrlertypes.MaxTotalPower())
+//	delegatee.AddStake(
+//		stake.NewStakeWithPower(
+//			delegatee.Addr,
+//			delegatee.Addr,
+//			power0,
+//			height0+1,              // height
+//			bytes.RandHexBytes(32), //txhash
+//		),
+//	)
+//	// not rewarded - height0 is not enough
+//	reward0 := delegatee.DoReward(height0, govParams.RewardPerPower())
+//	require.True(t, reward0 == 0)
+//	require.EqualValues(t, 0, delegatee.RewardPower)
+//
+//	// first reward
+//	reward1 := delegatee.DoReward(height0+1, govParams.RewardPerPower())
+//	require.True(t, reward1 > 0, fmt.Sprintf("delegatee: %v, reward: %v\n", delegatee, reward1))
+//	require.Equal(t, reward0+reward1, delegatee.RewardPower)
+//
+//	// second reward
+//	reward2 := delegatee.DoReward(height0+2, govParams.RewardPerPower())
+//	require.True(t, reward2 > 0)
+//	require.Equal(t, reward1, reward2)
+//	require.Equal(t, reward0+reward1+reward2, delegatee.RewardPower)
+//}
+//
+//func BenchmarkApplyReward(b *testing.B) {
+//	delegatee := stake.NewDelegatee(Wallets[1].Address(), Wallets[1].GetPubKey())
+//	for i := 0; i < 10000; i++ {
+//		// staking
+//		power := rand.Int63n(1000000000)
+//		delegatee.AddStake(
+//			stake.NewStakeWithPower(
+//				types.RandAddress(),
+//				delegatee.Addr,
+//				power,                  // power
+//				rand.Int63n(1),         // height
+//				bytes.RandHexBytes(32), //txhash
+//			),
+//		)
+//	}
+//
+//	b.ResetTimer()
+//	for i := 0; i < b.N; i++ {
+//		rewarded := delegatee.DoReward(int64(i+1), govParams.RewardPerPower())
+//		require.True(b, rewarded > 0)
+//	}
+//}

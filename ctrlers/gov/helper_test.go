@@ -50,7 +50,7 @@ func (s *stakeHandlerMock) GetTotalPower() int64 {
 	return sum
 }
 
-func (s *stakeHandlerMock) GetTotalPowerOf(addr types.Address) int64 {
+func (s *stakeHandlerMock) TotalPowerOf(addr types.Address) int64 {
 	for _, v := range s.delegatees {
 		if bytes.Compare(addr, v.Addr) == 0 {
 			return v.TotalPower
@@ -59,8 +59,12 @@ func (s *stakeHandlerMock) GetTotalPowerOf(addr types.Address) int64 {
 	return int64(0)
 }
 
-func (s *stakeHandlerMock) PowerOf(addr types.Address) int64 {
-	return s.GetTotalPowerOf(addr)
+func (s *stakeHandlerMock) SelfPowerOf(addr types.Address) int64 {
+	return 0
+}
+
+func (s *stakeHandlerMock) DelegatedPowerOf(addr types.Address) int64 {
+	return 0
 }
 
 func (s *stakeHandlerMock) PickAddress(i int) types.Address {
@@ -71,6 +75,11 @@ var _ ctrlertypes.IStakeHandler = (*stakeHandlerMock)(nil)
 
 type acctHelperMock struct {
 	acctMap map[ctrlertypes.AcctKey]*ctrlertypes.Account
+}
+
+func (a *acctHelperMock) FindOrNewAccount(address types.Address, b bool) *ctrlertypes.Account {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (a *acctHelperMock) FindAccount(addr types.Address, exec bool) *ctrlertypes.Account {
@@ -85,6 +94,28 @@ func (a *acctHelperMock) FindAccount(addr types.Address, exec bool) *ctrlertypes
 	}
 }
 
+func (a *acctHelperMock) Transfer(address types.Address, address2 types.Address, u *uint256.Int, b bool) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *acctHelperMock) Reward(address types.Address, u *uint256.Int, b bool) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *acctHelperMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *acctHelperMock) SetAccountCommittable(account *ctrlertypes.Account, b bool) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+var _ ctrlertypes.IAccountHandler = (*acctHelperMock)(nil)
+
 func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxContext {
 	txbz, _ := tx.Encode()
 	txctx, _ := ctrlertypes.NewTrxContext(txbz, height, time.Now().Unix(), exec, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -97,6 +128,7 @@ func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxCo
 		_txctx.Sender = acct
 		_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
 		_txctx.GovHandler = govCtrler
+		_txctx.AcctHandler = acctHelper
 		_txctx.StakeHandler = stakeHelper
 		return nil
 	})

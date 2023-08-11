@@ -61,6 +61,7 @@ pbm:
 	@protoc --go_out=$(GOPATH)/src -I./protos/ account.proto
 	@protoc --go_out=$(GOPATH)/src -I./protos/ gov_rule.proto
 	@protoc --go_out=$(GOPATH)/src -I./protos/ trx.proto
+	@protoc --go_out=$(GOPATH)/src -I./protos/ reward.proto
 
 build-deploy:
 	@echo "Build deploy tar file"

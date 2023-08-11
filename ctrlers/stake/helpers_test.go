@@ -81,21 +81,26 @@ func randMakeStakingToSelfTrxContext() (*ctrlertypes.TrxContext, error) {
 	from := Wallets[rand.Intn(len(Wallets))]
 	to := from
 
-	power := rand.Int63n(1000)
+	power := ctrlertypes.AmountToPower(govParams.MinValidatorStake()) + rand.Int63n(10000)
 
 	if txCtx, err := makeStakingTrxContext(from, to, power); err != nil {
 		return nil, err
 	} else {
-		DelegateeWallets = append(DelegateeWallets, from)
+		DelegateeWallets = append(DelegateeWallets, to)
 		return txCtx, nil
 	}
 
 }
 
 func randMakeStakingTrxContext() (*ctrlertypes.TrxContext, error) {
-	from, to := Wallets[rand.Intn(len(Wallets))], DelegateeWallets[rand.Intn(len(DelegateeWallets))]
-	power := rand.Int63n(1000) + 10
-	return makeStakingTrxContext(from, to, power)
+	for {
+		from, to := Wallets[rand.Intn(len(Wallets))], DelegateeWallets[rand.Intn(len(DelegateeWallets))]
+		if bytes.Compare(from.Address(), to.Address()) == 0 {
+			continue
+		}
+		power := rand.Int63n(1000) + 10
+		return makeStakingTrxContext(from, to, power)
+	}
 }
 
 func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*ctrlertypes.TrxContext, error) {

@@ -43,7 +43,7 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	require.NoError(t, sender.SyncAccount(rweb3))
 
 	// get allowed delegating
-	maxAllowedAmt := valStakes.TotalAmount
+	maxAllowedAmt := ctrlertypes.PowerToAmount(valStakes.TotalPower)
 	ret, err := sender.StakingSync(valWal.Address(), baseFee, maxAllowedAmt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
@@ -58,7 +58,7 @@ func TestMinSelfStakeRatio(t *testing.T) {
 
 	// self-staking must be allowed.
 	// already stake + new stake >= govRule.MinValidatorStake
-	allowedMinStake := new(uint256.Int).Sub(govRule.MinValidatorStake(), valStakes.SelfAmount)
+	allowedMinStake := new(uint256.Int).Sub(govRule.MinValidatorStake(), ctrlertypes.PowerToAmount(valStakes.SelfPower))
 	if allowedMinStake.Sign() <= 0 {
 		allowedMinStake = uint256.NewInt(10_000_000_000_000_000_000)
 	}
@@ -141,7 +141,7 @@ func TestDelegating(t *testing.T) {
 	require.True(t, len(stakes) > 0)
 	for _, s0 := range stakes {
 		if bytes.Compare(s0.TxHash, txHash) == 0 {
-			require.Equal(t, stakeAmt, s0.Amount)
+			require.Equal(t, stakeAmt, ctrlertypes.PowerToAmount(s0.Power))
 			found = true
 		}
 	}
@@ -152,7 +152,7 @@ func TestDelegating(t *testing.T) {
 
 	require.Equal(t, valStakes0.SelfPower, valStakes1.SelfPower)
 	require.Equal(t, valStakes0.TotalPower+stakePower, valStakes1.TotalPower)
-	require.Equal(t, new(uint256.Int).Add(valStakes0.TotalAmount, stakeAmt), valStakes1.TotalAmount)
+	require.Equal(t, new(uint256.Int).Add(ctrlertypes.PowerToAmount(valStakes0.TotalPower), stakeAmt), ctrlertypes.PowerToAmount(valStakes1.TotalPower))
 
 	fmt.Println("Wait 5 seconds...")
 	time.Sleep(5 * time.Second)

@@ -17,7 +17,7 @@ func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 	switch req.Path {
 	case "account":
 		response.Value, xerr = ctrler.acctCtrler.Query(req)
-	case "stakes", "delegatee":
+	case "stakes", "delegatee", "reward":
 		response.Value, xerr = ctrler.stakeCtrler.Query(req)
 	case "proposals", "rule":
 		response.Value, xerr = ctrler.govCtrler.Query(req)

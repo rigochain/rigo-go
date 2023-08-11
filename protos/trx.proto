@@ -15,10 +15,15 @@ message TrxProto {
   bytes sig = 10;
 }
 
+message TrxPayloadAssetTransferProto {}
+
 message TrxPayloadStakingProto {}
 
 message TrxPayloadUnstakingProto {
   bytes tx_hash = 1;
+}
+message TrxPayloadWithdrawProto {
+  bytes _reqAmt = 1;
 }
 
 message TrxPayloadContractProto {

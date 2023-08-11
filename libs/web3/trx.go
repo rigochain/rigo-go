@@ -37,6 +37,16 @@ func NewTrxUnstaking(from, to types.Address, nonce uint64, gas *uint256.Int, txh
 		&types2.TrxPayloadUnstaking{TxHash: txhash})
 }
 
+func NewTrxWithdraw(from, to types.Address, nonce uint64, gas, req *uint256.Int) *types2.Trx {
+	return types2.NewTrx(
+		uint32(1),
+		from, to,
+		nonce,
+		gas,
+		uint256.NewInt(0),
+		&types2.TrxPayloadWithdraw{ReqAmt: req})
+}
+
 func NewTrxProposal(from, to types.Address, nonce uint64, gas *uint256.Int, msg string, start, period int64, optType int32, options ...[]byte) *types2.Trx {
 	return types2.NewTrx(
 		uint32(1),

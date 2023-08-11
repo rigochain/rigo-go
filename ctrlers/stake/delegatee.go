@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ledger"
 	"github.com/rigochain/rigo-go/types"
 	bytes2 "github.com/rigochain/rigo-go/types/bytes"
@@ -17,13 +16,10 @@ type Delegatee struct {
 	Addr   types.Address   `json:"address"`
 	PubKey bytes2.HexBytes `json:"pubKey"`
 
-	SelfAmount  *uint256.Int `json:"selfAmount"`
-	SelfPower   int64        `json:"selfPower,string"`
-	TotalAmount *uint256.Int `json:"totalAmount"`
-	TotalPower  int64        `json:"totalPower,string"`
+	SelfPower  int64 `json:"selfPower,string"`
+	TotalPower int64 `json:"totalPower,string"`
 
-	TotalRewardAmount *uint256.Int `json:"rewardAmount"`
-	Stakes            []*Stake     `json:"stakes"`
+	Stakes []*Stake `json:"stakes"`
 
 	mtx sync.RWMutex
 }
@@ -60,14 +56,18 @@ var _ ledger.ILedgerItem = (*Delegatee)(nil)
 
 func NewDelegatee(addr types.Address, pubKey bytes2.HexBytes) *Delegatee {
 	return &Delegatee{
-		Addr:              addr,
-		PubKey:            pubKey,
-		SelfAmount:        uint256.NewInt(0),
-		SelfPower:         0,
-		TotalPower:        0,
-		TotalAmount:       uint256.NewInt(0),
-		TotalRewardAmount: uint256.NewInt(0),
+		Addr:       addr,
+		PubKey:     pubKey,
+		SelfPower:  0,
+		TotalPower: 0,
 	}
+}
+
+func (delegatee *Delegatee) GetAddress() types.Address {
+	delegatee.mtx.RLock()
+	defer delegatee.mtx.RUnlock()
+
+	return delegatee.Addr
 }
 
 func (delegatee *Delegatee) AddStake(stakes ...*Stake) xerrors.XError {
@@ -78,17 +78,13 @@ func (delegatee *Delegatee) AddStake(stakes ...*Stake) xerrors.XError {
 }
 
 func (delegatee *Delegatee) addStake(stakes ...*Stake) xerrors.XError {
-
 	delegatee.Stakes = append(delegatee.Stakes, stakes...)
 
 	for _, s := range stakes {
 		if s.IsSelfStake() {
 			delegatee.SelfPower += s.Power
-			_ = delegatee.SelfAmount.Add(delegatee.SelfAmount, s.Amount)
 		}
 		delegatee.TotalPower += s.Power
-		_ = delegatee.TotalAmount.Add(delegatee.TotalAmount, s.Amount)
-		_ = delegatee.TotalRewardAmount.Add(delegatee.TotalRewardAmount, s.ReceivedReward)
 	}
 	return nil
 }
@@ -100,11 +96,8 @@ func (delegatee *Delegatee) DelStake(txhash bytes2.HexBytes) *Stake {
 	if s := delegatee.delStakeByHash(txhash); s != nil {
 		if s.IsSelfStake() {
 			delegatee.SelfPower -= s.Power
-			_ = delegatee.SelfAmount.Sub(delegatee.SelfAmount, s.Amount)
 		}
 		delegatee.TotalPower -= s.Power
-		_ = delegatee.TotalAmount.Sub(delegatee.TotalAmount, s.Amount)
-		_ = delegatee.TotalRewardAmount.Sub(delegatee.TotalRewardAmount, s.ReceivedReward)
 		return s
 	}
 	return nil
@@ -117,11 +110,8 @@ func (delegatee *Delegatee) DelStakeByIdx(idx int) *Stake {
 	if s := delegatee.delStakeByIdx(idx); s != nil {
 		if s.IsSelfStake() {
 			delegatee.SelfPower -= s.Power
-			_ = delegatee.SelfAmount.Sub(delegatee.SelfAmount, s.Amount)
 		}
 		delegatee.TotalPower -= s.Power
-		_ = delegatee.TotalAmount.Sub(delegatee.TotalAmount, s.Amount)
-		_ = delegatee.TotalRewardAmount.Sub(delegatee.TotalRewardAmount, s.ReceivedReward)
 		return s
 	}
 	return nil
@@ -155,8 +145,6 @@ func (delegatee *Delegatee) DelAllStakes() []*Stake {
 
 	for _, s := range stakes {
 		delegatee.TotalPower -= s.Power
-		_ = delegatee.TotalAmount.Sub(delegatee.TotalAmount, s.Amount)
-		_ = delegatee.TotalRewardAmount.Sub(delegatee.TotalRewardAmount, s.ReceivedReward)
 	}
 
 	return stakes
@@ -221,44 +209,6 @@ func (delegatee *Delegatee) StakesLen() int {
 	return len(delegatee.Stakes)
 }
 
-func (delegatee *Delegatee) GetSelfAmount() *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.SelfAmount.Clone()
-}
-
-func (delegatee *Delegatee) GetTotalAmount() *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.TotalAmount.Clone()
-}
-
-func (delegatee *Delegatee) SumAmount() *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.sumAmountOf(nil)
-}
-
-func (delegatee *Delegatee) SumAmountOf(addr types.Address) *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.sumAmountOf(addr)
-}
-
-func (delegatee *Delegatee) sumAmountOf(addr types.Address) *uint256.Int {
-	amt := uint256.NewInt(0)
-	for _, s0 := range delegatee.Stakes {
-		if addr == nil || bytes.Compare(s0.From, addr) == 0 {
-			_ = amt.Add(amt, s0.Amount)
-		}
-	}
-	return amt
-}
-
 func (delegatee *Delegatee) GetSelfPower() int64 {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
@@ -280,81 +230,28 @@ func (delegatee *Delegatee) SelfStakeRatio(added int64) int64 {
 	return (delegatee.SelfPower * int64(100)) / (delegatee.TotalPower + added)
 }
 
-func (delegatee *Delegatee) GetTotalRewardAmount() *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.TotalRewardAmount.Clone()
-}
-
-func (delegatee *Delegatee) DoReward(height int64, amtPerPower *uint256.Int, rwdPerPower int64) *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.doBlockReward(height, amtPerPower, rwdPerPower)
-}
-
-func (delegatee *Delegatee) doBlockReward(height int64, amtPerPower *uint256.Int, rwdPerPower int64) *uint256.Int {
-	reward := uint256.NewInt(0)
-	for _, s := range delegatee.Stakes {
-
-		// issue #29
-		// `doBlockReward` is called after running `execStaking/execUnstaking`.
-		// So the `delegatee` has new stakes at now.
-		// Rewarding should be given only to old stakes.
-		if s.StartHeight <= height {
-			// issue #52
-			// Use reward calculated at runtime.
-			rwd := BlockRewardOf(s.Amount, amtPerPower, rwdPerPower)
-			_ = s.applyReward(height, rwd)
-			_ = reward.Add(reward, rwd)
-		}
-	}
-	_ = delegatee.TotalRewardAmount.Add(delegatee.TotalRewardAmount, reward)
-	return reward
-}
-
-func (delegatee *Delegatee) DoSlash(ratio int64, amtPerPower *uint256.Int, rwdPerPower int64, slashAll bool) int64 {
+func (delegatee *Delegatee) DoSlash(ratio int64) int64 {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
-	if slashAll {
-		// to slash delegators too. issue #49
-		return delegatee.doSlashAll(ratio, amtPerPower, rwdPerPower)
-	} else {
-		return delegatee.doSlashOne(ratio, amtPerPower, rwdPerPower)
-	}
+	// to slash delegators too. issue #49
+	return delegatee.doSlashAll(ratio)
 }
 
-func (delegatee *Delegatee) doSlashAll(ratio int64, amtPerPower *uint256.Int, rwdPerPower int64) int64 {
-	//_p0 := uint256.NewInt(uint64(delegatee.TotalPower))
-	//_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
-	//_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
-	//slashingPower := int64(_p0.Uint64())
-	slashedPower := int64(0)
+func (delegatee *Delegatee) doSlashAll(ratio int64) int64 {
+	sumSlashedPower := int64(0)
 
 	var removingStakes []*Stake
 	for _, s0 := range delegatee.Stakes {
-		_p0 := uint256.NewInt(uint64(s0.Power))
-		_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
-		_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
-		slashingPower := int64(_p0.Uint64())
-
-		if slashingPower < 1 {
-			slashedPower += s0.Power
-			fmt.Println("DEBUG - slashingPower =", slashingPower)
-			// power, amount is processed at out of loop
+		slashedPower := (s0.Power * ratio) / int64(100)
+		if slashedPower < 1 {
 			removingStakes = append(removingStakes, s0)
+			slashedPower = s0.Power
 			continue
 		}
 
-		s0.Power -= slashingPower
-		s0.Amount = new(uint256.Int).Mul(uint256.NewInt(uint64(s0.Power)), amtPerPower)
-
-		_ = s0.ReceivedReward.Mul(s0.ReceivedReward, uint256.NewInt(uint64(ratio)))
-		_ = s0.ReceivedReward.Div(s0.ReceivedReward, uint256.NewInt(uint64(100)))
-
-		slashedPower += slashingPower
+		s0.Power -= slashedPower
+		sumSlashedPower += slashedPower
 	}
 
 	if removingStakes != nil {
@@ -363,70 +260,10 @@ func (delegatee *Delegatee) doSlashAll(ratio int64, amtPerPower *uint256.Int, rw
 		}
 	}
 
-	delegatee.SelfAmount = delegatee.sumAmountOf(delegatee.Addr)
 	delegatee.SelfPower = delegatee.sumPowerOf(delegatee.Addr)
-	delegatee.TotalAmount = delegatee.sumAmountOf(nil)
 	delegatee.TotalPower = delegatee.sumPowerOf(nil)
-	delegatee.TotalRewardAmount = delegatee.sumBlockRewardOf(nil)
 
-	return slashedPower
-}
-
-// doSlashOne is DEPRECATED.
-func (delegatee *Delegatee) doSlashOne(ratio int64, amtPerPower *uint256.Int, rwdPerPower int64) int64 {
-	panic("`doSlashOne` is DEPRECATED.")
-
-	//_p0 := uint256.NewInt(uint64(delegatee.SelfPower))
-	//_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
-	//_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
-	//slashingPower := int64(_p0.Uint64())
-	//slashedPower := int64(0)
-	//
-	//var removingStakes []*Stake
-	//for _, s0 := range delegatee.Stakes {
-	//	if s0.From.Compare(delegatee.Addr) == 0 && s0.IsSelfStake() {
-	//		if s0.Power <= slashingPower {
-	//			slashingPower -= s0.Power
-	//			slashedPower += s0.Power
-	//
-	//			// power, amount is processed at out of loop
-	//			removingStakes = append(removingStakes, s0)
-	//		} else {
-	//			s0.Power -= slashingPower
-	//			slashedPower += slashingPower
-	//
-	//			blocks := uint64(0)
-	//			if s0.ReceivedReward.Sign() > 0 {
-	//				blocks = new(uint256.Int).Div(s0.ReceivedReward, s0.BlockRewardUnit).Uint64()
-	//			}
-	//
-	//			s0.Amount = new(uint256.Int).Mul(uint256.NewInt(uint64(s0.Power)), amtPerPower)
-	//			s0.BlockRewardUnit = new(uint256.Int).Mul(rwdPerPower, uint256.NewInt(uint64(s0.Power)))
-	//			if blocks > 0 {
-	//				s0.ReceivedReward = new(uint256.Int).Mul(s0.BlockRewardUnit, uint256.NewInt(blocks))
-	//			}
-	//
-	//			slashingPower = 0
-	//		}
-	//		if slashingPower == 0 {
-	//			break
-	//		}
-	//	}
-	//}
-	//
-	//if removingStakes != nil {
-	//	for _, s1 := range removingStakes {
-	//		_ = delegatee.delStakeByHash(s1.TxHash)
-	//	}
-	//}
-	//
-	//delegatee.SelfAmount = delegatee.sumAmountOf(delegatee.Addr)
-	//delegatee.SelfPower = delegatee.sumPowerOf(delegatee.Addr)
-	//delegatee.TotalAmount = delegatee.sumAmountOf(nil)
-	//delegatee.TotalPower = delegatee.sumPowerOf(nil)
-	//delegatee.TotalRewardAmount = delegatee.sumBlockRewardOf(nil)
-	//
-	//return slashedPower
+	return sumSlashedPower
 }
 
 func (delegatee *Delegatee) String() string {
@@ -461,42 +298,10 @@ func (delegatee *Delegatee) sumPowerOf(addr types.Address) int64 {
 	return power
 }
 
-func (delegatee *Delegatee) SumBlockReward() *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.sumBlockRewardOf(nil)
-}
-
-func (delegatee *Delegatee) SumBlockRewardOf(addr types.Address) *uint256.Int {
-	delegatee.mtx.RLock()
-	defer delegatee.mtx.RUnlock()
-
-	return delegatee.sumBlockRewardOf(addr)
-}
-
-func (delegatee *Delegatee) sumBlockRewardOf(addr types.Address) *uint256.Int {
-	reward := uint256.NewInt(0)
-	for _, s := range delegatee.Stakes {
-		if addr == nil || bytes.Compare(addr, s.From) == 0 {
-			_ = reward.Add(reward, s.ReceivedReward)
-		}
-	}
-	return reward
-}
-
 //
 // DelegateeArray
 
 type DelegateeArray []*Delegatee
-
-func (vs DelegateeArray) SumTotalAmount() *uint256.Int {
-	amt := uint256.NewInt(0)
-	for _, val := range vs {
-		_ = amt.Add(amt, val.TotalAmount)
-	}
-	return amt
-}
 
 func (vs DelegateeArray) SumTotalPower() int64 {
 	power := int64(0)
@@ -504,22 +309,6 @@ func (vs DelegateeArray) SumTotalPower() int64 {
 		power += val.TotalPower
 	}
 	return power
-}
-
-func (vs DelegateeArray) SumTotalReward() *uint256.Int {
-	reward := uint256.NewInt(0)
-	for _, val := range vs {
-		_ = reward.Add(reward, val.GetTotalRewardAmount())
-	}
-	return reward
-}
-
-func (vs DelegateeArray) SumBlockReward() *uint256.Int {
-	reward := uint256.NewInt(0)
-	for _, val := range vs {
-		_ = reward.Add(reward, val.TotalRewardAmount)
-	}
-	return reward
 }
 
 type PowerOrderDelegatees []*Delegatee

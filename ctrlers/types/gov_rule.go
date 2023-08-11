@@ -58,9 +58,9 @@ func DefaultGovRule() *GovRule {
 		// When like this,
 		// the max issuance rate becomes ...
 		//			= 4,756,468,797 * 31,536,000(blocks in 1Y)
-		//			= 149,999,999,982,192,000 [per 1RIGO, 1Y]
+		//			= 149,999,999,982,192,000 amount [per 1RIGO, 1Y]
 		// , it's about 15% of 1 power
-		rewardPerPower:         4_756_468_797,
+		rewardPerPower:         4_756_468_797,                         // amount
 		lazyRewardBlocks:       2592000,                               // = 60 * 60 * 24 * 30 => 30 days
 		lazyApplyingBlocks:     259200,                                // = 60 * 60 * 24 * 3 => 3 days
 		gasPrice:               uint256.NewInt(10_000_000_000),        // 10Gwei
@@ -364,17 +364,7 @@ func (r *GovRule) String() string {
 	}
 }
 
-//
 // utility methods
-
-// MaxStakeAmount means the max of amount which could be deposited.
-// tmtypes.MaxTotalVotingPower = int64(math.MaxInt64) / 8
-// When the type of voting power is `int64`and VP:XCO = 1:1,
-// the MAXSTAKEsau becomes `int64(math.MaxInt64) / 8 * 10^18` (~= 922경 XCO)
-func MaxStakeAmount() *uint256.Int {
-	return new(uint256.Int).Mul(uint256.NewInt(uint64(tmtypes.MaxTotalVotingPower)), amountPerPower)
-}
-
 func MaxTotalPower() int64 {
 	return tmtypes.MaxTotalVotingPower
 }
@@ -390,7 +380,7 @@ func AmountToPower(amt *uint256.Int) int64 {
 }
 
 func PowerToAmount(power int64) *uint256.Int {
-	// 1 VotingPower == 1 RIGO
+	// 1 VotingPower == 1 RIGO = 10^18 amount
 	return new(uint256.Int).Mul(uint256.NewInt(uint64(power)), amountPerPower)
 }
 

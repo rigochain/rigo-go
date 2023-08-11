@@ -22,6 +22,7 @@ const (
 	TRX_VOTING
 	TRX_CONTRACT
 	TRX_SETDOC
+	TRX_WITHDRAW
 )
 
 const (
@@ -165,6 +166,8 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 			payload = &TrxPayloadStaking{}
 		case TRX_UNSTAKING:
 			payload = &TrxPayloadUnstaking{}
+		case TRX_WITHDRAW:
+			payload = &TrxPayloadWithdraw{}
 		case TRX_PROPOSAL:
 			payload = &TrxPayloadProposal{}
 		case TRX_VOTING:
@@ -214,6 +217,8 @@ func (tx *Trx) TypeString() string {
 		return "staking"
 	case TRX_UNSTAKING:
 		return "unstaking"
+	case TRX_WITHDRAW:
+		return "withdraw"
 	case TRX_PROPOSAL:
 		return "proposal"
 	case TRX_VOTING:
@@ -253,6 +258,11 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 		// there is no payload!!!
 	case TRX_UNSTAKING:
 		payload = &TrxPayloadUnstaking{}
+		if err := payload.Decode(txProto.XPayload); err != nil {
+			return err
+		}
+	case TRX_WITHDRAW:
+		payload = &TrxPayloadWithdraw{}
 		if err := payload.Decode(txProto.XPayload); err != nil {
 			return err
 		}
@@ -302,6 +312,7 @@ func (tx *Trx) toProto() (*TrxProto, xerrors.XError) {
 			payload = bz
 		}
 	}
+
 	return &TrxProto{
 		Version:  tx.Version,
 		Time:     tx.Time,

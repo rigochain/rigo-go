@@ -30,6 +30,7 @@ type TrxContext struct {
 	TrxEVMHandler   ITrxHandler
 
 	GovHandler   IGovHandler
+	AcctHandler  IAccountHandler
 	StakeHandler IStakeHandler
 
 	Callback func(*TrxContext, xerrors.XError)

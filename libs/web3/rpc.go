@@ -14,10 +14,26 @@ import (
 	"strings"
 )
 
+func (rweb3 *RigoWeb3) Status() (*coretypes.ResultStatus, error) {
+	retStatus := &coretypes.ResultStatus{}
+
+	if req, err := rweb3.NewRequest("status"); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, retStatus); err != nil {
+		return nil, err
+	}
+
+	return retStatus, nil
+}
+
 func (rweb3 *RigoWeb3) GetRule() (*ctrlertypes.GovRule, error) {
 	queryResp := &rpc.QueryResult{}
 
-	if req, err := rweb3.NewRequest("rule"); err != nil {
+	if req, err := rweb3.NewRequest("rule", strconv.FormatInt(0, 10)); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -37,7 +53,7 @@ func (rweb3 *RigoWeb3) GetRule() (*ctrlertypes.GovRule, error) {
 func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, error) {
 	queryResp := &rpc.QueryResult{}
 
-	if req, err := rweb3.NewRequest("account", addr.String()); err != nil {
+	if req, err := rweb3.NewRequest("account", addr.String(), strconv.FormatInt(0, 10)); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -81,7 +97,7 @@ func (rweb3 *RigoWeb3) GetDelegatee(addr types.Address) (*stake.Delegatee, error
 	queryResp := &rpc.QueryResult{}
 	delegatee := stake.NewDelegatee(nil, nil)
 
-	if req, err := rweb3.NewRequest("delegatee", addr.String()); err != nil {
+	if req, err := rweb3.NewRequest("delegatee", addr.String(), strconv.FormatInt(0, 10)); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -99,7 +115,7 @@ func (rweb3 *RigoWeb3) GetDelegatee(addr types.Address) (*stake.Delegatee, error
 func (rweb3 *RigoWeb3) GetStakes(addr types.Address) ([]*stake.Stake, error) {
 	queryResp := &rpc.QueryResult{}
 	var stakes []*stake.Stake
-	if req, err := rweb3.NewRequest("stakes", addr.String()); err != nil {
+	if req, err := rweb3.NewRequest("stakes", addr.String(), strconv.FormatInt(0, 10)); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -111,6 +127,24 @@ func (rweb3 *RigoWeb3) GetStakes(addr types.Address) ([]*stake.Stake, error) {
 		return nil, err
 	} else {
 		return stakes, nil
+	}
+}
+
+func (rweb3 *RigoWeb3) QueryReward(addr types.Address, height int64) (*stake.Reward, error) {
+	queryResp := &rpc.QueryResult{}
+	rwd := stake.NewReward(addr)
+	if req, err := rweb3.NewRequest("reward", addr.String(), strconv.FormatInt(height, 10)); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return nil, err
+	} else if err := tmjson.Unmarshal(queryResp.Value, rwd); err != nil {
+		return nil, err
+	} else {
+		return rwd, nil
 	}
 }
 

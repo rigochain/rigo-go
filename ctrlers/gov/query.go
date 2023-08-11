@@ -1,6 +1,8 @@
 package gov
 
 import (
+	"github.com/rigochain/rigo-go/ledger"
+	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -34,7 +36,15 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			}
 		}
 	case "rule":
-		if bz, err := tmjson.Marshal(&ctrler.GovRule); err != nil {
+		atledger, xerr := ctrler.ruleLedger.ImmutableLedgerAt(req.Height, 0)
+		if xerr != nil {
+			return nil, xerrors.ErrQuery.Wrap(xerr)
+		}
+		govParams, xerr := atledger.Read(ledger.ToLedgerKey(bytes.ZeroBytes(32)))
+		if xerr != nil {
+			return nil, xerrors.ErrQuery.Wrap(xerr)
+		}
+		if bz, err := tmjson.Marshal(govParams); err != nil {
 			return nil, xerrors.ErrQuery.Wrap(err)
 		} else {
 			return bz, nil

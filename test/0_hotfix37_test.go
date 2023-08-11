@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"github.com/holiman/uint256"
+	"github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -28,7 +29,7 @@ func TestStaking2GenesisValidator(t *testing.T) {
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code)
 	require.Contains(t, ret.CheckTx.Log, "too small stake to become validator")
 
-	amtStake = new(uint256.Int).Sub(govRule.MinValidatorStake(), valStakes0.SelfAmount)
+	amtStake = new(uint256.Int).Sub(govRule.MinValidatorStake(), types.PowerToAmount(valStakes0.SelfPower))
 	ret, err = valWal.StakingCommit(valWal.Address(), baseFee, amtStake, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
@@ -49,10 +50,10 @@ func TestStaking2GenesisValidator(t *testing.T) {
 	valStakes1, err := rweb3.GetDelegatee(valWal.Address())
 	require.NoError(t, err)
 	require.Equal(t,
-		new(uint256.Int).Add(valStakes0.GetTotalAmount(), amtStake),
-		valStakes1.GetTotalAmount())
-	require.Equal(t, valStakes1.GetTotalAmount(),
-		valStakes1.SumAmount())
+		new(uint256.Int).Add(types.PowerToAmount(valStakes0.TotalPower), amtStake),
+		types.PowerToAmount(valStakes1.TotalPower))
+	require.Equal(t, valStakes1.TotalPower,
+		valStakes1.SumPower())
 
 	//fmt.Println("valStakes1.SelfAmount", valStakes1.SelfAmount.Dec())
 

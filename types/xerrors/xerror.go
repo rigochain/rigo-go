@@ -23,6 +23,7 @@ const (
 	ErrCodeNotFoundStake
 	ErrCodeNotFoundProposal
 	ErrCodeNotFoundVoter
+	ErrCodeNotFoundReward
 )
 
 const (
@@ -35,6 +36,7 @@ const (
 
 var (
 	ErrCommon     = New(ErrCodeOrdinary, "rigo error", nil)
+	ErrOverFlow   = New(ErrCodeOrdinary, "overflow", nil)
 	ErrInitChain  = New(ErrCodeInitChain, "InitChain failed", nil)
 	ErrCheckTx    = New(ErrCodeCheckTx, "CheckTx failed", nil)
 	ErrBeginBlock = New(ErrCodeBeginBlock, "BeginBlock failed", nil)
@@ -61,6 +63,7 @@ var (
 	ErrNotFoundStake           = New(ErrCodeNotFoundStake, "not found stake", nil)
 	ErrNotFoundProposal        = New(ErrCodeNotFoundProposal, "not found proposal", nil)
 	ErrNotFoundVoter           = New(ErrCodeNotFoundVoter, "not found voter", nil)
+	ErrNotFoundReward          = New(ErrCodeNotFoundReward, "not found reward", nil)
 
 	ErrInvalidQueryPath   = New(ErrCodeInvalidQueryPath, "invalid query path", nil)
 	ErrInvalidQueryParams = New(ErrCodeInvalidQueryParams, "invalid query parameters", nil)

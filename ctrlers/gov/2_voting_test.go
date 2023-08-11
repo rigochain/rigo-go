@@ -96,7 +96,7 @@ func TestVoting(t *testing.T) {
 		require.Equal(t, c.err, xerr, "index", i)
 
 		if xerr == nil {
-			votedPowers += stakeHelper.PowerOf(c.txctx.Tx.From)
+			votedPowers += stakeHelper.TotalPowerOf(c.txctx.Tx.From)
 		}
 	}
 
@@ -109,7 +109,7 @@ func TestVoting(t *testing.T) {
 	sumVotedPowers := int64(0)
 	for i, c := range voteTestCases1 {
 		if c.err == nil {
-			power := stakeHelper.PowerOf(c.txctx.Tx.From)
+			power := stakeHelper.TotalPowerOf(c.txctx.Tx.From)
 			require.Equal(t, power, prop.Options[0].Votes(), "index", i)
 			sumVotedPowers += prop.Options[0].Votes()
 		}
@@ -138,7 +138,7 @@ func TestMajority(t *testing.T) {
 		require.NoError(t, xerr)
 		require.NotNil(t, prop)
 
-		votedPowers += stakeHelper.PowerOf(c.txctx.Tx.From)
+		votedPowers += stakeHelper.TotalPowerOf(c.txctx.Tx.From)
 		if votedPowers >= prop.MajorityPower {
 			opt := prop.UpdateMajorOption()
 			require.NotNil(t, opt, votedPowers, prop.MajorityPower)
