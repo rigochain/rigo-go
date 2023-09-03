@@ -131,9 +131,8 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		return xerrors.From(err)
 	}
 
-	needFee := gasToFee(gas, ctx.GovHandler.GasPrice())
-	if needFee.Cmp(ctx.Tx.Gas) > 0 {
-		return xerrors.ErrInsufficientFee
+	if ctx.Tx.Gas < gas {
+		return xerrors.ErrInvalidGas
 	}
 
 	return nil
@@ -161,7 +160,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctx.Tx.From,
 		ctx.Tx.To,
 		ctx.Tx.Nonce,
-		feeToGas(ctx.Tx.Gas, ctx.GovHandler.GasPrice()),
+		ctx.Tx.Gas,
 		ctx.GovHandler.GasPrice(),
 		ctx.Tx.Amount,
 		ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data,
@@ -193,9 +192,9 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 	ctx.RetData = ret.ReturnData
 
-	// Gas is already applied by buyGas and refundGas of EVM.
+	// Gas is already applied to accounts by buyGas and refundGas of EVM.
 	// the `EVM` handles nonce, amount and gas.
-	ctx.GasUsed = new(uint256.Int).Add(ctx.GasUsed, gasToFee(ret.UsedGas, ctx.GovHandler.GasPrice()))
+	ctx.GasUsed = ret.UsedGas
 
 	// Add events from evm.
 	if ctx.Exec {

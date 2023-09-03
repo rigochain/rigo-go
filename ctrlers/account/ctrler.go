@@ -1,7 +1,6 @@
 package account
 
 import (
-	"fmt"
 	"github.com/holiman/uint256"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	atypes "github.com/rigochain/rigo-go/ctrlers/types"
@@ -67,22 +66,8 @@ func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 func (ctrler *AcctCtrler) ValidateTrx(ctx *atypes.TrxContext) xerrors.XError {
-	ctx.Sender = ctrler.FindAccount(ctx.Tx.From, ctx.Exec)
-	if ctx.Sender == nil {
-		return xerrors.ErrNotFoundAccount
-	}
-	if !types.IsZeroAddress(ctx.Tx.To) {
-		ctx.Receiver = ctrler.FindOrNewAccount(ctx.Tx.To, ctx.Exec)
-	}
-
-	if xerr := ctx.Sender.CheckBalance(ctx.NeedAmt); xerr != nil {
-		return xerr
-	}
-	if xerr := ctx.Sender.CheckNonce(ctx.Tx.Nonce); xerr != nil {
-		return xerr.Wrap(fmt.Errorf("invalid nonce - ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), ctx.Tx.Nonce, ctx.Sender.Address, ctx.TxHash))
-	}
-
-	if ctx.Tx.GetType() == atypes.TRX_SETDOC {
+	switch ctx.Tx.GetType() {
+	case atypes.TRX_SETDOC:
 		name := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).Name
 		url := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).URL
 		if len(name) > atypes.MAX_ACCT_NAME {
@@ -100,30 +85,16 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// ctx.NeedAmt = amount + fee
-	if xerr := ctx.Sender.SubBalance(ctx.NeedAmt); xerr != nil {
-		return xerr
-	}
-	if ctx.Tx.GetType() == atypes.TRX_TRANSFER && ctx.Receiver != nil {
-		if xerr := ctx.Receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
+	switch ctx.Tx.GetType() {
+	case atypes.TRX_TRANSFER:
+		if xerr := ctrler.transfer(ctx.Sender, ctx.Receiver, ctx.Tx.Amount); xerr != nil {
 			return xerr
 		}
-	} else if ctx.Tx.Type == atypes.TRX_SETDOC {
-		name := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).Name
-		url := ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).URL
-		if name != "" {
-			ctx.Sender.Name = name
-		}
-		if url != "" {
-			ctx.Sender.DocURL = url
-		}
+	case atypes.TRX_SETDOC:
+		ctrler.setDoc(ctx.Sender,
+			ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).Name,
+			ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).URL)
 	}
-
-	// increase sender's nonce
-	ctx.Sender.AddNonce()
-
-	// set used gas
-	ctx.GasUsed = ctx.Tx.Gas
 
 	_ = ctrler.setAccountCommittable(ctx.Sender, ctx.Exec)
 	if ctx.Receiver != nil {
@@ -143,13 +114,13 @@ func (ctrler *AcctCtrler) EndBlock(ctx *atypes.BlockContext) ([]abcitypes.Event,
 	defer ctrler.mtx.Unlock()
 
 	header := ctx.BlockInfo().Header
-	if header.GetProposerAddress() != nil && ctx.GasSum().Sign() > 0 {
+	if header.GetProposerAddress() != nil && ctx.SumFee().Sign() > 0 {
 		// give fee to block proposer
 		acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(header.GetProposerAddress()))
 		if xerr != nil {
 			return nil, xerr
 		}
-		xerr = acct.AddBalance(ctx.GasSum())
+		xerr = acct.AddBalance(ctx.SumFee())
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -274,6 +245,28 @@ func (ctrler *AcctCtrler) transfer(from, to *atypes.Account, amt *uint256.Int) x
 		return err
 	}
 	return nil
+}
+
+func (ctrler *AcctCtrler) SetDoc(addr types.Address, name, url string, exec bool) xerrors.XError {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	acct0 := ctrler.findAccount(addr, exec)
+	if acct0 == nil {
+		return xerrors.ErrNotFoundAccount
+	}
+
+	ctrler.setDoc(acct0, name, url)
+
+	if xerr := ctrler.setAccountCommittable(acct0, exec); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (ctrler *AcctCtrler) setDoc(acct *atypes.Account, name, url string) {
+	acct.Name = name
+	acct.DocURL = url
 }
 
 func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {

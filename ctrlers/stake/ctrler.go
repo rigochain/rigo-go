@@ -380,6 +380,12 @@ func (ctrler *StakeCtrler) exeStaking(ctx *ctrlertypes.TrxContext) xerrors.XErro
 		return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 	}
 
+	// Update sender account balance
+	if xerr := ctx.Sender.SubBalance(ctx.Tx.Amount); xerr != nil {
+		return xerr
+	}
+	_ = ctx.AcctHandler.SetAccountCommittable(ctx.Sender, ctx.Exec)
+
 	// create stake and delegate it to `delegatee`
 	// the reward for this stake will be started at ctx.Height + 1. (issue #29)
 	power := ctrlertypes.AmountToPower(ctx.Tx.Amount)

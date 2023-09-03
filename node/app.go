@@ -7,7 +7,7 @@ import (
 	"github.com/rigochain/rigo-go/ctrlers/account"
 	"github.com/rigochain/rigo-go/ctrlers/gov"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
-	types2 "github.com/rigochain/rigo-go/ctrlers/types"
+	rctypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/ctrlers/vm/evm"
 	"github.com/rigochain/rigo-go/genesis"
 	"github.com/rigochain/rigo-go/types/bytes"
@@ -30,7 +30,7 @@ var _ abcitypes.Application = (*RigoApp)(nil)
 type RigoApp struct {
 	abcitypes.BaseApplication
 
-	currBlockCtx *types2.BlockContext
+	currBlockCtx *rctypes.BlockContext
 
 	metaDB      *MetaDB
 	acctCtrler  *account.AcctCtrler
@@ -131,7 +131,7 @@ func (ctrler *RigoApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 		lastHeight = ctrler.metaDB.LastBlockHeight()
 		appHash = ctrler.metaDB.LastBlockAppHash()
 
-		ctrler.currBlockCtx = types2.NewBlockContext(
+		ctrler.currBlockCtx = rctypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				Header: tmproto.Header{
 					Height: lastHeight,
@@ -211,11 +211,11 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
-		txctx, xerr := types2.NewTrxContext(req.Tx,
+		txctx, xerr := rctypes.NewTrxContext(req.Tx,
 			ctrler.currBlockCtx.Height()+int64(1), // issue #39: set block number expected to include current tx.
 			ctrler.currBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
-			func(_txctx *types2.TrxContext) xerrors.XError {
+			func(_txctx *rctypes.TrxContext) xerrors.XError {
 				_txctx.TrxGovHandler = ctrler.govCtrler
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -246,8 +246,8 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 			Code:      abcitypes.CodeTypeOK,
 			Log:       "",
 			Data:      txctx.RetData,
-			GasWanted: int64(txctx.Tx.Gas.Uint64()),
-			GasUsed:   int64(txctx.GasUsed.Uint64()),
+			GasWanted: int64(txctx.Tx.Gas),
+			GasUsed:   int64(txctx.GasUsed),
 		}
 	case abcitypes.CheckTxType_Recheck:
 		// do nothing
@@ -266,7 +266,7 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 
 	ctrler.mtx.Lock() // this lock will be unlocked at EndBlock
 
-	ctrler.currBlockCtx = types2.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
+	ctrler.currBlockCtx = rctypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
 
 	ev0, _ := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
 	ev1, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
@@ -279,11 +279,11 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 
 func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 
-	txctx, xerr := types2.NewTrxContext(req.Tx,
+	txctx, xerr := rctypes.NewTrxContext(req.Tx,
 		ctrler.currBlockCtx.Height(),
 		ctrler.currBlockCtx.TimeSeconds(),
 		true,
-		func(_txctx *types2.TrxContext) xerrors.XError {
+		func(_txctx *rctypes.TrxContext) xerrors.XError {
 			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt()
 			ctrler.currBlockCtx.AddTxsCnt(1)
 
@@ -312,24 +312,24 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 		}
 	} else {
 
-		ctrler.currBlockCtx.AddGas(txctx.GasUsed)
+		ctrler.currBlockCtx.AddFee(rctypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
 			Type: "tx",
 			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte(types2.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-				{Key: []byte(types2.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-				{Key: []byte(types2.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
-				{Key: []byte(types2.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
-				{Key: []byte(types2.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+				{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+				{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+				{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
+				{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
+				{Key: []byte(rctypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
 			},
 		})
 
 		return abcitypes.ResponseDeliverTx{
 			Code:      abcitypes.CodeTypeOK,
-			GasWanted: int64(txctx.Tx.Gas.Uint64()),
-			GasUsed:   int64(txctx.GasUsed.Uint64()),
+			GasWanted: int64(txctx.Tx.Gas),
+			GasUsed:   int64(txctx.GasUsed),
 			Data:      txctx.RetData,
 			Events:    txctx.Events,
 		}
@@ -342,11 +342,11 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 	txIdx := ctrler.currBlockCtx.TxsCnt()
 	ctrler.currBlockCtx.AddTxsCnt(1)
 
-	txctx, xerr := types2.NewTrxContext(req.Tx,
+	txctx, xerr := rctypes.NewTrxContext(req.Tx,
 		ctrler.currBlockCtx.Height(),
 		ctrler.currBlockCtx.TimeSeconds(),
 		true,
-		func(_txctx *types2.TrxContext) xerrors.XError {
+		func(_txctx *rctypes.TrxContext) xerrors.XError {
 			_txctx.TxIdx = txIdx
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
@@ -356,7 +356,7 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
 			// when the 'tx' is finished, it's called
-			_txctx.Callback = func(ctx *types2.TrxContext, xerr xerrors.XError) {
+			_txctx.Callback = func(ctx *rctypes.TrxContext, xerr xerrors.XError) {
 				// it is called from executionRoutine goroutine
 				// when execution is finished or error is generated
 				response := abcitypes.ResponseDeliverTx{}
@@ -366,22 +366,22 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 					response.Log = xerr.Error()
 
 				} else {
-					response.GasWanted = int64(ctx.Tx.Gas.Uint64())
-					response.GasUsed = int64(ctx.GasUsed.Uint64())
+					response.GasWanted = int64(ctx.Tx.Gas)
+					response.GasUsed = int64(ctx.GasUsed)
 					response.Data = ctx.RetData
 					response.Events = []abcitypes.Event{
 						{
 							Type: "tx",
 							Attributes: []abcitypes.EventAttribute{
-								{Key: []byte(types2.EVENT_ATTR_TXTYPE), Value: []byte(ctx.Tx.TypeString()), Index: true},
-								{Key: []byte(types2.EVENT_ATTR_TXSENDER), Value: []byte(ctx.Tx.From.String()), Index: true},
-								{Key: []byte(types2.EVENT_ATTR_TXRECVER), Value: []byte(ctx.Tx.To.String()), Index: true},
-								{Key: []byte(types2.EVENT_ATTR_ADDRPAIR), Value: []byte(ctx.Tx.From.String() + ctx.Tx.To.String()), Index: true},
+								{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(ctx.Tx.TypeString()), Index: true},
+								{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(ctx.Tx.From.String()), Index: true},
+								{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(ctx.Tx.To.String()), Index: true},
+								{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(ctx.Tx.From.String() + ctx.Tx.To.String()), Index: true},
 							},
 						},
 					}
 
-					ctrler.currBlockCtx.AddGas(ctx.GasUsed)
+					ctrler.currBlockCtx.AddFee(rctypes.GasToFee(ctx.GasUsed, ctrler.govCtrler.GasPrice()))
 				}
 				ctrler.localClient.(*rigoLocalClient).OnTrxExecFinished(ctrler.localClient, ctx.TxIdx, &req, &response)
 			}

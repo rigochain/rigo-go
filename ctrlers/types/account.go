@@ -118,7 +118,7 @@ func (acct *Account) AddBalance(amt *uint256.Int) xerrors.XError {
 	defer acct.mtx.Unlock()
 
 	if amt.Sign() < 0 {
-		return xerrors.ErrNegAmount
+		return xerrors.ErrInvalidAmount
 	}
 	_ = acct.Balance.Add(acct.Balance, amt)
 
@@ -130,7 +130,7 @@ func (acct *Account) SubBalance(amt *uint256.Int) xerrors.XError {
 	defer acct.mtx.Unlock()
 
 	if amt.Sign() < 0 {
-		return xerrors.ErrNegAmount
+		return xerrors.ErrInvalidAmount
 	}
 	if amt.Cmp(acct.Balance) > 0 {
 		return xerrors.ErrInsufficientFund

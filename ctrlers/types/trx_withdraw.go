@@ -45,13 +45,6 @@ func (tx *TrxPayloadWithdraw) Encode() ([]byte, xerrors.XError) {
 	return bz, xerrors.From(err)
 }
 
-func (tx *TrxPayloadWithdraw) RLPEncode() ([]byte, error) {
-	return rlp.EncodeToBytes(tx)
-}
-func (tx *TrxPayloadWithdraw) RLPDecode(bz []byte) error {
-	return rlp.DecodeBytes(bz, tx)
-}
-
 func (tx *TrxPayloadWithdraw) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, tx.ReqAmt.Bytes())
 }

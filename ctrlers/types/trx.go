@@ -34,16 +34,17 @@ const (
 )
 
 type trxRPL struct {
-	Version uint32
-	Time    uint64
-	Nonce   uint64
-	From    types.Address
-	To      types.Address
-	Amount  string
-	Gas     string
-	Type    uint32
-	Payload bytes.HexBytes
-	Sig     bytes.HexBytes
+	Version  uint32
+	Time     uint64
+	Nonce    uint64
+	From     types.Address
+	To       types.Address
+	Amount   string
+	Gas      uint64
+	GasPrice string
+	Type     uint32
+	Payload  bytes.HexBytes
+	Sig      bytes.HexBytes
 }
 
 type ITrxPayload interface {
@@ -51,21 +52,22 @@ type ITrxPayload interface {
 	Equal(ITrxPayload) bool
 	Encode() ([]byte, xerrors.XError)
 	Decode([]byte) xerrors.XError
-	RLPEncode() ([]byte, error)
-	RLPDecode([]byte) error
+	rlp.Encoder
+	rlp.Decoder
 }
 
 type Trx struct {
-	Version uint32         `json:"version,omitempty"`
-	Time    int64          `json:"time"`
-	Nonce   uint64         `json:"nonce"`
-	From    types.Address  `json:"from"`
-	To      types.Address  `json:"to"`
-	Amount  *uint256.Int   `json:"amount"`
-	Gas     *uint256.Int   `json:"gas"`
-	Type    int32          `json:"type"`
-	Payload ITrxPayload    `json:"payload,omitempty"`
-	Sig     bytes.HexBytes `json:"sig"`
+	Version  uint32         `json:"version,omitempty"`
+	Time     int64          `json:"time"`
+	Nonce    uint64         `json:"nonce"`
+	From     types.Address  `json:"from"`
+	To       types.Address  `json:"to"`
+	Amount   *uint256.Int   `json:"amount"`
+	Gas      uint64         `json:"gas"`
+	GasPrice *uint256.Int   `json:"gasPrice"`
+	Type     int32          `json:"type"`
+	Payload  ITrxPayload    `json:"payload,omitempty"`
+	Sig      bytes.HexBytes `json:"sig"`
 }
 
 func (tx *Trx) Equal(_tx *Trx) bool {
@@ -87,7 +89,10 @@ func (tx *Trx) Equal(_tx *Trx) bool {
 	if tx.Amount.Cmp(_tx.Amount) != 0 {
 		return false
 	}
-	if tx.Gas.Cmp(_tx.Gas) != 0 {
+	if tx.Gas != _tx.Gas {
+		return false
+	}
+	if tx.GasPrice.Cmp(_tx.GasPrice) != 0 {
 		return false
 	}
 	if tx.Type != _tx.Type {
@@ -111,25 +116,33 @@ func (tx *Trx) Equal(_tx *Trx) bool {
 }
 
 func (tx *Trx) EncodeRLP(w io.Writer) error {
-	var payload bytes.HexBytes
-	if tx.Payload != nil {
-		_tmp, err := tx.Payload.RLPEncode()
-		if err != nil {
-			return err
-		}
-		payload = _tmp
+
+	payload, err := rlp.EncodeToBytes(tx.Payload)
+	if err != nil {
+		return err
 	}
+
+	//var payload bytes.HexBytes
+	//if tx.Payload != nil {
+	//	_tmp, err := tx.Payload.RLPEncode()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	payload = _tmp
+	//}
+
 	tmpTx := &trxRPL{
-		Version: tx.Version,
-		Time:    uint64(tx.Time),
-		Nonce:   tx.Nonce,
-		From:    tx.From,
-		To:      tx.To,
-		Amount:  tx.Amount.Hex(),
-		Gas:     tx.Gas.Hex(),
-		Type:    uint32(tx.Type),
-		Payload: payload,
-		Sig:     tx.Sig,
+		Version:  tx.Version,
+		Time:     uint64(tx.Time),
+		Nonce:    tx.Nonce,
+		From:     tx.From,
+		To:       tx.To,
+		Amount:   tx.Amount.Hex(),
+		Gas:      uint64(tx.Gas),
+		GasPrice: tx.GasPrice.Hex(),
+		Type:     uint32(tx.Type),
+		Payload:  payload,
+		Sig:      tx.Sig,
 	}
 	return rlp.Encode(w, tmpTx)
 }
@@ -150,7 +163,8 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 	if err != nil {
 		return err
 	}
-	tx.Gas, err = uint256.FromHex(rtx.Gas)
+	tx.Gas = rtx.Gas
+	tx.GasPrice, err = uint256.FromHex(rtx.GasPrice)
 	if err != nil {
 		return err
 	}
@@ -179,9 +193,14 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 		default:
 			return xerrors.ErrInvalidTrxPayloadType
 		}
-		if err := payload.RLPDecode(rtx.Payload); err != nil {
+
+		if err := rlp.DecodeBytes(rtx.Payload, payload); err != nil {
 			return err
 		}
+
+		//if err := payload.RLPDecode(rtx.Payload); err != nil {
+		//	return err
+		//}
 	}
 
 	tx.Payload = payload
@@ -191,17 +210,18 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 var _ rlp.Encoder = (*Trx)(nil)
 var _ rlp.Decoder = (*Trx)(nil)
 
-func NewTrx(ver uint32, from, to types.Address, nonce uint64, gas, amt *uint256.Int, payload ITrxPayload) *Trx {
+func NewTrx(ver uint32, from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, payload ITrxPayload) *Trx {
 	return &Trx{
-		Version: ver,
-		Time:    time.Now().Round(0).UTC().UnixNano(),
-		Nonce:   nonce,
-		From:    from,
-		To:      to,
-		Amount:  amt,
-		Gas:     gas,
-		Type:    payload.Type(),
-		Payload: payload,
+		Version:  ver,
+		Time:     time.Now().Round(0).UTC().UnixNano(),
+		Nonce:    nonce,
+		From:     from,
+		To:       to,
+		Amount:   amt,
+		Gas:      gas,
+		GasPrice: gasPrice,
+		Type:     payload.Type(),
+		Payload:  payload,
 	}
 }
 
@@ -296,7 +316,8 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 	tx.From = txProto.From
 	tx.To = txProto.To
 	tx.Amount = new(uint256.Int).SetBytes(txProto.XAmount)
-	tx.Gas = new(uint256.Int).SetBytes(txProto.XGas)
+	tx.Gas = txProto.Gas
+	tx.GasPrice = new(uint256.Int).SetBytes(txProto.XGasPrice)
 	tx.Type = txProto.Type
 	tx.Payload = payload
 	tx.Sig = txProto.Sig
@@ -314,16 +335,17 @@ func (tx *Trx) toProto() (*TrxProto, xerrors.XError) {
 	}
 
 	return &TrxProto{
-		Version:  tx.Version,
-		Time:     tx.Time,
-		Nonce:    tx.Nonce,
-		From:     tx.From,
-		To:       tx.To,
-		XAmount:  tx.Amount.Bytes(),
-		XGas:     tx.Gas.Bytes(),
-		Type:     tx.Type,
-		XPayload: payload,
-		Sig:      tx.Sig,
+		Version:   tx.Version,
+		Time:      tx.Time,
+		Nonce:     tx.Nonce,
+		From:      tx.From,
+		To:        tx.To,
+		XAmount:   tx.Amount.Bytes(),
+		Gas:       tx.Gas,
+		XGasPrice: tx.GasPrice.Bytes(),
+		Type:      tx.Type,
+		XPayload:  payload,
+		Sig:       tx.Sig,
 	}, nil
 }
 

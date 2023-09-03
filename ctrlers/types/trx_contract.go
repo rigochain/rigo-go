@@ -46,13 +46,6 @@ func (tx *TrxPayloadContract) Decode(bz []byte) xerrors.XError {
 	return nil
 }
 
-func (tx *TrxPayloadContract) RLPEncode() ([]byte, error) {
-	return rlp.EncodeToBytes(tx)
-}
-func (tx *TrxPayloadContract) RLPDecode(bz []byte) error {
-	return rlp.DecodeBytes(bz, tx)
-}
-
 func (tx *TrxPayloadContract) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, tx.Data)
 }

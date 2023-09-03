@@ -1,12 +1,9 @@
 package node
 
 import (
-	"bytes"
 	"fmt"
+	"github.com/holiman/uint256"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
-	"github.com/rigochain/rigo-go/types"
-	abytes "github.com/rigochain/rigo-go/types/bytes"
-	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/log"
 	"runtime"
@@ -104,38 +101,12 @@ func executionRoutine(name string, ch chan *ctrlertypes.TrxContext, logger log.L
 }
 
 func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if len(ctx.Tx.From) != types.AddrSize {
-		return xerrors.ErrInvalidAddress
-	}
-
-	if len(ctx.Tx.To) != types.AddrSize {
-		return xerrors.ErrInvalidAddress
-	}
-
-	// check signature
-	var fromAddr types.Address
-	var pubBytes abytes.HexBytes
-
-	if ctx.Exec {
-		tx := ctx.Tx
-		sig := tx.Sig
-		tx.Sig = nil
-		_txbz, xerr := tx.Encode()
-		tx.Sig = sig
-		if xerr != nil {
-			return xerr
-		}
-		if fromAddr, pubBytes, xerr = crypto.Sig2Addr(_txbz, sig); xerr != nil {
-			return xerr
-		}
-		if bytes.Compare(fromAddr, tx.From) != 0 {
-			return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
-		}
-		ctx.SenderPubKey = pubBytes
-	}
 
 	//
 	// tx validation
+	if xerr := commonValidation(ctx); xerr != nil {
+		return xerr
+	}
 	if xerr := ctx.TrxGovHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 		return xerr
 	}
@@ -152,15 +123,20 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	return nil
 }
 
+func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	return nil
+}
+
 func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
 	// tx execution
-	if ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT {
+	switch ctx.Tx.GetType() {
+	case ctrlertypes.TRX_CONTRACT:
 		if xerr := ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 			return xerr
 		}
-	} else {
+	default:
 		if xerr := ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 			return xerr
 		}
@@ -172,7 +148,28 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			// todo: rollback changes in TrxGovHandler.ExecuteTrx and TrxAcctHandler.ExecuteTrx
 			return xerr
 		}
+		if xerr := runPostTrx(ctx); xerr != nil {
+			return xerr
+		}
 	}
 
+	// processing gas
+
+	return nil
+}
+
+func runPostTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
+	if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
+		return xerr
+	}
+	ctx.Sender.AddNonce()
+
+	if xerr := ctx.AcctHandler.SetAccountCommittable(ctx.Sender, ctx.Exec); xerr != nil {
+		return xerr
+	}
+
+	// set used gas
+	ctx.GasUsed = ctx.Tx.Gas
 	return nil
 }

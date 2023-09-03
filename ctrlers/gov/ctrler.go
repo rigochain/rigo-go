@@ -164,12 +164,6 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		getProposal = ctrler.proposalLedger.GetFinality
 	}
 
-	// common validation for all trxs
-	// check min tx fee
-	if ctrler.MinTrxFee().Cmp(ctx.Tx.Gas) > 0 {
-		return xerrors.ErrInsufficientFee
-	}
-
 	// validation by tx type
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_PROPOSAL:

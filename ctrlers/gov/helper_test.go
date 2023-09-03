@@ -126,7 +126,6 @@ func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxCo
 			return xerrors.ErrNotFoundAccount
 		}
 		_txctx.Sender = acct
-		_txctx.NeedAmt = new(uint256.Int).Add(_tx.Amount, _tx.Gas)
 		_txctx.GovHandler = govCtrler
 		_txctx.AcctHandler = acctHelper
 		_txctx.StakeHandler = stakeHelper

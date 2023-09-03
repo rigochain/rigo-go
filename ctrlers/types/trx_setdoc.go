@@ -48,13 +48,6 @@ func (tx *TrxPayloadSetDoc) Decode(bz []byte) xerrors.XError {
 	return nil
 }
 
-func (tx *TrxPayloadSetDoc) RLPEncode() ([]byte, error) {
-	return rlp.EncodeToBytes(tx)
-}
-func (tx *TrxPayloadSetDoc) RLPDecode(bz []byte) error {
-	return rlp.DecodeBytes(bz, tx)
-}
-
 func (tx *TrxPayloadSetDoc) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, []interface{}{tx.Name, tx.URL})
 }

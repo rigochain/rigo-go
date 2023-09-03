@@ -21,11 +21,11 @@ type GovRule struct {
 	version               int64
 	maxValidatorCnt       int64
 	minValidatorStake     *uint256.Int
-	rewardPerPower        int64
+	rewardPerPower        int64 // todo: change to `*uint256.Int`
 	lazyRewardBlocks      int64
 	lazyApplyingBlocks    int64
 	gasPrice              *uint256.Int
-	minTrxFee             *uint256.Int
+	minTrxFee             *uint256.Int // todo: add `minTxGas uint256`, `maxTxGas uint256` and `maxBlockGas uint256`
 	minVotingPeriodBlocks int64
 	maxVotingPeriodBlocks int64
 
@@ -504,6 +504,15 @@ func PowerToAmount(power int64) *uint256.Int {
 
 func AmountPerPower() *uint256.Int {
 	return amountPerPower.Clone()
+}
+
+func FeeToGas(fee, price *uint256.Int) uint64 {
+	gas := new(uint256.Int).Div(fee, price)
+	return gas.Uint64()
+}
+
+func GasToFee(gas uint64, price *uint256.Int) *uint256.Int {
+	return new(uint256.Int).Mul(uint256.NewInt(gas), price)
 }
 
 var _ ledger.ILedgerItem = (*GovRule)(nil)

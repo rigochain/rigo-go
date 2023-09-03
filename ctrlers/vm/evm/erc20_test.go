@@ -55,7 +55,7 @@ func Test_callEVM_Deploy(t *testing.T) {
 		Exec:       true,
 		Sender:     fromAcct,
 		Receiver:   nil,
-		GasUsed:    uint256.NewInt(0),
+		GasUsed:    0,
 		GovHandler: govParams,
 	}
 
@@ -181,7 +181,7 @@ func execMethod(from, to types.Address, nonce uint64, gas, amt *uint256.Int, bn,
 		Exec:       true,
 		Sender:     fromAcct,
 		Receiver:   toAcct,
-		GasUsed:    uint256.NewInt(0),
+		GasUsed:    0,
 		GovHandler: govParams,
 	}
 	xerr := rigoEVM.ExecuteTrx(txctx)

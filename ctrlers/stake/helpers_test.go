@@ -120,8 +120,7 @@ func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*ctrlertypes.Trx
 		SenderPubKey: from.GetPubKey(),
 		Sender:       from.GetAccount(),
 		Receiver:     to.GetAccount(),
-		NeedAmt:      nil,
-		GasUsed:      nil,
+		GasUsed:      0,
 		GovHandler:   govParams,
 	}, nil
 }

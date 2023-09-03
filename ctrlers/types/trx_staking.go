@@ -26,13 +26,6 @@ func (tx *TrxPayloadStaking) Encode() ([]byte, xerrors.XError) {
 	return nil, nil
 }
 
-func (tx *TrxPayloadStaking) RLPEncode() ([]byte, error) {
-	return nil, nil //rlp.EncodeToBytes(tx)
-}
-func (tx *TrxPayloadStaking) RLPDecode(bz []byte) error {
-	return nil //rlp.DecodeBytes(bz, tx)
-}
-
 func (tx *TrxPayloadStaking) EncodeRLP(w io.Writer) error {
 	return nil
 }
@@ -80,13 +73,6 @@ func (tx *TrxPayloadUnstaking) Encode() ([]byte, xerrors.XError) {
 
 	bz, err := proto.Marshal(pm)
 	return bz, xerrors.From(err)
-}
-
-func (tx *TrxPayloadUnstaking) RLPEncode() ([]byte, error) {
-	return rlp.EncodeToBytes(tx)
-}
-func (tx *TrxPayloadUnstaking) RLPDecode(bz []byte) error {
-	return rlp.DecodeBytes(bz, tx)
 }
 
 func (tx *TrxPayloadUnstaking) EncodeRLP(w io.Writer) error {

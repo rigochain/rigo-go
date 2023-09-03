@@ -155,72 +155,72 @@ func (w *Wallet) SignTrxRLP(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, err
 	}
 }
 
-func (w *Wallet) TransferAsync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) TransferAsync(to types.Address, gas uint64, gasPrice, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
 		w.acct.GetNonce(),
-		gas, amt,
+		gas, gasPrice, amt,
 	)
 	return w.SendTxAsync(tx, rweb3)
 }
 
-func (w *Wallet) TransferSync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) TransferSync(to types.Address, gas uint64, gasPrice, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
 		w.acct.GetNonce(),
-		gas, amt,
+		gas, gasPrice, amt,
 	)
 	return w.SendTxSync(tx, rweb3)
 }
 
-func (w *Wallet) TransferCommit(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+func (w *Wallet) TransferCommit(to types.Address, gas uint64, gasPrice, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
 	tx := NewTrxTransfer(
 		w.Address(), to,
 		w.acct.GetNonce(),
-		gas, amt,
+		gas, gasPrice, amt,
 	)
 	return w.SendTxCommit(tx, rweb3)
 }
 
-func (w *Wallet) StakingAsync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) StakingAsync(to types.Address, gas uint64, gasPrice, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxStaking(
 		w.Address(), to,
 		w.acct.GetNonce(),
-		gas, amt,
+		gas, gasPrice, amt,
 	)
 	return w.SendTxAsync(tx, rweb3)
 }
 
-func (w *Wallet) StakingSync(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) StakingSync(to types.Address, gas uint64, gasPrice, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxStaking(
 		w.Address(), to,
 		w.acct.GetNonce(),
-		gas, amt,
+		gas, gasPrice, amt,
 	)
 	return w.SendTxSync(tx, rweb3)
 }
 
-func (w *Wallet) StakingCommit(to types.Address, gas, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+func (w *Wallet) StakingCommit(to types.Address, gas uint64, gasPrice, amt *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
 	tx := NewTrxStaking(
 		w.Address(), to,
 		w.acct.GetNonce(),
-		gas, amt,
+		gas, gasPrice, amt,
 	)
 	return w.SendTxCommit(tx, rweb3)
 }
 
-func (w *Wallet) WithdrawAync(fee, req *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
-	tx := NewTrxWithdraw(w.Address(), w.Address(), w.acct.GetNonce(), fee, req)
+func (w *Wallet) WithdrawAync(gas uint64, gasPrice, req *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	tx := NewTrxWithdraw(w.Address(), w.Address(), w.acct.GetNonce(), gas, gasPrice, req)
 	return w.SendTxAsync(tx, rweb3)
 }
 
-func (w *Wallet) WithdrawSync(fee, req *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
-	tx := NewTrxWithdraw(w.Address(), w.Address(), w.acct.GetNonce(), fee, req)
+func (w *Wallet) WithdrawSync(gas uint64, gasPrice, req *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	tx := NewTrxWithdraw(w.Address(), w.Address(), w.acct.GetNonce(), gas, gasPrice, req)
 	return w.SendTxSync(tx, rweb3)
 }
 
-func (w *Wallet) WithdrawCommit(fee, req *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
-	tx := NewTrxWithdraw(w.Address(), w.Address(), w.acct.GetNonce(), fee, req)
+func (w *Wallet) WithdrawCommit(gas uint64, gasPrice, req *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+	tx := NewTrxWithdraw(w.Address(), w.Address(), w.acct.GetNonce(), gas, gasPrice, req)
 	return w.SendTxCommit(tx, rweb3)
 }
 
@@ -248,8 +248,8 @@ func (w *Wallet) SendTxCommit(tx *types2.Trx, rweb3 *RigoWeb3) (*coretypes.Resul
 	}
 }
 
-func (w *Wallet) SetDocSync(name, url string, gas *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
-	tx := NewTrxSetDoc(w.Address(), w.acct.GetNonce(), gas, name, url)
+func (w *Wallet) SetDocSync(name, url string, gas uint64, gasPrice *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	tx := NewTrxSetDoc(w.Address(), w.acct.GetNonce(), gas, gasPrice, name, url)
 	if _, _, err := w.SignTrx(tx); err != nil {
 		return nil, err
 	} else {

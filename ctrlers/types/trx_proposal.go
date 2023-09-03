@@ -81,19 +81,43 @@ func (tx *TrxPayloadProposal) Encode() ([]byte, xerrors.XError) {
 	return bz, xerrors.From(err)
 }
 
-func (tx *TrxPayloadProposal) RLPEncode() ([]byte, error) {
-	return rlp.EncodeToBytes(tx)
-}
-func (tx *TrxPayloadProposal) RLPDecode(bz []byte) error {
-	return rlp.DecodeBytes(bz, tx)
-}
-
 func (tx *TrxPayloadProposal) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, tx)
+
+	rlpPayload := &struct {
+		Message            string
+		StartVotingHeight  uint64
+		VotingPeriodBlocks uint64
+		OptType            uint32
+		Options            [][]byte
+	}{
+		Message:            tx.Message,
+		StartVotingHeight:  uint64(tx.StartVotingHeight),
+		VotingPeriodBlocks: uint64(tx.VotingPeriodBlocks),
+		OptType:            uint32(tx.OptType),
+		Options:            tx.Options,
+	}
+	return rlp.Encode(w, rlpPayload)
 }
 
 func (tx *TrxPayloadProposal) DecodeRLP(s *rlp.Stream) error {
-	return s.Decode(tx)
+	rlpPayload := &struct {
+		Message            string
+		StartVotingHeight  uint64
+		VotingPeriodBlocks uint64
+		OptType            uint32
+		Options            [][]byte
+	}{}
+
+	if err := s.Decode(rlpPayload); err != nil {
+		return err
+	}
+
+	tx.Message = rlpPayload.Message
+	tx.StartVotingHeight = int64(rlpPayload.StartVotingHeight)
+	tx.VotingPeriodBlocks = int64(rlpPayload.VotingPeriodBlocks)
+	tx.OptType = int32(rlpPayload.OptType)
+	tx.Options = rlpPayload.Options
+	return nil
 }
 
 func (tx *TrxPayloadProposal) GetOptionCount() int {

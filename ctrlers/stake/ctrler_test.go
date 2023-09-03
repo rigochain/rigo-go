@@ -338,7 +338,7 @@ func TestUnfreezing(t *testing.T) {
 		},
 	}
 	bctx := ctrlertypes.NewBlockContext(req, govParams, acctHelper, nil)
-	bctx.AddGas(uint256.NewInt(10))
+	bctx.AddFee(uint256.NewInt(10))
 	_, err := stakeCtrler.EndBlock(bctx)
 	require.NoError(t, err)
 
