@@ -45,7 +45,7 @@ func MergeGovRule(oldGovRule, newGovRule *GovRule) {
 		newGovRule.maxValidatorCnt = oldGovRule.maxValidatorCnt
 	}
 
-	if newGovRule.minValidatorStake == nil {
+	if newGovRule.minValidatorStake == nil || newGovRule.minValidatorStake.IsZero() {
 		newGovRule.minValidatorStake = oldGovRule.minValidatorStake
 	}
 
@@ -61,11 +61,11 @@ func MergeGovRule(oldGovRule, newGovRule *GovRule) {
 		newGovRule.lazyApplyingBlocks = oldGovRule.lazyApplyingBlocks
 	}
 
-	if newGovRule.gasPrice == nil {
+	if newGovRule.gasPrice == nil || newGovRule.gasPrice.IsZero() {
 		newGovRule.gasPrice = oldGovRule.gasPrice
 	}
 
-	if newGovRule.minTrxFee == nil {
+	if newGovRule.minTrxFee == nil || newGovRule.minTrxFee.IsZero() {
 		newGovRule.minTrxFee = oldGovRule.minTrxFee
 	}
 
@@ -167,7 +167,7 @@ func Test3GovRule() *GovRule {
 	return &GovRule{
 		version:                4,
 		maxValidatorCnt:        13,
-		minValidatorStake:      nil,
+		minValidatorStake:      uint256.MustFromDecimal("0"),
 		rewardPerPower:         0,
 		lazyRewardBlocks:       20,
 		lazyApplyingBlocks:     0,
@@ -202,6 +202,7 @@ func Test4GovRule() *GovRule {
 func Test5GovRule() *GovRule {
 	return &GovRule{
 		version:                3,
+		minValidatorStake:      uint256.MustFromDecimal("0"),
 		minSelfStakeRatio:      40,
 		maxUpdatableStakeRatio: 50,
 		slashRatio:             60,
