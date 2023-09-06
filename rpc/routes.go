@@ -10,7 +10,7 @@ func AddRoutes() {
 	tmrpccore.Routes["delegatee"] = tmrpccore_server.NewRPCFunc(QueryDelegatee, "addr,height")
 	tmrpccore.Routes["stakes"] = tmrpccore_server.NewRPCFunc(QueryStakes, "addr,height")
 	tmrpccore.Routes["reward"] = tmrpccore_server.NewRPCFunc(QueryReward, "addr,height")
-	tmrpccore.Routes["proposals"] = tmrpccore_server.NewRPCFunc(QueryProposals, "txhash")
+	tmrpccore.Routes["proposals"] = tmrpccore_server.NewRPCFunc(QueryProposals, "txhash,height")
 	tmrpccore.Routes["rule"] = tmrpccore_server.NewRPCFunc(QueryRule, "height")
 	tmrpccore.Routes["vm_call"] = tmrpccore_server.NewRPCFunc(QueryVM, "addr,to,height,data")
 	tmrpccore.Routes["subscribe"] = tmrpccore_server.NewRPCFunc(Subscribe, "query")
