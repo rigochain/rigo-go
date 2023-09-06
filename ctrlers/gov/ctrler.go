@@ -365,6 +365,7 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 					if err := json.Unmarshal(prop.MajorOption.Option(), newGovRule); err != nil {
 						return xerrors.From(err)
 					}
+					ctrlertypes.MergeGovRule(&ctrler.GovRule, newGovRule)
 					if xerr := ctrler.ruleLedger.SetFinality(newGovRule); xerr != nil {
 						return xerr
 					}

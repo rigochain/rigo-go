@@ -22,6 +22,9 @@ var (
 	govRule0    = ctrlertypes.DefaultGovRule()
 	govRule1    = ctrlertypes.Test1GovRule()
 	govRule2    = ctrlertypes.Test2GovRule()
+	govRule3    = ctrlertypes.Test3GovRule()
+	govRule4    = ctrlertypes.Test4GovRule()
+	govRule5    = ctrlertypes.Test5GovRule()
 )
 
 func init() {
