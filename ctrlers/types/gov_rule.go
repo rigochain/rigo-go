@@ -300,12 +300,12 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 	}{
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
-		MinValidatorStake:      toUint256String(r.minValidatorStake), // hex-string
+		MinValidatorStake:      uint256ToString(r.minValidatorStake), // hex-string
 		RewardPerPower:         r.rewardPerPower,                     // hex-string
 		LazyRewardBlocks:       r.lazyRewardBlocks,
 		LazyApplyingBlocks:     r.lazyApplyingBlocks,
-		GasPrice:               toUint256String(r.gasPrice),
-		MinTrxFee:              toUint256String(r.minTrxFee),
+		GasPrice:               uint256ToString(r.gasPrice),
+		MinTrxFee:              uint256ToString(r.minTrxFee),
 		MinVotingBlocks:        r.minVotingPeriodBlocks,
 		MaxVotingBlocks:        r.maxVotingPeriodBlocks,
 		MinSelfStakeRatio:      r.minSelfStakeRatio,
@@ -315,7 +315,7 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 	return tmjson.Marshal(tm)
 }
 
-func toUint256String(value *uint256.Int) string {
+func uint256ToString(value *uint256.Int) string {
 	if value == nil {
 		return ""
 	}
@@ -349,18 +349,18 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 
 	r.version = tm.Version
 	r.maxValidatorCnt = tm.MaxValidatorCnt
-	r.minValidatorStake, err = toStringUint256(tm.MinValidatorStake)
+	r.minValidatorStake, err = stringToUint256(tm.MinValidatorStake)
 	if err != nil {
 		return err
 	}
 	r.rewardPerPower = tm.RewardPerPower
 	r.lazyRewardBlocks = tm.LazyRewardBlocks
 	r.lazyApplyingBlocks = tm.LazyApplyingBlocks
-	r.gasPrice, err = toStringUint256(tm.GasPrice)
+	r.gasPrice, err = stringToUint256(tm.GasPrice)
 	if err != nil {
 		return err
 	}
-	r.minTrxFee, err = toStringUint256(tm.MinTrxFee)
+	r.minTrxFee, err = stringToUint256(tm.MinTrxFee)
 	if err != nil {
 		return err
 	}
@@ -372,7 +372,7 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 	return nil
 }
 
-func toStringUint256(value string) (*uint256.Int, error) {
+func stringToUint256(value string) (*uint256.Int, error) {
 	if value == "" {
 		return nil, nil
 	}
