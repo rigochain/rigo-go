@@ -153,7 +153,7 @@ func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 			valset := []tmtypes.GenesisValidator{{
 				Address: pubKey.Address(),
 				PubKey:  pubKey,
-				Power:   10,
+				Power:   types.AmountToPower(types.DefaultGovRule().MinValidatorStake()),
 			}}
 
 			walkeys = append(walkeys, pvWalKey)

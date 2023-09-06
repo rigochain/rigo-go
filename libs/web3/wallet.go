@@ -294,3 +294,59 @@ func (w *Wallet) SyncBalance(rweb3 *RigoWeb3) error {
 
 	return w.syncBalance(rweb3)
 }
+
+func (w *Wallet) ProposalSync(gas *uint256.Int, msg string, start, period int64, optType int32, options []byte, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	tx := NewTrxProposal(
+		w.Address(),
+		types.ZeroAddress(),
+		w.acct.GetNonce(),
+		gas, msg, start, period, optType, options,
+	)
+	if _, _, err := w.SignTrx(tx); err != nil {
+		return nil, err
+	} else {
+		return rweb3.SendTransactionSync(tx)
+	}
+}
+
+func (w *Wallet) ProposalSyncCommit(gas *uint256.Int, msg string, start, period int64, optType int32, options []byte, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+	tx := NewTrxProposal(
+		w.Address(),
+		types.ZeroAddress(),
+		w.acct.GetNonce(),
+		gas, msg, start, period, optType, options,
+	)
+	if _, _, err := w.SignTrx(tx); err != nil {
+		return nil, err
+	} else {
+		return rweb3.SendTransactionCommit(tx)
+	}
+}
+
+func (w *Wallet) VotingSync(gas *uint256.Int, txHash bytes.HexBytes, choice int32, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	tx := NewTrxVoting(
+		w.Address(),
+		types.ZeroAddress(),
+		w.acct.GetNonce(),
+		gas, txHash, choice,
+	)
+	if _, _, err := w.SignTrx(tx); err != nil {
+		return nil, err
+	} else {
+		return rweb3.SendTransactionSync(tx)
+	}
+}
+
+func (w *Wallet) VotingSyncCommit(gas *uint256.Int, txHash bytes.HexBytes, choice int32, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+	tx := NewTrxVoting(
+		w.Address(),
+		types.ZeroAddress(),
+		w.acct.GetNonce(),
+		gas, txHash, choice,
+	)
+	if _, _, err := w.SignTrx(tx); err != nil {
+		return nil, err
+	} else {
+		return rweb3.SendTransactionCommit(tx)
+	}
+}
