@@ -62,7 +62,8 @@ func TestRLP_TrxPayloadContract(t *testing.T) {
 	_, _, err := w.SignTrxRLP(tx0)
 
 	require.NoError(t, err)
-	require.NoError(t, types2.VerifyTrxRLP(tx0))
+	_, _, xerr := types2.VerifyTrxRLP(tx0)
+	require.NoError(t, xerr)
 
 	bz0, err := rlp.EncodeToBytes(tx0)
 	require.NoError(t, err)
@@ -70,7 +71,8 @@ func TestRLP_TrxPayloadContract(t *testing.T) {
 	tx1 := &types2.Trx{}
 	err = rlp.DecodeBytes(bz0, tx1)
 	require.NoError(t, err)
-	require.NoError(t, types2.VerifyTrxRLP(tx1))
+	_, _, xerr = types2.VerifyTrxRLP(tx1)
+	require.NoError(t, xerr)
 
 	require.Equal(t,
 		tx0.Payload.(*types2.TrxPayloadContract).Data,
@@ -102,7 +104,8 @@ func TestRLP_TrxPayloadSetDoc(t *testing.T) {
 	_, _, err := w.SignTrxRLP(tx0)
 
 	require.NoError(t, err)
-	require.NoError(t, types2.VerifyTrxRLP(tx0))
+	_, _, xerr := types2.VerifyTrxRLP(tx0)
+	require.NoError(t, xerr)
 
 	bz0, err := rlp.EncodeToBytes(tx0)
 	require.NoError(t, err)
@@ -110,7 +113,8 @@ func TestRLP_TrxPayloadSetDoc(t *testing.T) {
 	tx1 := &types2.Trx{}
 	err = rlp.DecodeBytes(bz0, tx1)
 	require.NoError(t, err)
-	require.NoError(t, types2.VerifyTrxRLP(tx1))
+	_, _, xerr = types2.VerifyTrxRLP(tx0)
+	require.NoError(t, xerr)
 
 	require.Equal(t,
 		tx0.Payload.(*types2.TrxPayloadSetDoc).Name,
@@ -150,7 +154,8 @@ func TestRLP_TrxPayloadProposal(t *testing.T) {
 	// check signature
 	_, _, err := w.SignTrxRLP(tx0)
 	require.NoError(t, err)
-	require.NoError(t, types2.VerifyTrxRLP(tx0))
+	_, _, xerr := types2.VerifyTrxRLP(tx0)
+	require.NoError(t, xerr)
 
 	// check encoding/decoding
 	bz0, err := rlp.EncodeToBytes(tx0)
@@ -159,7 +164,8 @@ func TestRLP_TrxPayloadProposal(t *testing.T) {
 	tx1 := &types2.Trx{}
 	err = rlp.DecodeBytes(bz0, tx1)
 	require.NoError(t, err)
-	require.NoError(t, types2.VerifyTrxRLP(tx1))
+	_, _, xerr = types2.VerifyTrxRLP(tx0)
+	require.NoError(t, xerr)
 	require.True(t, tx1.Equal(tx0))
 
 	bz1, err := rlp.EncodeToBytes(tx1)

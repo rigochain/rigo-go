@@ -32,8 +32,9 @@ var (
 	stakingTrxCtxs       []*ctrlertypes.TrxContext
 	unstakingTrxCtxs     []*ctrlertypes.TrxContext
 
-	dummyGas   = uint256.NewInt(0)
-	dummyNonce = uint64(0)
+	dummyGas      = uint64(0)
+	dummyGasPrice = uint256.NewInt(0)
+	dummyNonce    = uint64(0)
 
 	lastHeight = int64(1)
 )

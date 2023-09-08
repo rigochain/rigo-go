@@ -24,13 +24,13 @@ func TestStaking2GenesisValidator(t *testing.T) {
 	//fmt.Println("valStake0.SelfAmount", valStakes0.SelfAmount.Dec())
 
 	amtStake := uint256.NewInt(1000000000000000000)
-	ret, err := valWal.StakingCommit(valWal.Address(), baseFee, amtStake, rweb3)
+	ret, err := valWal.StakingCommit(valWal.Address(), defGas, defGasPrice, amtStake, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code)
 	require.Contains(t, ret.CheckTx.Log, "too small stake to become validator")
 
 	amtStake = new(uint256.Int).Sub(govRule.MinValidatorStake(), types.PowerToAmount(valStakes0.SelfPower))
-	ret, err = valWal.StakingCommit(valWal.Address(), baseFee, amtStake, rweb3)
+	ret, err = valWal.StakingCommit(valWal.Address(), defGas, defGasPrice, amtStake, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 

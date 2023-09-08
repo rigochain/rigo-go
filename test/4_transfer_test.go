@@ -32,14 +32,15 @@ func TestTransfer_GasUsed(t *testing.T) {
 
 	raddr := types.RandAddress()
 	trAmt := uint256.MustFromDecimal("1000")
-	ret, err := w.TransferSync(raddr, baseFee, trAmt, rweb3)
+	ret, err := w.TransferSync(raddr, defGas, defGasPrice, trAmt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
 	txRet, xerr := waitTrxResult(ret.Hash, 30, rweb3)
 	require.NoError(t, xerr)
+	require.Equal(t, defGas, txRet.TxDetail.Gas)
 
-	expectedBalance := new(uint256.Int).Sub(oriBalance, new(uint256.Int).Add(trAmt, uint256.NewInt(uint64(txRet.TxResult.GasUsed))))
+	expectedBalance := new(uint256.Int).Sub(oriBalance, new(uint256.Int).Add(trAmt, baseFee))
 	require.NoError(t, w.SyncAccount(rweb3))
 	require.Equal(t, expectedBalance.Dec(), w.GetBalance().Dec())
 
@@ -147,7 +148,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 
 		eventDataTx := event.Data.(tmtypes.EventDataTx)
 		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code)
-		require.Equal(t, baseFee, uint256.NewInt(uint64(eventDataTx.TxResult.Result.GasUsed)))
+		require.Equal(t, defGas, uint64(eventDataTx.TxResult.Result.GasUsed))
 
 		tx := &ctrlertypes.Trx{}
 		err = tx.Decode(eventDataTx.Tx)
@@ -188,7 +189,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 
 		subWg.Add(1)
 
-		ret, err := w.TransferSync(raddr, baseFee, randAmt, _rweb3)
+		ret, err := w.TransferSync(raddr, defGas, defGasPrice, randAmt, _rweb3)
 
 		if err != nil && strings.Contains(err.Error(), "mempool is full") {
 			subWg.Done()
@@ -245,7 +246,7 @@ func TestTransfer_OverBalance(t *testing.T) {
 
 	overAmt := W0.GetBalance() // baseFee is not included
 
-	ret, err := W0.TransferSync(W1.Address(), baseFee, overAmt, rweb3)
+	ret, err := W0.TransferSync(W1.Address(), defGas, defGasPrice, overAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
 	//require.Equal(t, xerrors.ErrCheckTx.Wrap(xerrors.ErrInsufficientFund).Error(), ret.Log)
@@ -258,7 +259,7 @@ func TestTransfer_OverBalance(t *testing.T) {
 	require.Equal(t, testObj0.originNonce, W0.GetNonce())
 
 	overAmt = new(uint256.Int).Add(new(uint256.Int).Sub(W0.GetBalance(), baseFee), uint256.NewInt(1)) // amt - baseFee + 1
-	ret, err = W0.TransferSync(W1.Address(), baseFee, overAmt, rweb3)
+	ret, err = W0.TransferSync(W1.Address(), defGas, defGasPrice, overAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
 	//require.Equal(t, xerrors.ErrCheckTx.Wrap(xerrors.ErrInsufficientFund).Error(), ret.Log)
@@ -280,11 +281,11 @@ func TestTransfer_WrongAddr(t *testing.T) {
 	require.NotEqual(t, uint256.NewInt(0).String(), W0.GetBalance().String())
 
 	tmpAmt := new(uint256.Int).Div(W0.GetBalance(), uint256.NewInt(2))
-	ret, err := W0.TransferSync(nil, baseFee, tmpAmt, rweb3)
+	ret, err := W0.TransferSync(nil, defGas, defGasPrice, tmpAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Code)
 
-	ret, err = W0.TransferSync([]byte{0x00}, baseFee, tmpAmt, rweb3)
+	ret, err = W0.TransferSync([]byte{0x00}, defGas, defGasPrice, tmpAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Code)
 }

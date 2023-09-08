@@ -39,14 +39,14 @@ func TestWithdraw(t *testing.T) {
 
 	// try to withdraw amount more than current reward
 	reqAmt := new(uint256.Int).AddUint64(rwd0.GetCumulated(), uint64(1))
-	retTxCommit, err := val0.WithdrawCommit(baseFee, reqAmt, rweb3)
+	retTxCommit, err := val0.WithdrawCommit(defGas, defGasPrice, reqAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, retTxCommit.CheckTx.Code, retTxCommit.CheckTx.Log)
 
 	// try to withdraw amount less than current reward
 
 	reqAmt = bytes.RandU256IntN(rwd0.GetCumulated())
-	retTxCommit, err = val0.WithdrawCommit(baseFee, reqAmt, rweb3)
+	retTxCommit, err = val0.WithdrawCommit(defGas, defGasPrice, reqAmt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTxCommit.CheckTx.Code, retTxCommit.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTxCommit.DeliverTx.Code, retTxCommit.DeliverTx.Log)

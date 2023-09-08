@@ -20,11 +20,11 @@ func TestSetDoc(t *testing.T) {
 	name := "test account"
 	url := "https://www.my.site/doc"
 
-	ret, err := w.SetDocSync(name, url, smallFee, rweb3)
+	ret, err := w.SetDocSync(name, url, smallGas, defGasPrice, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
 
-	ret, err = w.SetDocSync(name, url, baseFee, rweb3)
+	ret, err = w.SetDocSync(name, url, defGas, defGasPrice, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code)
 
@@ -32,14 +32,14 @@ func TestSetDoc(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 
-	expectedBalance := new(uint256.Int).Sub(oriBalance, uint256.NewInt(uint64(txRet.TxResult.GasUsed)))
+	expectedBalance := new(uint256.Int).Sub(oriBalance, gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice))
 	require.NoError(t, w.SyncAccount(rweb3))
 	require.Equal(t, expectedBalance.Dec(), w.GetBalance().Dec())
 	require.Equal(t, name, w.GetAccount().Name)
 	require.Equal(t, url, w.GetAccount().DocURL)
 
 	tooLongName := rand.Str(types.MAX_ACCT_NAME + 1)
-	ret, err = w.SetDocSync(tooLongName, url, baseFee, rweb3)
+	ret, err = w.SetDocSync(tooLongName, url, defGas, defGasPrice, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 

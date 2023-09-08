@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/holiman/uint256"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
+	rtypes "github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/log"
+	"math"
 	"runtime"
 	"strconv"
 	"strings"
@@ -100,30 +102,93 @@ func executionRoutine(name string, ch chan *ctrlertypes.TrxContext, logger log.L
 	}
 }
 
+func commonValidation0(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	//
+	// the following CAN be parellely done
+	//
+	tx := ctx.Tx
+
+	if len(tx.From) != rtypes.AddrSize {
+		return xerrors.ErrInvalidAddress
+	}
+	if len(tx.To) != rtypes.AddrSize {
+		return xerrors.ErrInvalidAddress
+	}
+	if tx.Amount.Sign() < 0 {
+		return xerrors.ErrInvalidAmount
+	}
+	if tx.Gas < 0 || tx.Gas > math.MaxInt64 {
+		return xerrors.ErrInvalidGas
+	}
+	if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(ctx.GovHandler.GasPrice()) != 0 {
+		return xerrors.ErrInvalidGasPrice
+	}
+
+	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+	if feeAmt.Cmp(ctx.GovHandler.MinTrxFee()) < 0 {
+		return xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
+	}
+
+	if ctx.Exec {
+		_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx)
+		if xerr != nil {
+			return xerr
+		}
+		ctx.SenderPubKey = pubKeyBytes
+	}
+	return nil
+}
+
+func commonValidation1(ctx *ctrlertypes.TrxContext) xerrors.XError {
+
+	//
+	// this validation MUST be serially done
+	//
+	tx := ctx.Tx
+
+	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+	needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
+	if xerr := ctx.Sender.CheckBalance(needAmt); xerr != nil {
+		return xerr
+	}
+	if xerr := ctx.Sender.CheckNonce(tx.Nonce); xerr != nil {
+		return xerr.Wrap(fmt.Errorf("invalid nonce - ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), tx.Nonce, ctx.Sender.Address, ctx.TxHash))
+	}
+	return nil
+}
+
 func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
 	// tx validation
-	if xerr := commonValidation(ctx); xerr != nil {
+	if xerr := commonValidation0(ctx); xerr != nil {
 		return xerr
 	}
-	if xerr := ctx.TrxGovHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-		return xerr
-	}
-	if xerr := ctx.TrxAcctHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-		return xerr
-	}
-	if xerr := ctx.TrxStakeHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-		return xerr
-	}
-	if xerr := ctx.TrxEVMHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	if xerr := commonValidation1(ctx); xerr != nil {
 		return xerr
 	}
 
-	return nil
-}
+	switch ctx.Tx.GetType() {
+	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
+		if xerr := ctx.TrxGovHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
+		if xerr := ctx.TrxAcctHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
+		if xerr := ctx.TrxStakeHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_CONTRACT:
+		if xerr := ctx.TrxEVMHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	default:
+		return xerrors.ErrUnknownTrxType
+	}
 
-func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	return nil
 }
 
@@ -136,33 +201,42 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		if xerr := ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 			return xerr
 		}
-	default:
-		if xerr := ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
+		if xerr := ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
-		if xerr := ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
+		if xerr := ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil {
 			// todo: rollback changes in TrxGovHandler.ExecuteTrx
 			return xerr
 		}
-		if xerr := ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
+		if xerr := ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil {
 			// todo: rollback changes in TrxGovHandler.ExecuteTrx and TrxAcctHandler.ExecuteTrx
 			return xerr
 		}
-		if xerr := runPostTrx(ctx); xerr != nil {
+	default:
+		return xerrors.ErrUnknownTrxType
+	}
+
+	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
+		// When processing a contract tx, the gas & nonce is processed in EVMCtrler
+		if xerr := postRunTrx(ctx); xerr != nil {
 			return xerr
 		}
 	}
-
-	// processing gas
 
 	return nil
 }
 
-func runPostTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	// processing fee = gas * gasPrice
 	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
 	if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
 		return xerr
 	}
+
+	// processing nonce
 	ctx.Sender.AddNonce()
 
 	if xerr := ctx.AcctHandler.SetAccountCommittable(ctx.Sender, ctx.Exec); xerr != nil {

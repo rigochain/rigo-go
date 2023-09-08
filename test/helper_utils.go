@@ -27,10 +27,13 @@ var (
 	W0               *rigoweb3.Wallet
 	W1               *rigoweb3.Wallet
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
+	defGas           = uint64(100_000)
+	smallGas         = uint64(99_999)
+	contractGas      = uint64(30_000_00)
+	defGasPrice      = uint256.NewInt(10_000_000_000)
 	baseFee          = uint256.NewInt(1_000_000_000_000_000)
-	smallFee         = uint256.NewInt(999_999_999_999_999)
-	bigFee           = uint256.NewInt(30_000_000_000_000_000)
-	defaultRpcNode   *PeerMock
+	//smallFee         = uint256.NewInt(999_999_999_999_999)
+	defaultRpcNode *PeerMock
 )
 
 func prepareTest(peers []*PeerMock) {
@@ -162,4 +165,8 @@ func randCommonWallet() *rigoweb3.Wallet {
 func saveWallet(w *rigoweb3.Wallet) error {
 	path := filepath.Join(defaultRpcNode.WalletPath(), fmt.Sprintf("wk%X.json", w.Address()))
 	return w.Save(libs.NewFileWriter(path))
+}
+
+func gasToFee(gas uint64, gasPrice *uint256.Int) *uint256.Int {
+	return new(uint256.Int).Mul(gasPrice, uint256.NewInt(gas))
 }

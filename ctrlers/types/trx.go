@@ -117,19 +117,14 @@ func (tx *Trx) Equal(_tx *Trx) bool {
 
 func (tx *Trx) EncodeRLP(w io.Writer) error {
 
-	payload, err := rlp.EncodeToBytes(tx.Payload)
-	if err != nil {
-		return err
+	var payload bytes.HexBytes
+	if tx.Payload != nil {
+		_tmp, err := rlp.EncodeToBytes(tx.Payload)
+		if err != nil {
+			return err
+		}
+		payload = _tmp
 	}
-
-	//var payload bytes.HexBytes
-	//if tx.Payload != nil {
-	//	_tmp, err := tx.Payload.RLPEncode()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	payload = _tmp
-	//}
 
 	tmpTx := &trxRPL{
 		Version:  tx.Version,
@@ -363,39 +358,46 @@ func (tx *Trx) Hash() ([]byte, error) {
 	return tmtypes.Tx(bz).Hash(), nil
 }
 
-func VerifyTrx(tx *Trx) xerrors.XError {
+func VerifyTrx(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
 	sig := tx.Sig
 	tx.Sig = nil
 	_txbz, xerr := tx.Encode()
 	tx.Sig = sig
 	if xerr != nil {
-		return xerr
+		return nil, nil, xerr
 	}
 
-	fromAddr, _, xerr := crypto.Sig2Addr(_txbz, sig)
+	_prefix := fmt.Sprintf("\x19RIGO Signed Message:\n%d", len(_txbz))
+	prefixed := append([]byte(_prefix), _txbz...)
+
+	fromAddr, pubKey, xerr := crypto.Sig2Addr(prefixed, sig)
 	if xerr != nil {
-		return xerr
+		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(xerr)
 	}
 	if bytes.Compare(fromAddr, tx.From) != 0 {
-		return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
+		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
 	}
-	return nil
+	return fromAddr, pubKey, nil
 }
 
-func VerifyTrxRLP(tx *Trx) xerrors.XError {
+func VerifyTrxRLP(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
 	sig := tx.Sig
 	tx.Sig = nil
 	_txbz, err := rlp.EncodeToBytes(tx)
 	tx.Sig = sig
 	if err != nil {
-		return xerrors.From(err)
+		return nil, nil, xerrors.From(err)
 	}
-	fromAddr, _, xerr := crypto.Sig2Addr(_txbz, sig)
+
+	_prefix := fmt.Sprintf("\x19RIGO Signed Message:\n%d", len(_txbz))
+	prefixed := append([]byte(_prefix), _txbz...)
+
+	fromAddr, pubKey, xerr := crypto.Sig2Addr(prefixed, sig)
 	if xerr != nil {
-		return xerr
+		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(xerr)
 	}
 	if bytes.Compare(fromAddr, tx.From) != 0 {
-		return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
+		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
 	}
-	return nil
+	return fromAddr, pubKey, nil
 }

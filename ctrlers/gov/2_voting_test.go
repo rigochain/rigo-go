@@ -18,7 +18,8 @@ var (
 	voteTestCases1        []*Case
 	voteTestCases2        []*Case
 	testFlagAlreadyFrozen = false
-	baseFee               = uint256.NewInt(1_000_000_000_000_000)
+	defMinGas             = uint64(100_000)
+	defGasPrice           = uint256.NewInt(10_000_000_000)
 )
 
 func init() {
@@ -27,8 +28,8 @@ func init() {
 		panic(err)
 	}
 	txProposal := web3.NewTrxProposal(
-		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, baseFee,
-		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // wrong min fee
+		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
 	if xerr := runTrx(trxCtxProposal); xerr != nil {
 		panic(xerr)
@@ -38,21 +39,21 @@ func init() {
 	}
 
 	// no error
-	tx0 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, baseFee,
+	tx0 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
 
 	// no right
-	tx1 := web3.NewTrxVoting(stakeHelper.PickAddress(stakeHelper.valCnt), types.ZeroAddress(), 1, baseFee,
+	tx1 := web3.NewTrxVoting(stakeHelper.PickAddress(stakeHelper.valCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
 
 	// invalid payload params : wrong choice
-	tx2 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, baseFee,
+	tx2 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 1)
 	// invalid payload params : wrong choice
-	tx3 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, baseFee,
+	tx3 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, -1)
 	// not found result
-	tx4 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, baseFee,
+	tx4 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		bytes.RandBytes(32), 0)
 
 	// test cases #1
@@ -75,7 +76,7 @@ func init() {
 		//if rn%3 == 0 {
 		//	choice = 1
 		//}
-		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, baseFee,
+		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, defMinGas, defGasPrice,
 			trxCtxProposal.TxHash, choice)
 		txs = append(txs, tx)
 	}

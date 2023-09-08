@@ -70,7 +70,7 @@ func (ec *EVMContract) Call(name string, args []interface{}, from types.Address,
 	return ec.unpack(name, ret0.ReturnData)
 }
 
-func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wallet, nonce uint64, gas, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	to := ec.addr
 
 	data, err := ec.pack(name, args...)
@@ -83,8 +83,8 @@ func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wal
 		to = types.ZeroAddress()
 		data = append(ec.buildInfo.Bytecode, data...)
 	}
-	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, amt, data)
-	_, _, err = from.SignTrx(tx)
+	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
+	_, _, err = from.SignTrxRLP(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wal
 	return ret, nil
 }
 
-func (ec *EVMContract) ExecSync(name string, args []interface{}, from *web3.Wallet, nonce uint64, gas, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (ec *EVMContract) ExecSync(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	to := ec.addr
 
 	data, err := ec.pack(name, args...)
@@ -113,8 +113,8 @@ func (ec *EVMContract) ExecSync(name string, args []interface{}, from *web3.Wall
 		to = types.ZeroAddress()
 		data = append(ec.buildInfo.Bytecode, data...)
 	}
-	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, amt, data)
-	_, _, err = from.SignTrx(tx)
+	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
+	_, _, err = from.SignTrxRLP(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (ec *EVMContract) ExecSync(name string, args []interface{}, from *web3.Wall
 	return ret, nil
 }
 
-func (ec *EVMContract) ExecCommit(name string, args []interface{}, from *web3.Wallet, nonce uint64, gas, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+func (ec *EVMContract) ExecCommit(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
 	to := ec.addr
 
 	data, err := ec.pack(name, args...)
@@ -143,8 +143,8 @@ func (ec *EVMContract) ExecCommit(name string, args []interface{}, from *web3.Wa
 		to = types.ZeroAddress()
 		data = append(ec.buildInfo.Bytecode, data...)
 	}
-	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, amt, data)
-	_, _, err = from.SignTrx(tx)
+	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
+	_, _, err = from.SignTrxRLP(tx)
 	if err != nil {
 		return nil, err
 	}

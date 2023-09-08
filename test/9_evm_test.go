@@ -50,7 +50,7 @@ func testDeploy(t *testing.T) {
 
 	// insufficient gas
 	ret, err := contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
-		creator, creator.GetNonce(), baseFee, uint256.NewInt(0), rweb3)
+		creator, creator.GetNonce(), defGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 
@@ -61,7 +61,7 @@ func testDeploy(t *testing.T) {
 
 	// sufficient gas
 	ret, err = contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
-		creator, creator.GetNonce(), bigFee, uint256.NewInt(0), rweb3)
+		creator, creator.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
@@ -80,8 +80,8 @@ func testDeploy(t *testing.T) {
 	afterBalance := creator.GetBalance().Clone()
 
 	// check balance - changed by gas
-	usedGas := new(uint256.Int).Sub(beforeBalance1, afterBalance).Uint64()
-	require.Equal(t, uint64(txRet.TxResult.GasUsed), usedGas)
+	usedGas := new(uint256.Int).Sub(beforeBalance1, afterBalance)
+	require.Equal(t, gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice), usedGas)
 }
 
 func testQuery(t *testing.T) {
@@ -114,7 +114,7 @@ func testPayable(t *testing.T) {
 	randAmt := bytes.RandU256IntN(sender.GetBalance())
 	_ = randAmt.Sub(randAmt, baseFee)
 
-	ret, err := sender.TransferSync(evmContract.GetAddress(), baseFee, randAmt, rweb3)
+	ret, err := sender.TransferSync(evmContract.GetAddress(), defGas, defGasPrice, randAmt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
@@ -122,7 +122,7 @@ func testPayable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 
-	expectedAmt := new(uint256.Int).Sub(sender.GetBalance(), uint256.NewInt(uint64(txRet.TxResult.GasUsed)))
+	expectedAmt := new(uint256.Int).Sub(sender.GetBalance(), gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice))
 	_ = expectedAmt.Sub(expectedAmt, randAmt)
 	require.NotEqual(t, sender.GetBalance(), expectedAmt)
 	require.NoError(t, sender.SyncAccount(rweb3))
@@ -140,7 +140,7 @@ func testPayable(t *testing.T) {
 	//
 
 	refundAmt := bytes.RandU256IntN(randAmt)
-	ret, err = evmContract.ExecSync("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), bigFee, uint256.NewInt(0), rweb3)
+	ret, err = evmContract.ExecSync("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
@@ -149,7 +149,7 @@ func testPayable(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 
 	expectedAmt = new(uint256.Int).Add(sender.GetBalance(), refundAmt)
-	_ = expectedAmt.Sub(expectedAmt, uint256.NewInt(uint64(txRet.TxResult.GasUsed)))
+	_ = expectedAmt.Sub(expectedAmt, gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice))
 	require.NoError(t, sender.SyncAccount(rweb3))
 	require.Equal(t, expectedAmt, sender.GetBalance())
 
@@ -190,7 +190,7 @@ func testEvents(t *testing.T) {
 
 	rAddr := types.RandAddress()
 	// Transfer Event sig: ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
-	ret, err := evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), bigFee, uint256.NewInt(0), rweb3)
+	ret, err := evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 

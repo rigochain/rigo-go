@@ -50,7 +50,7 @@ func Test_callEVM_Deploy(t *testing.T) {
 		Height:     bctx.Height(),
 		BlockTime:  time.Now().UnixNano(),
 		TxHash:     bytes2.RandBytes(32),
-		Tx:         web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), uint256.NewInt(30_000_000_000_000_000), uint256.NewInt(0), deployInput),
+		Tx:         web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), deployInput),
 		TxIdx:      1,
 		Exec:       true,
 		Sender:     fromAcct,
@@ -106,7 +106,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 	_, xerr = rigoEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
-	ret, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), uint256.NewInt(30_000_000_000_000_000), uint256.NewInt(0), bctx.Height(), time.Now().Unix(),
+	ret, xerr = execMethod(fromAcct.Address, contractAddr, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bctx.Height(), time.Now().Unix(),
 		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
 	fmt.Println("<transferred>")
@@ -164,7 +164,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 }
 
-func execMethod(from, to types.Address, nonce uint64, gas, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
+func execMethod(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
 	input, err := abiContract.Pack(methodName, args...)
 	if err != nil {
 		return nil, xerrors.From(err)
@@ -176,7 +176,7 @@ func execMethod(from, to types.Address, nonce uint64, gas, amt *uint256.Int, bn,
 		Height:     1,
 		BlockTime:  time.Now().UnixNano(),
 		TxHash:     bytes2.RandBytes(32),
-		Tx:         web3.NewTrxContract(from, to, nonce, gas, amt, input),
+		Tx:         web3.NewTrxContract(from, to, nonce, gas, gasPrice, amt, input),
 		TxIdx:      1,
 		Exec:       true,
 		Sender:     fromAcct,
