@@ -29,7 +29,7 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
-	btm := block.Block.Time.UnixNano()
+	btm := block.Block.Time.Unix()
 
 	execRet, xerr := ctrler.queryVM(from, to, data, height, btm)
 	if xerr != nil {
