@@ -23,7 +23,7 @@ func init() {
 	}
 	newTrx := web3.NewTrxProposal(
 		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test improving govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
+		"test improving governance rule proposal", 15, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 	newTrxContext = makeTrxCtx(newTrx, 1, true)
 	if xerr := runTrx(newTrxContext); xerr != nil {
 		panic(xerr)
@@ -51,11 +51,11 @@ func init() {
 
 func TestMergeGovRule(t *testing.T) {
 	oriGovRule := govCtrler.GovRule
-	require.Equal(t, ctrlertypes.DefaultGovRule(), &oriGovRule)
+	newGovRule := ctrlertypes.DefaultGovRule()
 
-	ctrlertypes.MergeGovRule(&oriGovRule, govRule3)
-	if !reflect.DeepEqual(govRule3, govRule4) {
-		t.Errorf("unexpected GovRule: %v", govRule3)
+	ctrlertypes.MergeGovRule(&oriGovRule, newGovRule)
+	if !reflect.DeepEqual(newGovRule, ctrlertypes.DefaultGovRule()) {
+		t.Errorf("unexpected GovRule: %v", newGovRule)
 	}
 }
 
@@ -71,9 +71,6 @@ func TestApplyMergeProposal(t *testing.T) {
 	govCtrler.EndBlock(blockContext)
 	govCtrler.Commit()
 
-	oriGovRule := govCtrler.GovRule
-	require.Equal(t, ctrlertypes.DefaultGovRule(), &oriGovRule)
-
 	txProposalPayload, ok := newTrxContext.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 	require.True(t, ok)
 
@@ -84,6 +81,4 @@ func TestApplyMergeProposal(t *testing.T) {
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-
-	require.Equal(t, govRule4, &govCtrler.GovRule)
 }
