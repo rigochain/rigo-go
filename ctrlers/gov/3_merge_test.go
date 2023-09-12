@@ -22,7 +22,7 @@ func init() {
 		panic(err)
 	}
 	newTrx := web3.NewTrxProposal(
-		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, baseFee,
+		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test improving govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
 	newTrxContext = makeTrxCtx(newTrx, 1, true)
 	if xerr := runTrx(newTrxContext); xerr != nil {
@@ -36,7 +36,7 @@ func init() {
 	for i := 1; i < stakeHelper.valCnt; i++ {
 		addr := stakeHelper.PickAddress(i)
 		choice := int32(0)
-		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, baseFee,
+		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, defMinGas, defGasPrice,
 			newTrxContext.TxHash, choice)
 		txs = append(txs, tx)
 	}
