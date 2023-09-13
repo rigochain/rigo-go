@@ -84,7 +84,7 @@ func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wal
 		data = append(ec.buildInfo.Bytecode, data...)
 	}
 	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
-	_, _, err = from.SignTrxRLP(tx)
+	_, _, err = from.SignTrxRLP(tx, rweb3.ChainID())
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (ec *EVMContract) ExecSync(name string, args []interface{}, from *web3.Wall
 		data = append(ec.buildInfo.Bytecode, data...)
 	}
 	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
-	_, _, err = from.SignTrxRLP(tx)
+	_, _, err = from.SignTrxRLP(tx, rweb3.ChainID())
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func (ec *EVMContract) ExecCommit(name string, args []interface{}, from *web3.Wa
 		data = append(ec.buildInfo.Bytecode, data...)
 	}
 	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
-	_, _, err = from.SignTrxRLP(tx)
+	_, _, err = from.SignTrxRLP(tx, rweb3.ChainID())
 	if err != nil {
 		return nil, err
 	}

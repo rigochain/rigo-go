@@ -4,13 +4,18 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-func DevnetGenesisDoc() (*tmtypes.GenesisDoc, error) {
-	return tmtypes.GenesisDocFromJSON(jsonBlobDevnetGenesis)
+func DevnetGenesisDoc(chainId string) (*tmtypes.GenesisDoc, error) {
+	genDoc, err := tmtypes.GenesisDocFromJSON(jsonBlobDevnetGenesis)
+	if err != nil {
+		return nil, err
+	}
+	genDoc.ChainID = chainId
+	return genDoc, nil
 }
 
 var jsonBlobDevnetGenesis = []byte(`{
   "genesis_time": "2021-08-06T08:29:24.827484Z",
-  "chain_id": "RIGO.DEVNET",
+  "chain_id": "",
   "initial_height": "0",
   "consensus_params": {
     "block": {

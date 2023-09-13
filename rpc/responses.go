@@ -15,7 +15,7 @@ func (qr *QueryResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		Code      uint32           `json:"code,omitempty"`
 		Log       string           `json:"log,omitempty"`
-		Info      string           ` json:"info,omitempty"`
+		Info      string           `json:"info,omitempty"`
 		Index     int64            `json:"index,omitempty"`
 		Key       bytes.HexBytes   `json:"key,omitempty"`
 		Value     json.RawMessage  `json:"value,omitempty"`

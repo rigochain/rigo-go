@@ -59,10 +59,10 @@ func TestRLP_TrxPayloadContract(t *testing.T) {
 			Data: bytes.RandHexBytes(10234),
 		},
 	}
-	_, _, err := w.SignTrxRLP(tx0)
+	_, _, err := w.SignTrxRLP(tx0, "trx_test_chain")
 
 	require.NoError(t, err)
-	_, _, xerr := types2.VerifyTrxRLP(tx0)
+	_, _, xerr := types2.VerifyTrxRLP(tx0, "trx_test_chain")
 	require.NoError(t, xerr)
 
 	bz0, err := rlp.EncodeToBytes(tx0)
@@ -71,7 +71,7 @@ func TestRLP_TrxPayloadContract(t *testing.T) {
 	tx1 := &types2.Trx{}
 	err = rlp.DecodeBytes(bz0, tx1)
 	require.NoError(t, err)
-	_, _, xerr = types2.VerifyTrxRLP(tx1)
+	_, _, xerr = types2.VerifyTrxRLP(tx1, "trx_test_chain")
 	require.NoError(t, xerr)
 
 	require.Equal(t,
@@ -101,10 +101,10 @@ func TestRLP_TrxPayloadSetDoc(t *testing.T) {
 			URL:  "https://test.account.doc/1",
 		},
 	}
-	_, _, err := w.SignTrxRLP(tx0)
+	_, _, err := w.SignTrxRLP(tx0, "trx_test_chain")
 
 	require.NoError(t, err)
-	_, _, xerr := types2.VerifyTrxRLP(tx0)
+	_, _, xerr := types2.VerifyTrxRLP(tx0, "trx_test_chain")
 	require.NoError(t, xerr)
 
 	bz0, err := rlp.EncodeToBytes(tx0)
@@ -113,7 +113,7 @@ func TestRLP_TrxPayloadSetDoc(t *testing.T) {
 	tx1 := &types2.Trx{}
 	err = rlp.DecodeBytes(bz0, tx1)
 	require.NoError(t, err)
-	_, _, xerr = types2.VerifyTrxRLP(tx0)
+	_, _, xerr = types2.VerifyTrxRLP(tx0, "trx_test_chain")
 	require.NoError(t, xerr)
 
 	require.Equal(t,
@@ -152,9 +152,9 @@ func TestRLP_TrxPayloadProposal(t *testing.T) {
 	}
 
 	// check signature
-	_, _, err := w.SignTrxRLP(tx0)
+	_, _, err := w.SignTrxRLP(tx0, "trx_test_chain")
 	require.NoError(t, err)
-	_, _, xerr := types2.VerifyTrxRLP(tx0)
+	_, _, xerr := types2.VerifyTrxRLP(tx0, "trx_test_chain")
 	require.NoError(t, xerr)
 
 	// check encoding/decoding
@@ -164,7 +164,7 @@ func TestRLP_TrxPayloadProposal(t *testing.T) {
 	tx1 := &types2.Trx{}
 	err = rlp.DecodeBytes(bz0, tx1)
 	require.NoError(t, err)
-	_, _, xerr = types2.VerifyTrxRLP(tx0)
+	_, _, xerr = types2.VerifyTrxRLP(tx0, "trx_test_chain")
 	require.NoError(t, xerr)
 	require.True(t, tx1.Equal(tx0))
 

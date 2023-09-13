@@ -106,7 +106,7 @@ func (acct *Account) CheckNonce(n uint64) xerrors.XError {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
-	// Change `tx_nonce == nonce + 1` to `tx_nonce == nonce`
+	// Change to `tx_nonce == nonce` from `tx_nonce == nonce + 1`
 	if acct.Nonce != n {
 		return xerrors.ErrInvalidNonce
 	}

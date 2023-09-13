@@ -4,8 +4,13 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-func TestnetGenesisDoc() (*tmtypes.GenesisDoc, error) {
-	return tmtypes.GenesisDocFromJSON(jsonBlobTestnetGenesis)
+func TestnetGenesisDoc(chainId string) (*tmtypes.GenesisDoc, error) {
+	genDoc, err := tmtypes.GenesisDocFromJSON(jsonBlobTestnetGenesis)
+	if err != nil {
+		return nil, err
+	}
+	genDoc.ChainID = chainId
+	return genDoc, nil
 }
 
 var jsonBlobTestnetGenesis = []byte(`{

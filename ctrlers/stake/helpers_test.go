@@ -154,7 +154,7 @@ func randMakeUnstakingTrxContext() (*ctrlertypes.TrxContext, error) {
 func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes) (*ctrlertypes.TrxContext, error) {
 
 	tx := web3.NewTrxUnstaking(from.Address(), to.Address(), dummyNonce, dummyGas, dummyGasPrice, txhash)
-	tzbz, _, err := from.SignTrxRLP(tx)
+	tzbz, _, err := from.SignTrxRLP(tx, "stake_test_chain")
 	if err != nil {
 		return nil, err
 	}

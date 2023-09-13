@@ -112,15 +112,15 @@ func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 		var err error
 		var genDoc *tmtypes.GenesisDoc
 		if chainID == "mainnet" {
-			if genDoc, err = genesis.MainnetGenesisDoc(); err != nil {
+			if genDoc, err = genesis.MainnetGenesisDoc(chainID); err != nil {
 				return err
 			}
 		} else if chainID == "testnet" {
-			if genDoc, err = genesis.TestnetGenesisDoc(); err != nil {
+			if genDoc, err = genesis.TestnetGenesisDoc(chainID); err != nil {
 				return err
 			}
 		} else if chainID == "devnet" {
-			if genDoc, err = genesis.DevnetGenesisDoc(); err != nil {
+			if genDoc, err = genesis.DevnetGenesisDoc(chainID); err != nil {
 				return err
 			}
 		} else { // anything (e.g. loclanet)

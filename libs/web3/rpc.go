@@ -30,6 +30,22 @@ func (rweb3 *RigoWeb3) Status() (*coretypes.ResultStatus, error) {
 	return retStatus, nil
 }
 
+func (rweb3 *RigoWeb3) Genesis() (*coretypes.ResultGenesis, error) {
+	retGen := &coretypes.ResultGenesis{}
+
+	if req, err := rweb3.NewRequest("genesis"); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, retGen); err != nil {
+		return nil, err
+	}
+
+	return retGen, nil
+}
+
 func (rweb3 *RigoWeb3) GetRule() (*ctrlertypes.GovRule, error) {
 	queryResp := &rpc.QueryResult{}
 

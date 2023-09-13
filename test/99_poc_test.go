@@ -86,14 +86,14 @@ func getAccountData(address types.Address) AccountData {
 
 func submitTrx(wallet *web3.Wallet, trx *types2.Trx) []byte {
 	wallet.Unlock([]byte("1234"))
-	wallet.SignTrxRLP(trx)
+	wallet.SignTrxRLP(trx, defaultRpcNode.ChainID)
 	encode, _ := trx.Encode()
 	return requestHttp(defaultRpcNode.RPCURL + "/broadcast_tx_commit?tx=0x" + hex.EncodeToString(encode))
 }
 
 func submitTrxAsync(wallet *web3.Wallet, trx *types2.Trx) []byte {
 	wallet.Unlock([]byte("1234"))
-	wallet.SignTrxRLP(trx)
+	wallet.SignTrxRLP(trx, defaultRpcNode.ChainID)
 	encode, _ := trx.Encode()
 	return requestHttp(defaultRpcNode.RPCURL + "/broadcast_tx_async?tx=0x" + hex.EncodeToString(encode))
 }

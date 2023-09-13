@@ -130,7 +130,7 @@ func commonValidation0(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	}
 
 	if ctx.Exec {
-		_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx)
+		_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx, ctx.ChainID)
 		if xerr != nil {
 			return xerr
 		}

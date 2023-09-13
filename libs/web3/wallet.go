@@ -1,8 +1,6 @@
 package web3
 
 import (
-	"fmt"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
@@ -128,50 +126,44 @@ func (w *Wallet) Unlock(s []byte) error {
 	return w.wkey.Unlock(s)
 }
 
-func (w *Wallet) SignTrxProto(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error) {
+func (w *Wallet) SignTrxProto(tx *types2.Trx, chainId string) (bytes.HexBytes, bytes.HexBytes, error) {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
-	txbz, xerr := tx.Encode()
+	preimg, xerr := types2.PreImageToSignTrxProto(tx, chainId)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
-	_prefix := fmt.Sprintf("\x19RIGO Signed Message:\n%d", len(txbz))
-	prefixed := append([]byte(_prefix), txbz...)
-
-	sig, err := w.wkey.Sign(prefixed)
+	sig, err := w.wkey.Sign(preimg)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	tx.Sig = sig
-	return sig, txbz, nil
+	return sig, preimg, nil
 }
 
-func (w *Wallet) SignTrxRLP(tx *types2.Trx) (bytes.HexBytes, bytes.HexBytes, error) {
+func (w *Wallet) SignTrxRLP(tx *types2.Trx, chainId string) (bytes.HexBytes, bytes.HexBytes, error) {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
-	txbz, err := rlp.EncodeToBytes(tx)
-	if err != nil {
-		return nil, nil, err
+	preimg, xerr := types2.PreImageToSignTrxRLP(tx, chainId)
+	if xerr != nil {
+		return nil, nil, xerr
 	}
 
-	_prefix := fmt.Sprintf("\x19RIGO Signed Message:\n%d", len(txbz))
-	prefixed := append([]byte(_prefix), txbz...)
-
-	sig, err := w.wkey.Sign(prefixed)
+	sig, err := w.wkey.Sign(preimg)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	tx.Sig = sig
-	return sig, txbz, nil
+	return sig, preimg, nil
 }
 
 func (w *Wallet) SendTxAsync(tx *types2.Trx, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
-	if _, _, err := w.SignTrxRLP(tx); err != nil {
+	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
 		return rweb3.SendTransactionAsync(tx)
@@ -179,7 +171,7 @@ func (w *Wallet) SendTxAsync(tx *types2.Trx, rweb3 *RigoWeb3) (*coretypes.Result
 }
 
 func (w *Wallet) SendTxSync(tx *types2.Trx, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
-	if _, _, err := w.SignTrxRLP(tx); err != nil {
+	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
 		return rweb3.SendTransactionSync(tx)
@@ -187,7 +179,7 @@ func (w *Wallet) SendTxSync(tx *types2.Trx, rweb3 *RigoWeb3) (*coretypes.ResultB
 }
 
 func (w *Wallet) SendTxCommit(tx *types2.Trx, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
-	if _, _, err := w.SignTrxRLP(tx); err != nil {
+	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
 		return rweb3.SendTransactionCommit(tx)
@@ -196,7 +188,7 @@ func (w *Wallet) SendTxCommit(tx *types2.Trx, rweb3 *RigoWeb3) (*coretypes.Resul
 
 func (w *Wallet) SetDocSync(name, url string, gas uint64, gasPrice *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxSetDoc(w.Address(), w.acct.GetNonce(), gas, gasPrice, name, url)
-	if _, _, err := w.SignTrxRLP(tx); err != nil {
+	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
 		return rweb3.SendTransactionSync(tx)
@@ -205,7 +197,7 @@ func (w *Wallet) SetDocSync(name, url string, gas uint64, gasPrice *uint256.Int,
 
 func (w *Wallet) SetDocCommit(name, url string, gas uint64, gasPrice *uint256.Int, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
 	tx := NewTrxSetDoc(w.Address(), w.acct.GetNonce(), gas, gasPrice, name, url)
-	if _, _, err := w.SignTrxRLP(tx); err != nil {
+	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
 		return rweb3.SendTransactionCommit(tx)
@@ -288,7 +280,7 @@ func (w *Wallet) ProposalSync(gas uint64, gasPrice *uint256.Int, msg string, sta
 		w.acct.GetNonce(),
 		gas, gasPrice, msg, start, period, optType, options,
 	)
-	if _, _, err := w.SignTrxRLP(tx); err != nil {
+	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
 		return rweb3.SendTransactionSync(tx)
@@ -302,7 +294,7 @@ func (w *Wallet) ProposalCommit(gas uint64, gasPrice *uint256.Int, msg string, s
 		w.acct.GetNonce(),
 		gas, gasPrice, msg, start, period, optType, options,
 	)
-	if _, _, err := w.SignTrxRLP(tx); err != nil {
+	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
 		return rweb3.SendTransactionCommit(tx)
@@ -316,7 +308,7 @@ func (w *Wallet) VotingSync(gas uint64, gasPrice *uint256.Int, txHash bytes.HexB
 		w.acct.GetNonce(),
 		gas, gasPrice, txHash, choice,
 	)
-	if _, _, err := w.SignTrxRLP(tx); err != nil {
+	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
 		return rweb3.SendTransactionSync(tx)
@@ -330,7 +322,7 @@ func (w *Wallet) VotingCommit(gas uint64, gasPrice *uint256.Int, txHash bytes.He
 		w.acct.GetNonce(),
 		gas, gasPrice, txHash, choice,
 	)
-	if _, _, err := w.SignTrxRLP(tx); err != nil {
+	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
 		return rweb3.SendTransactionCommit(tx)

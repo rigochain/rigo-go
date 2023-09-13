@@ -8,7 +8,6 @@ import (
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
-	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"time"
@@ -344,33 +343,53 @@ func (tx *Trx) toProto() (*TrxProto, xerrors.XError) {
 	}, nil
 }
 
-func (tx *Trx) Hash() ([]byte, error) {
-	if tx.Sig != nil {
-		oriSig := tx.Sig
-		tx.Sig = nil
-		defer func() { tx.Sig = oriSig }()
-	}
-	bz, err := tx.Encode()
-	if err != nil {
-		return nil, err
-	}
+//func (tx *Trx) Hash() ([]byte, error) {
+//	if tx.Sig != nil {
+//		oriSig := tx.Sig
+//		tx.Sig = nil
+//		defer func() { tx.Sig = oriSig }()
+//	}
+//	bz, err := tx.Encode()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return tmtypes.Tx(bz).Hash(), nil
+//}
 
-	return tmtypes.Tx(bz).Hash(), nil
-}
-
-func VerifyTrx(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
+func PreImageToSignTrxProto(tx *Trx, chainId string) ([]byte, xerrors.XError) {
 	sig := tx.Sig
 	tx.Sig = nil
-	_txbz, xerr := tx.Encode()
-	tx.Sig = sig
+	defer func() { tx.Sig = sig }()
+
+	bz, xerr := tx.Encode()
+	if xerr != nil {
+		return nil, xerr
+	}
+	prefix := fmt.Sprintf("\x19RIGO(%s) Signed Message:\n%d", chainId, len(bz))
+	return append([]byte(prefix), bz...), nil
+}
+
+func PreImageToSignTrxRLP(tx *Trx, chainId string) ([]byte, xerrors.XError) {
+	sig := tx.Sig
+	tx.Sig = nil
+	defer func() { tx.Sig = sig }()
+
+	bz, err := rlp.EncodeToBytes(tx)
+	if err != nil {
+		return nil, xerrors.From(err)
+	}
+	prefix := fmt.Sprintf("\x19RIGO(%s) Signed Message:\n%d", chainId, len(bz))
+	return append([]byte(prefix), bz...), nil
+}
+
+func VerifyTrxProto(tx *Trx, chainId string) (types.Address, bytes.HexBytes, xerrors.XError) {
+	preimg, xerr := PreImageToSignTrxProto(tx, chainId)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
-	_prefix := fmt.Sprintf("\x19RIGO Signed Message:\n%d", len(_txbz))
-	prefixed := append([]byte(_prefix), _txbz...)
-
-	fromAddr, pubKey, xerr := crypto.Sig2Addr(prefixed, sig)
+	fromAddr, pubKey, xerr := crypto.Sig2Addr(preimg, tx.Sig)
 	if xerr != nil {
 		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(xerr)
 	}
@@ -380,19 +399,13 @@ func VerifyTrx(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
 	return fromAddr, pubKey, nil
 }
 
-func VerifyTrxRLP(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
-	sig := tx.Sig
-	tx.Sig = nil
-	_txbz, err := rlp.EncodeToBytes(tx)
-	tx.Sig = sig
-	if err != nil {
-		return nil, nil, xerrors.From(err)
+func VerifyTrxRLP(tx *Trx, chainId string) (types.Address, bytes.HexBytes, xerrors.XError) {
+	preimg, xerr := PreImageToSignTrxRLP(tx, chainId)
+	if xerr != nil {
+		return nil, nil, xerr
 	}
 
-	_prefix := fmt.Sprintf("\x19RIGO Signed Message:\n%d", len(_txbz))
-	prefixed := append([]byte(_prefix), _txbz...)
-
-	fromAddr, pubKey, xerr := crypto.Sig2Addr(prefixed, sig)
+	fromAddr, pubKey, xerr := crypto.Sig2Addr(preimg, tx.Sig)
 	if xerr != nil {
 		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(xerr)
 	}
