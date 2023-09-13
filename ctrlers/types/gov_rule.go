@@ -10,6 +10,7 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
+	"math"
 	"sync"
 )
 
@@ -21,11 +22,13 @@ type GovRule struct {
 	version               int64
 	maxValidatorCnt       int64
 	minValidatorStake     *uint256.Int
-	rewardPerPower        int64 // todo: change to `*uint256.Int`
+	rewardPerPower        *uint256.Int
 	lazyRewardBlocks      int64
 	lazyApplyingBlocks    int64
 	gasPrice              *uint256.Int
-	minTrxFee             *uint256.Int // todo: add `minTxGas uint256`, `maxTxGas uint256` and `maxBlockGas uint256`
+	minTrxGas             uint64
+	maxTrxGas             uint64
+	maxBlockGas           uint64
 	minVotingPeriodBlocks int64
 	maxVotingPeriodBlocks int64
 
@@ -34,60 +37,6 @@ type GovRule struct {
 	slashRatio             int64
 
 	mtx sync.RWMutex
-}
-
-func MergeGovRule(oldGovRule, newGovRule *GovRule) {
-	if newGovRule.version == 0 {
-		newGovRule.version = oldGovRule.version
-	}
-
-	if newGovRule.maxValidatorCnt == 0 {
-		newGovRule.maxValidatorCnt = oldGovRule.maxValidatorCnt
-	}
-
-	if newGovRule.minValidatorStake == nil || newGovRule.minValidatorStake.IsZero() {
-		newGovRule.minValidatorStake = oldGovRule.minValidatorStake
-	}
-
-	if newGovRule.rewardPerPower == 0 {
-		newGovRule.rewardPerPower = oldGovRule.rewardPerPower
-	}
-
-	if newGovRule.lazyRewardBlocks == 0 {
-		newGovRule.lazyRewardBlocks = oldGovRule.lazyRewardBlocks
-	}
-
-	if newGovRule.lazyApplyingBlocks == 0 {
-		newGovRule.lazyApplyingBlocks = oldGovRule.lazyApplyingBlocks
-	}
-
-	if newGovRule.gasPrice == nil || newGovRule.gasPrice.IsZero() {
-		newGovRule.gasPrice = oldGovRule.gasPrice
-	}
-
-	if newGovRule.minTrxFee == nil || newGovRule.minTrxFee.IsZero() {
-		newGovRule.minTrxFee = oldGovRule.minTrxFee
-	}
-
-	if newGovRule.minVotingPeriodBlocks == 0 {
-		newGovRule.minVotingPeriodBlocks = oldGovRule.minVotingPeriodBlocks
-	}
-
-	if newGovRule.maxVotingPeriodBlocks == 0 {
-		newGovRule.maxVotingPeriodBlocks = oldGovRule.maxVotingPeriodBlocks
-	}
-
-	if newGovRule.minSelfStakeRatio == 0 {
-		newGovRule.minSelfStakeRatio = oldGovRule.minSelfStakeRatio
-	}
-
-	if newGovRule.maxUpdatableStakeRatio == 0 {
-		newGovRule.maxUpdatableStakeRatio = oldGovRule.maxUpdatableStakeRatio
-	}
-
-	if newGovRule.slashRatio == 0 {
-		newGovRule.slashRatio = oldGovRule.slashRatio
-	}
 }
 
 func DefaultGovRule() *GovRule {
@@ -114,16 +63,18 @@ func DefaultGovRule() *GovRule {
 		//			= 4,756,468,797 * 31,536,000(blocks in 1Y)
 		//			= 149,999,999,982,192,000 amount [per 1RIGO, 1Y]
 		// , it's about 15% of 1 power
-		rewardPerPower:         4_756_468_797,                         // amount
-		lazyRewardBlocks:       2592000,                               // = 60 * 60 * 24 * 30 => 30 days
-		lazyApplyingBlocks:     259200,                                // = 60 * 60 * 24 * 3 => 3 days
-		gasPrice:               uint256.NewInt(10_000_000_000),        // 10Gwei
-		minTrxFee:              uint256.NewInt(1_000_000_000_000_000), // 0.001 RIGO = 10^15 wei
-		minVotingPeriodBlocks:  259200,                                // = 60 * 60 * 24 * 3 => 3 days
-		maxVotingPeriodBlocks:  2592000,                               // = 60 * 60 * 24 * 30 => 30 days
-		minSelfStakeRatio:      50,                                    // 50%
-		maxUpdatableStakeRatio: 30,                                    // 30%
-		slashRatio:             50,                                    // 50%
+		rewardPerPower:         uint256.NewInt(4_756_468_797),  // amount
+		lazyRewardBlocks:       2592000,                        // = 60 * 60 * 24 * 30 => 30 days
+		lazyApplyingBlocks:     259200,                         // = 60 * 60 * 24 * 3 => 3 days
+		gasPrice:               uint256.NewInt(10_000_000_000), // 10Gwei
+		minTrxGas:              uint64(1_000_000_000_000_000),  // 0.001 RIGO = 10^15 wei
+		maxTrxGas:              math.MaxUint64,
+		maxBlockGas:            math.MaxUint64,
+		minVotingPeriodBlocks:  259200,  // = 60 * 60 * 24 * 3 => 3 days
+		maxVotingPeriodBlocks:  2592000, // = 60 * 60 * 24 * 30 => 30 days
+		minSelfStakeRatio:      50,      // 50%
+		maxUpdatableStakeRatio: 30,      // 30%
+		slashRatio:             50,      // 50%
 	}
 }
 
@@ -132,11 +83,13 @@ func Test1GovRule() *GovRule {
 		version:                1,
 		maxValidatorCnt:        10,
 		minValidatorStake:      uint256.MustFromDecimal("1000000000000000000"), // 1 RIGO
-		rewardPerPower:         2_000_000_000,
+		rewardPerPower:         uint256.NewInt(2_000_000_000),
 		lazyRewardBlocks:       10,
 		lazyApplyingBlocks:     10,
 		gasPrice:               uint256.NewInt(10),
-		minTrxFee:              uint256.NewInt(10),
+		minTrxGas:              uint64(10),
+		maxTrxGas:              math.MaxUint64,
+		maxBlockGas:            math.MaxUint64,
 		minVotingPeriodBlocks:  10,
 		maxVotingPeriodBlocks:  10,
 		minSelfStakeRatio:      50, // 50%
@@ -150,11 +103,13 @@ func Test2GovRule() *GovRule {
 		version:                2,
 		maxValidatorCnt:        10,
 		minValidatorStake:      uint256.MustFromDecimal("5000000000000000000"), // 5 RIGO
-		rewardPerPower:         2_000_000_000,
+		rewardPerPower:         uint256.NewInt(2_000_000_000),
 		lazyRewardBlocks:       30,
 		lazyApplyingBlocks:     40,
 		gasPrice:               uint256.NewInt(20),
-		minTrxFee:              uint256.NewInt(20),
+		minTrxGas:              uint64(20),
+		maxTrxGas:              math.MaxUint64,
+		maxBlockGas:            math.MaxUint64,
 		minVotingPeriodBlocks:  50,
 		maxVotingPeriodBlocks:  60,
 		minSelfStakeRatio:      50, // 50%
@@ -168,11 +123,13 @@ func Test3GovRule() *GovRule {
 		version:                4,
 		maxValidatorCnt:        13,
 		minValidatorStake:      uint256.MustFromDecimal("0"),
-		rewardPerPower:         0,
+		rewardPerPower:         uint256.NewInt(0),
 		lazyRewardBlocks:       20,
 		lazyApplyingBlocks:     0,
 		gasPrice:               nil,
-		minTrxFee:              nil,
+		minTrxGas:              0,
+		maxTrxGas:              math.MaxUint64,
+		maxBlockGas:            math.MaxUint64,
 		minVotingPeriodBlocks:  0,
 		maxVotingPeriodBlocks:  0,
 		minSelfStakeRatio:      0,
@@ -186,11 +143,13 @@ func Test4GovRule() *GovRule {
 		version:                4,
 		maxValidatorCnt:        13,
 		minValidatorStake:      uint256.MustFromDecimal("7000000000000000000000000"),
-		rewardPerPower:         4_756_468_797,
+		rewardPerPower:         uint256.NewInt(4_756_468_797),
 		lazyRewardBlocks:       20,
 		lazyApplyingBlocks:     259200,
 		gasPrice:               uint256.NewInt(10_000_000_000),
-		minTrxFee:              uint256.NewInt(1_000_000_000_000_000),
+		minTrxGas:              uint64(1_000_000_000_000_000),
+		maxTrxGas:              math.MaxUint64,
+		maxBlockGas:            math.MaxUint64,
 		minVotingPeriodBlocks:  259200,
 		maxVotingPeriodBlocks:  2592000,
 		minSelfStakeRatio:      50,
@@ -245,11 +204,13 @@ func (r *GovRule) fromProto(pm *GovRuleProto) {
 	r.version = pm.Version
 	r.maxValidatorCnt = pm.MaxValidatorCnt
 	r.minValidatorStake = new(uint256.Int).SetBytes(pm.XMinValidatorStake)
-	r.rewardPerPower = pm.RewardPerPower
+	r.rewardPerPower = new(uint256.Int).SetBytes(pm.XRewardPerPower)
 	r.lazyRewardBlocks = pm.LazyRewardBlocks
 	r.lazyApplyingBlocks = pm.LazyApplyingBlocks
 	r.gasPrice = new(uint256.Int).SetBytes(pm.XGasPrice)
-	r.minTrxFee = new(uint256.Int).SetBytes(pm.XMinTrxFee)
+	r.minTrxGas = pm.MinTrxGas
+	r.maxTrxGas = pm.MaxTrxGas
+	r.maxBlockGas = pm.MaxBlockGas
 	r.minVotingPeriodBlocks = pm.MinVotingPeriodBlocks
 	r.maxVotingPeriodBlocks = pm.MaxVotingPeriodBlocks
 	r.minSelfStakeRatio = pm.MinSelfStakeRatio
@@ -265,11 +226,13 @@ func (r *GovRule) toProto() *GovRuleProto {
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
 		XMinValidatorStake:     r.minValidatorStake.Bytes(),
-		RewardPerPower:         r.rewardPerPower,
+		XRewardPerPower:        r.rewardPerPower.Bytes(),
 		LazyRewardBlocks:       r.lazyRewardBlocks,
 		LazyApplyingBlocks:     r.lazyApplyingBlocks,
 		XGasPrice:              r.gasPrice.Bytes(),
-		XMinTrxFee:             r.minTrxFee.Bytes(),
+		MinTrxGas:              r.minTrxGas,
+		MaxTrxGas:              r.maxTrxGas,
+		MaxBlockGas:            r.maxBlockGas,
 		MinVotingPeriodBlocks:  r.minVotingPeriodBlocks,
 		MaxVotingPeriodBlocks:  r.maxVotingPeriodBlocks,
 		MinSelfStakeRatio:      r.minSelfStakeRatio,
@@ -287,11 +250,13 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 		Version                int64  `json:"version"`
 		MaxValidatorCnt        int64  `json:"maxValidatorCnt"`
 		MinValidatorStake      string `json:"minValidatorStake"`
-		RewardPerPower         int64  `json:"rewardPerPower"`
+		RewardPerPower         string `json:"rewardPerPower"`
 		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
 		LazyApplyingBlocks     int64  `json:"lazyApplyingBlocks"`
 		GasPrice               string `json:"gasPrice"`
-		MinTrxFee              string `json:"minTrxFee"`
+		MinTrxGas              uint64 `json:"minTrxGas"`
+		MaxTrxGas              uint64 `json:"maxTrxFee"`
+		MaxBlockGas            uint64 `json:"maxBlockFee"`
 		MinVotingBlocks        int64  `json:"minVotingPeriodBlocks"`
 		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
 		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
@@ -301,11 +266,13 @@ func (r *GovRule) MarshalJSON() ([]byte, error) {
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
 		MinValidatorStake:      uint256ToString(r.minValidatorStake), // hex-string
-		RewardPerPower:         r.rewardPerPower,                     // hex-string
+		RewardPerPower:         uint256ToString(r.rewardPerPower),    // hex-string
 		LazyRewardBlocks:       r.lazyRewardBlocks,
 		LazyApplyingBlocks:     r.lazyApplyingBlocks,
 		GasPrice:               uint256ToString(r.gasPrice),
-		MinTrxFee:              uint256ToString(r.minTrxFee),
+		MinTrxGas:              r.minTrxGas,
+		MaxTrxGas:              r.maxTrxGas,
+		MaxBlockGas:            r.maxBlockGas,
 		MinVotingBlocks:        r.minVotingPeriodBlocks,
 		MaxVotingBlocks:        r.maxVotingPeriodBlocks,
 		MinSelfStakeRatio:      r.minSelfStakeRatio,
@@ -327,11 +294,13 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 		Version                int64  `json:"version"`
 		MaxValidatorCnt        int64  `json:"maxValidatorCnt"`
 		MinValidatorStake      string `json:"minValidatorStake"`
-		RewardPerPower         int64  `json:"rewardPerPower"`
+		RewardPerPower         string `json:"rewardPerPower"`
 		LazyRewardBlocks       int64  `json:"lazyRewardBlocks"`
 		LazyApplyingBlocks     int64  `json:"lazyApplyingBlocks"`
 		GasPrice               string `json:"gasPrice"`
-		MinTrxFee              string `json:"minTrxFee"`
+		MinTrxGas              uint64 `json:"minTrxGas"`
+		MaxTrxGas              uint64 `json:"maxTrxGas"`
+		MaxBlockGas            uint64 `json:"maxBlockGas"`
 		MinVotingBlocks        int64  `json:"minVotingPeriodBlocks"`
 		MaxVotingBlocks        int64  `json:"maxVotingPeriodBlocks"`
 		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
@@ -353,17 +322,19 @@ func (r *GovRule) UnmarshalJSON(bz []byte) error {
 	if err != nil {
 		return err
 	}
-	r.rewardPerPower = tm.RewardPerPower
+	r.rewardPerPower, err = stringToUint256(tm.RewardPerPower)
+	if err != nil {
+		return err
+	}
 	r.lazyRewardBlocks = tm.LazyRewardBlocks
 	r.lazyApplyingBlocks = tm.LazyApplyingBlocks
 	r.gasPrice, err = stringToUint256(tm.GasPrice)
 	if err != nil {
 		return err
 	}
-	r.minTrxFee, err = stringToUint256(tm.MinTrxFee)
-	if err != nil {
-		return err
-	}
+	r.minTrxGas = tm.MinTrxGas
+	r.maxTrxGas = tm.MaxTrxGas
+	r.maxBlockGas = tm.MaxBlockGas
 	r.minVotingPeriodBlocks = tm.MinVotingBlocks
 	r.maxVotingPeriodBlocks = tm.MaxVotingBlocks
 	r.minSelfStakeRatio = tm.MinSelfStakeRatio
@@ -401,14 +372,14 @@ func (r *GovRule) MinValidatorStake() *uint256.Int {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	return new(uint256.Int).Set(r.minValidatorStake)
+	return r.minValidatorStake
 }
 
-func (r *GovRule) RewardPerPower() int64 {
+func (r *GovRule) RewardPerPower() *uint256.Int {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	return r.rewardPerPower
+	return new(uint256.Int).Set(r.rewardPerPower)
 }
 
 func (r *GovRule) LazyRewardBlocks() int64 {
@@ -432,11 +403,25 @@ func (r *GovRule) GasPrice() *uint256.Int {
 	return new(uint256.Int).Set(r.gasPrice)
 }
 
-func (r *GovRule) MinTrxFee() *uint256.Int {
+func (r *GovRule) MinTrxGas() uint64 {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	return new(uint256.Int).Set(r.minTrxFee)
+	return r.minTrxGas
+}
+
+func (r *GovRule) MaxTrxGas() uint64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.maxTrxGas
+}
+
+func (r *GovRule) MaxBlockGas() uint64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.maxBlockGas
 }
 
 func (r *GovRule) MinVotingPeriodBlocks() int64 {
@@ -513,6 +498,68 @@ func FeeToGas(fee, price *uint256.Int) uint64 {
 
 func GasToFee(gas uint64, price *uint256.Int) *uint256.Int {
 	return new(uint256.Int).Mul(uint256.NewInt(gas), price)
+}
+
+func MergeGovRule(oldGovRule, newGovRule *GovRule) {
+	if newGovRule.version == 0 {
+		newGovRule.version = oldGovRule.version
+	}
+
+	if newGovRule.maxValidatorCnt == 0 {
+		newGovRule.maxValidatorCnt = oldGovRule.maxValidatorCnt
+	}
+
+	if newGovRule.minValidatorStake == nil || newGovRule.minValidatorStake.IsZero() {
+		newGovRule.minValidatorStake = oldGovRule.minValidatorStake
+	}
+
+	if newGovRule.rewardPerPower == nil || newGovRule.rewardPerPower.IsZero() {
+		newGovRule.rewardPerPower = oldGovRule.rewardPerPower
+	}
+
+	if newGovRule.lazyRewardBlocks == 0 {
+		newGovRule.lazyRewardBlocks = oldGovRule.lazyRewardBlocks
+	}
+
+	if newGovRule.lazyApplyingBlocks == 0 {
+		newGovRule.lazyApplyingBlocks = oldGovRule.lazyApplyingBlocks
+	}
+
+	if newGovRule.gasPrice == nil || newGovRule.gasPrice.IsZero() {
+		newGovRule.gasPrice = oldGovRule.gasPrice
+	}
+
+	if newGovRule.minTrxGas == 0 {
+		newGovRule.minTrxGas = oldGovRule.minTrxGas
+	}
+
+	if newGovRule.maxTrxGas == 0 {
+		newGovRule.maxTrxGas = oldGovRule.maxTrxGas
+	}
+
+	if newGovRule.maxBlockGas == 0 {
+		newGovRule.maxBlockGas = oldGovRule.maxBlockGas
+	}
+
+	if newGovRule.minVotingPeriodBlocks == 0 {
+		newGovRule.minVotingPeriodBlocks = oldGovRule.minVotingPeriodBlocks
+	}
+
+	if newGovRule.maxVotingPeriodBlocks == 0 {
+		newGovRule.maxVotingPeriodBlocks = oldGovRule.maxVotingPeriodBlocks
+	}
+
+	if newGovRule.minSelfStakeRatio == 0 {
+		newGovRule.minSelfStakeRatio = oldGovRule.minSelfStakeRatio
+	}
+
+	if newGovRule.maxUpdatableStakeRatio == 0 {
+		newGovRule.maxUpdatableStakeRatio = oldGovRule.maxUpdatableStakeRatio
+	}
+
+	if newGovRule.slashRatio == 0 {
+		newGovRule.slashRatio = oldGovRule.slashRatio
+	}
 }
 
 var _ ledger.ILedgerItem = (*GovRule)(nil)

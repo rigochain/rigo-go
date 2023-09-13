@@ -17,12 +17,14 @@ type ILedgerHandler interface {
 type IGovHandler interface {
 	Version() int64
 	MaxValidatorCnt() int64
-	MinValidatorStake() *uint256.Int // todo: rename MinValidatorStake to MinValidatorPower and change return type to `int64`
-	RewardPerPower() int64
+	MinValidatorStake() *uint256.Int
+	RewardPerPower() *uint256.Int
 	LazyRewardBlocks() int64 // todo: rename LazyrewardBlocks to UnbondingPeriodBlockcs(?)
 	LazyApplyingBlocks() int64
 	GasPrice() *uint256.Int
-	MinTrxFee() *uint256.Int
+	MinTrxGas() uint64
+	MaxTrxGas() uint64
+	MaxBlockGas() uint64
 	MinVotingPeriodBlocks() int64
 	MaxVotingPeriodBlocks() int64
 	MinSelfStakeRatio() int64
