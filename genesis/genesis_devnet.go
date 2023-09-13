@@ -10,7 +10,7 @@ func DevnetGenesisDoc() (*tmtypes.GenesisDoc, error) {
 
 var jsonBlobDevnetGenesis = []byte(`{
   "genesis_time": "2021-08-06T08:29:24.827484Z",
-  "chain_id": "DEVNET",
+  "chain_id": "RIGO.DEVNET",
   "initial_height": "0",
   "consensus_params": {
     "block": {

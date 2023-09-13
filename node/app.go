@@ -145,6 +145,9 @@ func (ctrler *RigoApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 		appHash = ctrler.currBlockCtx.AppHash()
 	}
 
+	// get chain_id
+	ctrler.rootConfig.ChainID = ctrler.metaDB.ChainID()
+
 	return abcitypes.ResponseInfo{
 		Data:             "",
 		Version:          tmver.ABCIVersion,
@@ -199,6 +202,10 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		panic(xerr)
 	}
 
+	// set and put chain_id
+	ctrler.rootConfig.ChainID = req.GetChainId()
+	_ = ctrler.metaDB.PutChainID(ctrler.rootConfig.ChainID)
+
 	// these values will be saved as state of the consensus engine.
 	return abcitypes.ResponseInitChain{
 		AppHash: appHash,
@@ -223,6 +230,7 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 				_txctx.GovHandler = ctrler.govCtrler
 				_txctx.AcctHandler = ctrler.acctCtrler
 				_txctx.StakeHandler = ctrler.stakeCtrler
+				_txctx.ChainID = ctrler.rootConfig.ChainID
 				return nil
 			})
 		if xerr != nil {
@@ -294,6 +302,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 			_txctx.GovHandler = ctrler.govCtrler
 			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
+			_txctx.ChainID = ctrler.rootConfig.ChainID
 			return nil
 		})
 	if xerr != nil {
@@ -355,6 +364,8 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 			_txctx.GovHandler = ctrler.govCtrler
 			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
+			_txctx.ChainID = ctrler.rootConfig.ChainID
+
 			// when the 'tx' is finished, it's called
 			_txctx.Callback = func(ctx *rctypes.TrxContext, xerr xerrors.XError) {
 				// it is called from executionRoutine goroutine

@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	keyChainID      = "ci"
 	keyBlockHeight  = "bh"
 	keyBlockContext = "bc"
 	keyBlockAppHash = "ah"
@@ -40,6 +41,18 @@ func (stdb *MetaDB) Close() error {
 
 	stdb.cache = map[string][]byte{}
 	return stdb.db.Close()
+}
+
+func (stdb *MetaDB) ChainID() string {
+	v := stdb.get(keyChainID)
+	if v == nil {
+		return ""
+	}
+	return string(v)
+}
+
+func (stdb *MetaDB) PutChainID(chainId string) error {
+	return stdb.put(keyBlockHeight, []byte(chainId))
 }
 
 func (stdb *MetaDB) LastBlockHeight() int64 {

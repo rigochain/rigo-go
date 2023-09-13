@@ -31,6 +31,7 @@ type TrxContext struct {
 	GovHandler   IGovHandler
 	AcctHandler  IAccountHandler
 	StakeHandler IStakeHandler
+	ChainID      string
 
 	Callback func(*TrxContext, xerrors.XError)
 }
