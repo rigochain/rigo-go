@@ -17,13 +17,13 @@ var (
 )
 
 func init() {
-	bzOpt, err := json.Marshal(govRule3)
+	bzOpt, err := json.Marshal(govParams3)
 	if err != nil {
 		panic(err)
 	}
 	newTrx := web3.NewTrxProposal(
 		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test improving governance rule proposal", 15, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
+		"test improving governance parameters proposal", 15, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	newTrxContext = makeTrxCtx(newTrx, 1, true)
 	if xerr := runTrx(newTrxContext); xerr != nil {
 		panic(xerr)
@@ -49,13 +49,13 @@ func init() {
 	}
 }
 
-func TestMergeGovRule(t *testing.T) {
-	oriGovRule := govCtrler.GovRule
-	newGovRule := ctrlertypes.DefaultGovRule()
+func TestMergeGovParams(t *testing.T) {
+	oriParams := govCtrler.GovParams
+	newParams := ctrlertypes.DefaultGovParams()
 
-	ctrlertypes.MergeGovRule(&oriGovRule, newGovRule)
-	if !reflect.DeepEqual(newGovRule, ctrlertypes.DefaultGovRule()) {
-		t.Errorf("unexpected GovRule: %v", newGovRule)
+	ctrlertypes.MergeGovParams(&oriParams, newParams)
+	if !reflect.DeepEqual(newParams, ctrlertypes.DefaultGovParams()) {
+		t.Errorf("unexpected GovParams: %v", newParams)
 	}
 }
 

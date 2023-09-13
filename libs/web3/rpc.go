@@ -46,10 +46,10 @@ func (rweb3 *RigoWeb3) Genesis() (*coretypes.ResultGenesis, error) {
 	return retGen, nil
 }
 
-func (rweb3 *RigoWeb3) GetRule() (*ctrlertypes.GovRule, error) {
+func (rweb3 *RigoWeb3) GetGovParams() (*ctrlertypes.GovParams, error) {
 	queryResp := &rpc.QueryResult{}
 
-	if req, err := rweb3.NewRequest("rule", strconv.FormatInt(0, 10)); err != nil {
+	if req, err := rweb3.NewRequest("gov_params", strconv.FormatInt(0, 10)); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -59,11 +59,11 @@ func (rweb3 *RigoWeb3) GetRule() (*ctrlertypes.GovRule, error) {
 		return nil, err
 	}
 
-	govRule := &ctrlertypes.GovRule{}
-	if err := tmjson.Unmarshal(queryResp.Value, govRule); err != nil {
+	govParams := &ctrlertypes.GovParams{}
+	if err := tmjson.Unmarshal(queryResp.Value, govParams); err != nil {
 		return nil, err
 	}
-	return govRule, nil
+	return govParams, nil
 
 }
 func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, error) {

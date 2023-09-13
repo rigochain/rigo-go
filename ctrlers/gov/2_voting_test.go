@@ -23,13 +23,13 @@ var (
 )
 
 func init() {
-	bzOpt, err := json.Marshal(govRule1)
+	bzOpt, err := json.Marshal(govParams1)
 	if err != nil {
 		panic(err)
 	}
 	txProposal := web3.NewTrxProposal(
 		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
+		"test govparams proposal", 10, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
 	if xerr := runTrx(trxCtxProposal); xerr != nil {
 		panic(xerr)
@@ -218,8 +218,8 @@ func TestFreezingProposal(t *testing.T) {
 }
 
 func TestApplyingProposal(t *testing.T) {
-	oriGovRule := govCtrler.GovRule
-	require.Equal(t, ctrlertypes.DefaultGovRule(), &oriGovRule)
+	oriParams := govCtrler.GovParams
+	require.Equal(t, ctrlertypes.DefaultGovParams(), &oriParams)
 
 	txProposalPayload, ok := trxCtxProposal.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 	require.True(t, ok)
@@ -262,7 +262,7 @@ func TestApplyingProposal(t *testing.T) {
 	bctx.SetHeight(runHeight)
 	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
-	require.NotNil(t, govCtrler.newGovRule)
+	require.NotNil(t, govCtrler.newGovParams)
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
@@ -270,6 +270,6 @@ func TestApplyingProposal(t *testing.T) {
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 	require.Nil(t, frozenProp)
 
-	require.NotEqual(t, oriGovRule, govCtrler.GovRule)
-	require.Equal(t, govRule1, &govCtrler.GovRule)
+	require.NotEqual(t, oriParams, govCtrler.GovParams)
+	require.Equal(t, govParams1, &govCtrler.GovParams)
 }

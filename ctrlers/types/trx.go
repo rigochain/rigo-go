@@ -343,20 +343,6 @@ func (tx *Trx) toProto() (*TrxProto, xerrors.XError) {
 	}, nil
 }
 
-//func (tx *Trx) Hash() ([]byte, error) {
-//	if tx.Sig != nil {
-//		oriSig := tx.Sig
-//		tx.Sig = nil
-//		defer func() { tx.Sig = oriSig }()
-//	}
-//	bz, err := tx.Encode()
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return tmtypes.Tx(bz).Hash(), nil
-//}
-
 func PreImageToSignTrxProto(tx *Trx, chainId string) ([]byte, xerrors.XError) {
 	sig := tx.Sig
 	tx.Sig = nil

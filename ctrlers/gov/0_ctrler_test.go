@@ -19,12 +19,12 @@ var (
 	govCtrler   *GovCtrler
 	stakeHelper *stakeHandlerMock
 	acctHelper  *acctHelperMock
-	govRule0    = ctrlertypes.DefaultGovRule()
-	govRule1    = ctrlertypes.Test1GovRule()
-	govRule2    = ctrlertypes.Test2GovRule()
-	govRule3    = ctrlertypes.Test3GovRule()
-	govRule4    = ctrlertypes.Test4GovRule()
-	govRule5    = ctrlertypes.Test5GovRule()
+	govParams0  = ctrlertypes.DefaultGovParams()
+	govParams1  = ctrlertypes.Test1GovParams()
+	govParams2  = ctrlertypes.Test2GovParams()
+	govParams3  = ctrlertypes.Test3GovParams()
+	govParams4  = ctrlertypes.Test4GovParams()
+	govParams5  = ctrlertypes.Test5GovParams()
 )
 
 func init() {
@@ -36,7 +36,7 @@ func init() {
 	if govCtrler, err = NewGovCtrler(config, tmlog.NewNopLogger()); err != nil {
 		panic(err)
 	}
-	govCtrler.GovRule = *govRule0
+	govCtrler.GovParams = *govParams0
 
 	rand.Seed(time.Now().UnixNano())
 

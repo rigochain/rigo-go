@@ -31,7 +31,7 @@ func TestQueryValidators(t *testing.T) {
 func TestMinSelfStakeRatio(t *testing.T) {
 	rweb3 := randRigoWeb3()
 
-	govRule, err := rweb3.GetRule()
+	govParams, err := rweb3.GetGovParams()
 	require.NoError(t, err)
 
 	valWal := validatorWallets[0]
@@ -57,8 +57,8 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
 
 	// self-staking must be allowed.
-	// already stake + new stake >= govRule.MinValidatorStake
-	allowedMinStake := new(uint256.Int).Sub(govRule.MinValidatorStake(), ctrlertypes.PowerToAmount(valStakes.SelfPower))
+	// already stake + new stake >= govParams.MinValidatorStake
+	allowedMinStake := new(uint256.Int).Sub(govParams.MinValidatorStake(), ctrlertypes.PowerToAmount(valStakes.SelfPower))
 	if allowedMinStake.Sign() <= 0 {
 		allowedMinStake = uint256.NewInt(10_000_000_000_000_000_000)
 	}
@@ -165,14 +165,14 @@ func TestDelegating(t *testing.T) {
 func TestMinValidatorStake(t *testing.T) {
 	rweb3 := randRigoWeb3()
 
-	govRule, err := rweb3.GetRule()
+	govParams, err := rweb3.GetGovParams()
 	require.NoError(t, err)
 
 	sender := randCommonWallet()
 	require.NoError(t, sender.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, sender.SyncAccount(rweb3))
 
-	minValidatorStake := govRule.MinValidatorStake()
+	minValidatorStake := govParams.MinValidatorStake()
 	_amt := new(uint256.Int).Sub(minValidatorStake, ctrlertypes.AmountPerPower())
 	ret, err := sender.StakingSync(sender.Address(), defGas, defGasPrice, _amt, rweb3)
 	require.NoError(t, err)

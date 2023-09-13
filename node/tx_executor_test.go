@@ -19,7 +19,7 @@ type caseObj struct {
 
 var (
 	cases     []*caseObj
-	govParams = ctrlertypes.DefaultGovRule()
+	govParams = ctrlertypes.DefaultGovParams()
 )
 
 func Test_commonValidation(t *testing.T) {

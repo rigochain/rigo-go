@@ -35,8 +35,8 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 				return v, nil
 			}
 		}
-	case "rule":
-		atledger, xerr := ctrler.ruleLedger.ImmutableLedgerAt(req.Height, 0)
+	case "gov_params":
+		atledger, xerr := ctrler.paramsLedger.ImmutableLedgerAt(req.Height, 0)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}

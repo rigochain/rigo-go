@@ -5,7 +5,7 @@ package test
 
 //func TestStaking2GenesisValidator(t *testing.T) {
 //	rweb3 := randRigoWeb3()
-//	govRule, err := rweb3.GetRule()
+//	govParams, err := rweb3.GetGovParams()
 //	require.NoError(t, err)
 //
 //	valWal := validatorWallets[0]
@@ -23,7 +23,7 @@ package test
 //	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code)
 //	require.Contains(t, ret.CheckTx.Log, "too small stake to become validator")
 //
-//	amtStake = new(uint256.Int).Sub(govRule.MinValidatorStake(), types.PowerToAmount(valStakes0.SelfPower))
+//	amtStake = new(uint256.Int).Sub(govParams.MinValidatorStake(), types.PowerToAmount(valStakes0.SelfPower))
 //	ret, err = valWal.StakingCommit(valWal.Address(), defGas, defGasPrice, amtStake, rweb3)
 //	require.NoError(t, err)
 //	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)

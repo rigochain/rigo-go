@@ -2,7 +2,7 @@ syntax = "proto3";
 package types;
 option go_package = "github.com/rigochain/rigo-go/ctrlers/types";
 
-message GovRuleProto {
+message GovParamsProto {
   int64   version = 1;
   int64   max_validator_cnt = 2;
   bytes   _gas_price = 3;

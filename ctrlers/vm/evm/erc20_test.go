@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	govParams    = ctrlertypes.DefaultGovRule()
+	govParams    = ctrlertypes.DefaultGovParams()
 	contractAddr types.Address
 )
 

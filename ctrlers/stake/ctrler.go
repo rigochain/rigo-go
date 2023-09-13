@@ -231,15 +231,15 @@ func (ctrler *StakeCtrler) doReward(height int64, lastVotes []abcitypes.VoteInfo
 				continue
 			}
 
-			r := uint256.NewInt(uint64(s0.Power))
-			_ = r.Mul(r, uint256.NewInt(uint64(ctrler.govParams.RewardPerPower())))
-			_ = rwdObj.Issue(r, height)
+			power := uint256.NewInt(uint64(s0.Power))
+			rwd := new(uint256.Int).Mul(power, ctrler.govParams.RewardPerPower())
+			_ = rwdObj.Issue(rwd, height)
 
 			if xerr := ctrler.rewardLedger.SetFinality(rwdObj); xerr != nil {
 				ctrler.logger.Error("fail to reward to", s0.From, "err:", xerr)
 			}
 
-			_ = issuedReward.Add(issuedReward, r)
+			_ = issuedReward.Add(issuedReward, rwd)
 		}
 	}
 	return issuedReward, nil

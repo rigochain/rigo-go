@@ -153,7 +153,7 @@ func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 			valset := []tmtypes.GenesisValidator{{
 				Address: pubKey.Address(),
 				PubKey:  pubKey,
-				Power:   types.AmountToPower(types.DefaultGovRule().MinValidatorStake()),
+				Power:   types.AmountToPower(types.DefaultGovParams().MinValidatorStake()),
 			}}
 
 			walkeys = append(walkeys, pvWalKey)
@@ -173,7 +173,7 @@ func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 				}
 			}()
 
-			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovRule())
+			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovParams())
 			if err != nil {
 				return err
 			}

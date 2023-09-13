@@ -66,9 +66,9 @@ func QueryProposals(ctx *tmrpctypes.Context, txhash abytes.HexBytes, heightPtr *
 	}
 }
 
-func QueryRule(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
+func QueryGovParams(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
 	height := getHeight(heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "rule", nil, height, false); err != nil {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "gov_params", nil, height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil

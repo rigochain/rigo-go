@@ -20,10 +20,10 @@ import (
 )
 
 type GovCtrler struct {
-	ctrlertypes.GovRule
-	newGovRule *ctrlertypes.GovRule
+	ctrlertypes.GovParams
+	newGovParams *ctrlertypes.GovParams
 
-	ruleLedger     ledger.IFinalityLedger[*ctrlertypes.GovRule]
+	paramsLedger   ledger.IFinalityLedger[*ctrlertypes.GovParams]
 	proposalLedger ledger.IFinalityLedger[*proposal.GovProposal]
 	frozenLedger   ledger.IFinalityLedger[*proposal.GovProposal]
 
@@ -32,22 +32,22 @@ type GovCtrler struct {
 }
 
 func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
-	newRuleProvider := func() *ctrlertypes.GovRule { return &ctrlertypes.GovRule{} }
+	newGovParamsProvider := func() *ctrlertypes.GovParams { return &ctrlertypes.GovParams{} }
 	newProposalProvider := func() *proposal.GovProposal {
 		return &proposal.GovProposal{}
 	}
 
-	ruleLedger, xerr := ledger.NewFinalityLedger[*ctrlertypes.GovRule]("rule", config.DBDir(), 1, newRuleProvider)
+	paramsLedger, xerr := ledger.NewFinalityLedger[*ctrlertypes.GovParams]("gov_params", config.DBDir(), 1, newGovParamsProvider)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	rule, xerr := ruleLedger.Get(ledger.ToLedgerKey(abytes.ZeroBytes(32)))
-	// rule could be nil
+	params, xerr := paramsLedger.Get(ledger.ToLedgerKey(abytes.ZeroBytes(32)))
+	// `params` could be nil
 	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return nil, xerr
-	} else if rule == nil {
-		rule = &ctrlertypes.GovRule{} // empty rule
+	} else if params == nil {
+		params = &ctrlertypes.GovParams{} // empty params
 	}
 
 	proposalLedger, xerr := ledger.NewFinalityLedger[*proposal.GovProposal]("proposal", config.DBDir(), 1, newProposalProvider)
@@ -61,8 +61,8 @@ func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
 	}
 
 	return &GovCtrler{
-		GovRule:        *rule,
-		ruleLedger:     ruleLedger,
+		GovParams:      *params,
+		paramsLedger:   paramsLedger,
 		proposalLedger: proposalLedger,
 		frozenLedger:   frozenLedger,
 		logger:         logger.With("module", "rigo_GovCtrler"),
@@ -77,8 +77,8 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 	if !ok {
 		return xerrors.ErrInitChain.Wrapf("wrong parameter: GovCtrler::InitLedger requires *genesis.GenesisAppState")
 	}
-	ctrler.GovRule = *genAppState.GovRule
-	_ = ctrler.ruleLedger.SetFinality(&ctrler.GovRule)
+	ctrler.GovParams = *genAppState.GovParams
+	_ = ctrler.paramsLedger.SetFinality(&ctrler.GovParams)
 	return nil
 }
 
@@ -354,16 +354,16 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 			}
 			if prop.MajorOption != nil {
 				switch prop.OptType {
-				case proposal.PROPOSAL_GOVRULE:
-					newGovRule := &ctrlertypes.GovRule{}
-					if err := json.Unmarshal(prop.MajorOption.Option(), newGovRule); err != nil {
+				case proposal.PROPOSAL_GOVPARAMS:
+					newGovParams := &ctrlertypes.GovParams{}
+					if err := json.Unmarshal(prop.MajorOption.Option(), newGovParams); err != nil {
 						return xerrors.From(err)
 					}
-					ctrlertypes.MergeGovRule(&ctrler.GovRule, newGovRule)
-					if xerr := ctrler.ruleLedger.SetFinality(newGovRule); xerr != nil {
+					ctrlertypes.MergeGovParams(&ctrler.GovParams, newGovParams)
+					if xerr := ctrler.paramsLedger.SetFinality(newGovParams); xerr != nil {
 						return xerr
 					}
-					ctrler.newGovRule = newGovRule
+					ctrler.newGovParams = newGovParams
 				default:
 					key := prop.Key()
 					ctrler.logger.Debug("Apply proposal", "key(txHash)", abytes.HexBytes(key[:]), "type", prop.OptType)
@@ -382,7 +382,7 @@ func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	h0, v0, xerr := ctrler.ruleLedger.Commit()
+	h0, v0, xerr := ctrler.paramsLedger.Commit()
 	if xerr != nil {
 		return nil, -1, xerr
 	}
@@ -399,10 +399,10 @@ func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 		return nil, -1, xerrors.ErrCommit.Wrapf("error: GovCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2)
 	}
 
-	if ctrler.newGovRule != nil {
-		ctrler.GovRule = *ctrler.newGovRule
-		ctrler.newGovRule = nil
-		ctrler.logger.Debug("New governance rule is committed", "rule", ctrler.GovRule.String())
+	if ctrler.newGovParams != nil {
+		ctrler.GovParams = *ctrler.newGovParams
+		ctrler.newGovParams = nil
+		ctrler.logger.Debug("New governance parameters is committed", "gov_params", ctrler.GovParams.String())
 	}
 	return crypto.DefaultHash(h0, h1, h2), v0, nil
 
@@ -412,11 +412,11 @@ func (ctrler *GovCtrler) Close() xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if ctrler.ruleLedger != nil {
-		if xerr := ctrler.ruleLedger.Close(); xerr != nil {
-			ctrler.logger.Error("ruleLedger.Close()", "error", xerr.Error())
+	if ctrler.paramsLedger != nil {
+		if xerr := ctrler.paramsLedger.Close(); xerr != nil {
+			ctrler.logger.Error("paramsLedger.Close()", "error", xerr.Error())
 		}
-		ctrler.ruleLedger = nil
+		ctrler.paramsLedger = nil
 	}
 	if ctrler.proposalLedger != nil {
 		if xerr := ctrler.proposalLedger.Close(); xerr != nil {
@@ -427,11 +427,11 @@ func (ctrler *GovCtrler) Close() xerrors.XError {
 	return nil
 }
 
-func (ctrler *GovCtrler) GetRules() ctrlertypes.GovRule {
+func (ctrler *GovCtrler) GetGovParams() ctrlertypes.GovParams {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	return ctrler.GovRule
+	return ctrler.GovParams
 }
 
 func (ctrler *GovCtrler) RealAllProposals() ([]*proposal.GovProposal, xerrors.XError) {

@@ -28,7 +28,7 @@ func TestProposalAndVoting(t *testing.T) {
 	require.NoError(t, validatorWallets.SyncAccount(rweb3))
 	require.NoError(t, validatorWallets.Unlock(defaultRpcNode.Pass))
 
-	bzOpt, err := json.Marshal(ctrlertypes.Test3GovRule())
+	bzOpt, err := json.Marshal(ctrlertypes.Test3GovParams())
 	require.NoError(t, err)
 
 	//subscriber
@@ -44,7 +44,7 @@ func TestProposalAndVoting(t *testing.T) {
 		currentBlockHeight := event.Data.(types.EventDataNewBlock).Block.Height
 		if currentBlockHeight > 10 {
 			targetBlockHeight = currentBlockHeight + 5
-			proposalResult, err2 := validatorWallets.ProposalCommit(defGas, defGasPrice, "proposal test", targetBlockHeight, 259200, proposal.PROPOSAL_GOVRULE, bzOpt, rweb3)
+			proposalResult, err2 := validatorWallets.ProposalCommit(defGas, defGasPrice, "proposal test", targetBlockHeight, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt, rweb3)
 			require.NoError(t, err2)
 			require.Equal(t, xerrors.ErrCodeSuccess, proposalResult.CheckTx.Code)
 			proposalHash = bytes.HexBytes(proposalResult.Hash)

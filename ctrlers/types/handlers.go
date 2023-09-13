@@ -23,7 +23,9 @@ type IGovHandler interface {
 	LazyApplyingBlocks() int64
 	GasPrice() *uint256.Int
 	MinTrxGas() uint64
+	MinTrxFee() *uint256.Int
 	MaxTrxGas() uint64
+	MaxTrxFee() *uint256.Int
 	MaxBlockGas() uint64
 	MinVotingPeriodBlocks() int64
 	MaxVotingPeriodBlocks() int64

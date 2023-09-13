@@ -22,7 +22,7 @@ import (
 var (
 	config      = cfg.DefaultConfig()
 	DBDIR       = filepath.Join(os.TempDir(), "stake-ctrler-unstaking-test")
-	govParams   = ctrlertypes.Test1GovRule()
+	govParams   = ctrlertypes.Test1GovParams()
 	acctHelper  = &acctHandlerMock{}
 	stakeCtrler *stake.StakeCtrler
 
@@ -176,7 +176,7 @@ func TestDoReward(t *testing.T) {
 		})
 
 		expectedReward.Add(expectedReward,
-			new(uint256.Int).Mul(uint256.NewInt(uint64(val.Power)), uint256.NewInt(uint64(govParams.RewardPerPower()))))
+			new(uint256.Int).Mul(uint256.NewInt(uint64(val.Power)), govParams.RewardPerPower()))
 	}
 	lastHeight++
 	issued, err := stakeCtrler.DoReward(6, votes)
