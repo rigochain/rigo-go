@@ -18,4 +18,6 @@ message GovParamsProto {
   int64   max_updatable_stake_ratio = 13;
   int64   slash_ratio = 14;
   bytes   _min_validator_stake = 15;
+  int64   signed_blocks_window = 16;
+  int64   min_signed_ratio = 17;
 }
