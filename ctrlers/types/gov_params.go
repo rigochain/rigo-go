@@ -35,6 +35,8 @@ type GovParams struct {
 	minSelfStakeRatio      int64
 	maxUpdatableStakeRatio int64 // todo: add max updatable stake: issue #34
 	slashRatio             int64
+	signedBlocksWindow     int64
+	minSignedRatio         int64
 
 	mtx sync.RWMutex
 }
@@ -75,6 +77,8 @@ func DefaultGovParams() *GovParams {
 		minSelfStakeRatio:      50,      // 50%
 		maxUpdatableStakeRatio: 30,      // 30%
 		slashRatio:             50,      // 50%
+		signedBlocksWindow:     10000,   // 10000 blocks
+		minSignedRatio:         5,       // 5%
 	}
 }
 
@@ -92,9 +96,11 @@ func Test1GovParams() *GovParams {
 		maxBlockGas:            math.MaxUint64,
 		minVotingPeriodBlocks:  10,
 		maxVotingPeriodBlocks:  10,
-		minSelfStakeRatio:      50, // 50%
-		maxUpdatableStakeRatio: 30, // 30%
-		slashRatio:             50, // 50%
+		minSelfStakeRatio:      50,    // 50%
+		maxUpdatableStakeRatio: 30,    // 30%
+		slashRatio:             50,    // 50%
+		signedBlocksWindow:     10000, // 10000 blocks
+		minSignedRatio:         5,     // 5%
 	}
 }
 
@@ -112,9 +118,11 @@ func Test2GovParams() *GovParams {
 		maxBlockGas:            math.MaxUint64,
 		minVotingPeriodBlocks:  50,
 		maxVotingPeriodBlocks:  60,
-		minSelfStakeRatio:      50, // 50%
-		maxUpdatableStakeRatio: 30, // 30%
-		slashRatio:             50, // 50%
+		minSelfStakeRatio:      50,    // 50%
+		maxUpdatableStakeRatio: 30,    // 30%
+		slashRatio:             50,    // 50%
+		signedBlocksWindow:     10000, // 10000 blocks
+		minSignedRatio:         5,     // 5%
 	}
 }
 
@@ -135,6 +143,8 @@ func Test3GovParams() *GovParams {
 		minSelfStakeRatio:      0,
 		maxUpdatableStakeRatio: 10,
 		slashRatio:             50,
+		signedBlocksWindow:     10000,
+		minSignedRatio:         5,
 	}
 }
 
@@ -155,6 +165,8 @@ func Test4GovParams() *GovParams {
 		minSelfStakeRatio:      50,
 		maxUpdatableStakeRatio: 10,
 		slashRatio:             50,
+		signedBlocksWindow:     10000,
+		minSignedRatio:         5,
 	}
 }
 
@@ -216,6 +228,8 @@ func (r *GovParams) fromProto(pm *GovParamsProto) {
 	r.minSelfStakeRatio = pm.MinSelfStakeRatio
 	r.maxUpdatableStakeRatio = pm.MaxUpdatableStakeRatio
 	r.slashRatio = pm.SlashRatio
+	r.signedBlocksWindow = pm.SignedBlocksWindow
+	r.minSignedRatio = pm.MinSignedRatio
 }
 
 func (r *GovParams) toProto() *GovParamsProto {
@@ -238,6 +252,8 @@ func (r *GovParams) toProto() *GovParamsProto {
 		MinSelfStakeRatio:      r.minSelfStakeRatio,
 		MaxUpdatableStakeRatio: r.maxUpdatableStakeRatio,
 		SlashRatio:             r.slashRatio,
+		SignedBlocksWindow:     r.signedBlocksWindow,
+		MinSignedRatio:         r.minSignedRatio,
 	}
 	return a
 }
@@ -262,6 +278,8 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
 		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
 		SlashRatio             int64  `json:"slashRatio"`
+		SignedBlocksWindow     int64  `json:"signedBlocksWindow"`
+		MinSignedRatio         int64  `json:"minSignedRatio"`
 	}{
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
@@ -278,6 +296,8 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 		MinSelfStakeRatio:      r.minSelfStakeRatio,
 		MaxUpdatableStakeRatio: r.maxUpdatableStakeRatio,
 		SlashRatio:             r.slashRatio,
+		SignedBlocksWindow:     r.signedBlocksWindow,
+		MinSignedRatio:         r.minSignedRatio,
 	}
 	return tmjson.Marshal(tm)
 }
@@ -306,6 +326,8 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 		MinSelfStakeRatio      int64  `json:"minSelfStakeRatio"`
 		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
 		SlashRatio             int64  `json:"slashRatio"`
+		SignedBlocksWindow     int64  `json:"signedBlocksWindow"`
+		MinSignedRatio         int64  `json:"minSignedRatio"`
 	}{}
 
 	err := tmjson.Unmarshal(bz, tm)
@@ -340,6 +362,8 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 	r.minSelfStakeRatio = tm.MinSelfStakeRatio
 	r.maxUpdatableStakeRatio = tm.MaxUpdatableStakeRatio
 	r.slashRatio = tm.SlashRatio
+	r.signedBlocksWindow = tm.SignedBlocksWindow
+	r.minSignedRatio = tm.MinSignedRatio
 	return nil
 }
 
@@ -470,6 +494,20 @@ func (r *GovParams) SlashRatio() int64 {
 	return r.slashRatio
 }
 
+func (r *GovParams) SignedBlocksWindow() int64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.signedBlocksWindow
+}
+
+func (r *GovParams) MinSignedRatio() int64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.minSignedRatio
+}
+
 func (r *GovParams) String() string {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
@@ -573,6 +611,14 @@ func MergeGovParams(oldParams, newParams *GovParams) {
 
 	if newParams.slashRatio == 0 {
 		newParams.slashRatio = oldParams.slashRatio
+	}
+
+	if newParams.signedBlocksWindow == 0 {
+		newParams.signedBlocksWindow = oldParams.signedBlocksWindow
+	}
+
+	if newParams.minSignedRatio == 0 {
+		newParams.minSignedRatio = oldParams.minSignedRatio
 	}
 }
 
