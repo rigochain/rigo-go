@@ -76,11 +76,17 @@ func (ledger *FinalityLedger[T]) GetFinality(key LedgerKey) (T, xerrors.XError) 
 }
 
 func (ledger *FinalityLedger[T]) getFinality(key LedgerKey) (T, xerrors.XError) {
+	var emptyNil T
+
+	// if the item is already removed, return xerrors.ErrNotFoundResult
+	if ledger.finalityItems.isRemovedKey(key) {
+		return emptyNil, xerrors.ErrNotFoundResult
+	}
+
 	if item, ok := ledger.finalityItems.getGotItem(key); ok {
 		return item, nil
 	}
 
-	var emptyNil T
 	if item, xerr := ledger.read(key); xerr != nil {
 		return emptyNil, xerr
 	} else {
@@ -152,6 +158,7 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		// If SetFinality is called again (recreated) after calling DelFinality for the item,
 		// the item's key may exist not only `removedKeys` but also `updatedItems`.
 		// this item is removed at here but should be added again at the following code to update tree.
+		// Thus, the operation for `removeKeys` MUST be run prior to operation for `updatedItems`.
 
 		//delete(ledger.finalityItems.gotItems, vk)
 		//delete(ledger.finalityItems.updatedItems, vk)

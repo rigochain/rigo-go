@@ -28,6 +28,14 @@ func NewWallet(s []byte) *Wallet {
 	}
 }
 
+func ImportKey(prvKey, s []byte) *Wallet {
+	wkey := crypto.NewWalletKey(prvKey, s)
+	return &Wallet{
+		wkey: wkey,
+		acct: types2.NewAccount(wkey.Address),
+	}
+}
+
 func OpenWallet(r io.Reader) (*Wallet, error) {
 	wk, err := crypto.OpenWalletKey(r)
 	if err != nil {

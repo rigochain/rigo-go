@@ -126,27 +126,12 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		}
 	}
 
-	// Reward
-
-	// issue #54
-	// Reward validators for all blocks (including empty blocks):
-
-	// issue #70
-	// `doReward` rewards to validators and delegators based on their stakes at block[height - 4].
-	// Because of that, `doReward` doesn't need to be called prior to the `exeUnstaking`.
-	//issued, xerr := ctrler.doReward(blockCtx.BlockInfo().Header.Height, blockCtx.BlockInfo().LastCommitInfo.Votes)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-
-	//
-	//
-	//
 	//
 	// Reward and Check MinSignedBlocks
 	//
 
-	// The validators power of `lastVotes` are committed at `height` - 4
+	// issue #70
+	// The validators power of `lastVotes` is based on `height` - 4
 	//   N       : commit stakes of a validator.
 	//   N+1     : `updateValidators` is called and the updated validators are reported to consensus engine.
 	//   (N+1)+2 : the updated validators are applied (start signing)
@@ -186,16 +171,36 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 				ctrler.logger.Error("MinSignedBlocks - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
 				continue
 			}
-			ctrler.logger.Debug("Validator didn't sign the last block", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-			ctrler.processNotSignedBlocks(delegatee, blockCtx.Height())
+
+			_ = delegatee.ProcessNotSignedBlock(blockCtx.Height())
+
+			s := blockCtx.Height() - ctrler.govParams.SignedBlocksWindow()
+			if s < 0 {
+				s = 0
+			}
+			notSigned := delegatee.GetNotSignedBlockCount(s, blockCtx.Height())
+
+			if ctrler.govParams.SignedBlocksWindow()-int64(notSigned) < ctrler.govParams.MinSignedBlocks() {
+				// do un-staking all
+
+				ctrler.logger.Info("Validator stop",
+					"address", types.Address(vote.Validator.Address),
+					"power", vote.Validator.Power,
+					"from", s, "to", blockCtx.Height(),
+					"signed_blocks_window", ctrler.govParams.SignedBlocksWindow(),
+					"signed_blocks", ctrler.govParams.SignedBlocksWindow()-int64(notSigned),
+					"missed_blocks", notSigned)
+
+				stakes := delegatee.DelAllStakes()
+				for _, _s0 := range stakes {
+					_s0.RefundHeight = blockCtx.Height() + ctrler.govParams.LazyRewardBlocks()
+					_ = ctrler.frozenLedger.SetFinality(_s0) // add s0 to frozen ledger
+				}
+
+				_, _ = ctrler.delegateeLedger.DelFinality(delegatee.Key())
+			}
 		}
 	}
-
-	//
-	//
-	//
-	//
-	//
 
 	evts = append(evts, abcitypes.Event{
 		Type: "reward",
@@ -205,25 +210,6 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	})
 
 	return evts, nil
-}
-
-func (ctrler *StakeCtrler) processNotSignedBlocks(delegatee *Delegatee, height int64) xerrors.XError {
-	xerr := delegatee.ProcessNotSignedBlock(height)
-	if xerr != nil {
-		return xerr
-	}
-
-	s := height - 10000 // todo: replace with `govParams.GetSignedBlocksWindow`
-	if s < 1 {
-		s = 1
-	}
-	n := delegatee.GetNotSignedBlockCount(s, height)
-	if n > 500 { // todo: replace with `govParams.GetSignedBlocksWindow - govParams.GetMinSignedBlocks`
-		// do unstaking when miss more than N blocks
-
-	}
-	return nil
-
 }
 
 func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
@@ -310,75 +296,6 @@ func (ctrler *StakeCtrler) doRewardTo(delegatee *Delegatee, height int64) (*uint
 
 	return issuedReward, nil
 }
-
-//// doReward() rewards to NOT ctrler.lastValidators BUT validators of `votes`.
-//// `height` is current block height.
-//// `votes` is from `RequestBeginBlock.LastCommitInfo` which is set of validators of previous block.
-//func (ctrler *StakeCtrler) doReward(height int64, lastVotes []abcitypes.VoteInfo) (*uint256.Int, xerrors.XError) {
-//
-//	// The validators power of `lastVotes` are committed at `height` - 4
-//	//   N       : commit stakes of a validator.
-//	//   N+1     : `updateValidators` is called and the updated validators are reported to consensus engine.
-//	//   (N+1)+2 : the updated validators are applied (start signing)
-//	//   (N+1)+3 : the updated validators are included into `lastVotes`.
-//	//           : At this point, the validators have their power committed at block N (= `height` - 4).
-//
-//	_height := height - 4
-//	if _height <= 0 {
-//		_height = 1
-//	}
-//	_delegateeLedger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(_height, 128)
-//	if xerr != nil {
-//		return nil, xerr
-//	}
-//
-//	issuedReward := uint256.NewInt(0)
-//	for _, vote := range lastVotes {
-//		if vote.SignedLastBlock == false {
-//			ctrler.logger.Debug("Validator didn't sign the last block", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-//			continue
-//		}
-//
-//		delegatee, xerr := _delegateeLedger.GetFinality(ledger.ToLedgerKey(vote.Validator.Address))
-//		if xerr != nil {
-//			ctrler.logger.Error("Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-//			continue
-//		} else if delegatee == nil {
-//			ctrler.logger.Debug("Not found validator", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-//			continue
-//		}
-//
-//		if delegatee.TotalPower != vote.Validator.Power {
-//			panic(fmt.Errorf("delegatee(%v)'s power(%v) is not same as the power(%v) of VoteInfo",
-//				delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
-//		}
-//
-//		//
-//		// DO REWARD !!!
-//		//
-//
-//		for _, s0 := range delegatee.Stakes {
-//			rwdObj, xerr := ctrler.rewardLedger.GetFinality(ledger.ToLedgerKey(s0.From))
-//			if xerr == xerrors.ErrNotFoundResult {
-//				rwdObj = NewReward(s0.From)
-//			} else if xerr != nil {
-//				ctrler.logger.Error("fail to find reward object of", s0.From)
-//				continue
-//			}
-//
-//			power := uint256.NewInt(uint64(s0.Power))
-//			rwd := new(uint256.Int).Mul(power, ctrler.govParams.RewardPerPower())
-//			_ = rwdObj.Issue(rwd, height)
-//
-//			if xerr := ctrler.rewardLedger.SetFinality(rwdObj); xerr != nil {
-//				ctrler.logger.Error("fail to reward to", s0.From, "err:", xerr)
-//			}
-//
-//			_ = issuedReward.Add(issuedReward, rwd)
-//		}
-//	}
-//	return issuedReward, nil
-//}
 
 func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	switch ctx.Tx.GetType() {

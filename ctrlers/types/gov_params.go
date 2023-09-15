@@ -96,11 +96,11 @@ func Test1GovParams() *GovParams {
 		maxBlockGas:            math.MaxUint64,
 		minVotingPeriodBlocks:  10,
 		maxVotingPeriodBlocks:  10,
-		minSelfStakeRatio:      50,    // 50%
-		maxUpdatableStakeRatio: 30,    // 30%
-		slashRatio:             50,    // 50%
-		signedBlocksWindow:     10000, // 10000 blocks
-		minSignedBlocks:        500,   // 500 blocks
+		minSelfStakeRatio:      50, // 50%
+		maxUpdatableStakeRatio: 30, // 30%
+		slashRatio:             50, // 50%
+		signedBlocksWindow:     30,
+		minSignedBlocks:        3,
 	}
 }
 

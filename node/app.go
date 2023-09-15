@@ -198,6 +198,24 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		}
 	}
 
+	////
+	//// start of test
+	//_w := web3.NewWallet(nil)
+	//s0 := stake.NewStakeWithPower(
+	//	_w.Address(), _w.Address(), // self staking
+	//	100,
+	//	1,
+	//	bytes.ZeroBytes(32), // 0x00... txhash
+	//)
+	//initStakes = append(initStakes, &stake.InitStake{
+	//	_w.GetPubKey(),
+	//	[]*stake.Stake{s0},
+	//})
+	//
+	//ctrler.govCtrler.GovParams = *rctypes.Test1GovParams()
+	//// end of test
+	////
+
 	if xerr := ctrler.stakeCtrler.InitLedger(initStakes); xerr != nil {
 		panic(xerr)
 	}

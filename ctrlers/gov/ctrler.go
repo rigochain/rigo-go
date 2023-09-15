@@ -139,14 +139,8 @@ func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XErro
 
 	slashedPower := int64(0)
 	for _, k := range targetPropsKeys {
-		prop, xerr := ctrler.proposalLedger.GetFinality(k)
-		if xerr != nil {
-			// not reachable
-		}
-		slashed, xerr := prop.DoPunish(targetAddr, ctrler.SlashRatio())
-		if xerr != nil {
-			// not reachable
-		}
+		prop, _ := ctrler.proposalLedger.GetFinality(k)
+		slashed, _ := prop.DoPunish(targetAddr, ctrler.SlashRatio())
 		slashedPower += slashed
 
 		_ = ctrler.proposalLedger.SetFinality(prop)

@@ -84,13 +84,18 @@ func (ledger *SimpleLedger[T]) Get(key LedgerKey) (T, xerrors.XError) {
 }
 
 func (ledger *SimpleLedger[T]) get(key LedgerKey) (T, xerrors.XError) {
+	var emptyNil T
+
+	// if the item is already removed, return xerrors.ErrNotFoundResult
+	if ledger.cachedItems.isRemovedKey(key) {
+		return emptyNil, xerrors.ErrNotFoundResult
+	}
 
 	// search in cachedItems
 	if item, ok := ledger.cachedItems.getGotItem(key); ok {
 		return item, nil
 	}
 
-	var emptyNil T
 	if item, xerr := ledger.read(key); xerr != nil {
 		return emptyNil, xerr
 	} else {
