@@ -16,10 +16,13 @@ type Delegatee struct {
 	Addr   types.Address   `json:"address"`
 	PubKey bytes2.HexBytes `json:"pubKey"`
 
-	SelfPower  int64 `json:"selfPower,string"`
-	TotalPower int64 `json:"totalPower,string"`
+	SelfPower    int64 `json:"selfPower,string"`
+	TotalPower   int64 `json:"totalPower,string"`
+	SlashedPower int64 `json:"slashedPower,string"`
 
 	Stakes []*Stake `json:"stakes"`
+
+	NotSignedHeights *BlockMarker
 
 	mtx sync.RWMutex
 }
@@ -56,10 +59,11 @@ var _ ledger.ILedgerItem = (*Delegatee)(nil)
 
 func NewDelegatee(addr types.Address, pubKey bytes2.HexBytes) *Delegatee {
 	return &Delegatee{
-		Addr:       addr,
-		PubKey:     pubKey,
-		SelfPower:  0,
-		TotalPower: 0,
+		Addr:             addr,
+		PubKey:           pubKey,
+		SelfPower:        0,
+		TotalPower:       0,
+		NotSignedHeights: &BlockMarker{},
 	}
 }
 
@@ -228,6 +232,14 @@ func (delegatee *Delegatee) SelfStakeRatio(added int64) int64 {
 	defer delegatee.mtx.RUnlock()
 
 	return (delegatee.SelfPower * int64(100)) / (delegatee.TotalPower + added)
+}
+
+func (delegatee *Delegatee) ProcessNotSignedBlock(height int64) xerrors.XError {
+	return delegatee.NotSignedHeights.Mark(height)
+}
+
+func (delegatee *Delegatee) GetNotSignedBlockCount(s, e int64) int {
+	return delegatee.NotSignedHeights.CountInWindow(s, e, true)
 }
 
 func (delegatee *Delegatee) DoSlash(ratio int64) int64 {

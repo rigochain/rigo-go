@@ -98,6 +98,7 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	var evts []abcitypes.Event
 
+	// Slashing
 	byzantines := blockCtx.BlockInfo().ByzantineValidators
 	if byzantines != nil {
 		ctrler.logger.Debug("Byzantine validators is found", "count", len(byzantines))
@@ -125,25 +126,104 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		}
 	}
 
+	// Reward
+
 	// issue #54
 	// Reward validators for all blocks (including empty blocks):
 
 	// issue #70
 	// `doReward` rewards to validators and delegators based on their stakes at block[height - 4].
 	// Because of that, `doReward` doesn't need to be called prior to the `exeUnstaking`.
-	issued, xerr := ctrler.doReward(blockCtx.BlockInfo().Header.Height, blockCtx.BlockInfo().LastCommitInfo.Votes)
+	//issued, xerr := ctrler.doReward(blockCtx.BlockInfo().Header.Height, blockCtx.BlockInfo().LastCommitInfo.Votes)
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
+
+	//
+	//
+	//
+	//
+	// Reward and Check MinSignedBlocks
+	//
+
+	// The validators power of `lastVotes` are committed at `height` - 4
+	//   N       : commit stakes of a validator.
+	//   N+1     : `updateValidators` is called and the updated validators are reported to consensus engine.
+	//   (N+1)+2 : the updated validators are applied (start signing)
+	//   (N+1)+3 : the updated validators are included into `lastVotes`.
+	//           : At this point, the validators have their power committed at block N (= `height` - 4).
+
+	issuedReward := uint256.NewInt(0)
+
+	heightForReward := blockCtx.Height() - 4
+	if heightForReward <= 0 {
+		heightForReward = 1
+	}
+	immuDelegateeLedger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(heightForReward, 128)
 	if xerr != nil {
 		return nil, xerr
 	}
 
+	for _, vote := range blockCtx.BlockInfo().LastCommitInfo.Votes {
+		if vote.SignedLastBlock {
+			delegatee, xerr := immuDelegateeLedger.Get(ledger.ToLedgerKey(vote.Validator.Address))
+			if xerr != nil || delegatee == nil {
+				ctrler.logger.Error("Reward - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+				continue
+			}
+
+			if delegatee.TotalPower != vote.Validator.Power {
+				panic(fmt.Errorf("delegatee(%v)'s power(%v) is not same as the power(%v) of VoteInfo",
+					delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
+			}
+
+			issued, _ := ctrler.doRewardTo(delegatee, heightForReward)
+			_ = issuedReward.Add(issuedReward, issued)
+		} else {
+			// check missing blocks
+			delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(vote.Validator.Address))
+			if xerr != nil {
+				ctrler.logger.Error("MinSignedBlocks - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+				continue
+			}
+			ctrler.logger.Debug("Validator didn't sign the last block", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+			ctrler.processNotSignedBlocks(delegatee, blockCtx.Height())
+		}
+	}
+
+	//
+	//
+	//
+	//
+	//
+
 	evts = append(evts, abcitypes.Event{
 		Type: "reward",
 		Attributes: []abcitypes.EventAttribute{
-			{Key: []byte("issued"), Value: []byte(issued.Dec()), Index: false},
+			{Key: []byte("issued"), Value: []byte(issuedReward.Dec()), Index: false},
 		},
 	})
 
 	return evts, nil
+}
+
+func (ctrler *StakeCtrler) processNotSignedBlocks(delegatee *Delegatee, height int64) xerrors.XError {
+	xerr := delegatee.ProcessNotSignedBlock(height)
+	if xerr != nil {
+		return xerr
+	}
+
+	s := height - 10000 // todo: replace with `govParams.GetSignedBlocksWindow`
+	if s < 1 {
+		s = 1
+	}
+	n := delegatee.GetNotSignedBlockCount(s, height)
+	if n > 500 { // todo: replace with `govParams.GetSignedBlocksWindow - govParams.GetMinSignedBlocks`
+		// do unstaking when miss more than N blocks
+
+	}
+	return nil
+
 }
 
 func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
@@ -170,80 +250,135 @@ func (ctrler *StakeCtrler) DoReward(height int64, votes []abcitypes.VoteInfo) (*
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.doReward(height, votes)
-}
+	issuedReward := uint256.NewInt(0)
 
-// the following functions are called in EndBlock()
-//
-
-// doReward() rewards to NOT ctrler.lastValidators BUT validators of `votes`.
-// `height` is current block height.
-// `votes` is from `RequestBeginBlock.LastCommitInfo` which is set of validators of previous block.
-func (ctrler *StakeCtrler) doReward(height int64, lastVotes []abcitypes.VoteInfo) (*uint256.Int, xerrors.XError) {
-
-	// The validators power of `lastVotes` are committed at `height` - 4
-	//   N       : commit stakes of a validator.
-	//   N+1     : `updateValidators` is called and the updated validators are reported to consensus engine.
-	//   (N+1)+2 : the updated validators are applied (start signing)
-	//   (N+1)+3 : the updated validators are included into `lastVotes`.
-	//           : At this point, the validators have their power committed at block N (= `height` - 4).
-
-	_height := height - 4
-	if _height <= 0 {
-		_height = 1
+	heightForReward := height - 4
+	if heightForReward <= 0 {
+		heightForReward = 1
 	}
-	_delegateeLedger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(_height, 128)
+	immuDelegateeLedger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(heightForReward, 128)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	issuedReward := uint256.NewInt(0)
-	for _, vote := range lastVotes {
-		if vote.SignedLastBlock == false {
-			ctrler.logger.Debug("Validator didn't sign the last block", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-			continue
-		}
-
-		delegatee, xerr := _delegateeLedger.GetFinality(ledger.ToLedgerKey(vote.Validator.Address))
-		if xerr != nil {
-			ctrler.logger.Error("Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-			continue
-		} else if delegatee == nil {
-			ctrler.logger.Debug("Not found validator", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
-			continue
-		}
-
-		if delegatee.TotalPower != vote.Validator.Power {
-			panic(fmt.Errorf("delegatee(%v)'s power(%v) is not same as the power(%v) of VoteInfo",
-				delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
-		}
-
-		//
-		// DO REWARD !!!
-		//
-
-		for _, s0 := range delegatee.Stakes {
-			rwdObj, xerr := ctrler.rewardLedger.GetFinality(ledger.ToLedgerKey(s0.From))
-			if xerr == xerrors.ErrNotFoundResult {
-				rwdObj = NewReward(s0.From)
-			} else if xerr != nil {
-				ctrler.logger.Error("fail to find reward object of", s0.From)
+	for _, vote := range votes {
+		if vote.SignedLastBlock {
+			delegatee, xerr := immuDelegateeLedger.Get(ledger.ToLedgerKey(vote.Validator.Address))
+			if xerr != nil || delegatee == nil {
+				ctrler.logger.Error("Reward - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
 				continue
 			}
 
-			power := uint256.NewInt(uint64(s0.Power))
-			rwd := new(uint256.Int).Mul(power, ctrler.govParams.RewardPerPower())
-			_ = rwdObj.Issue(rwd, height)
-
-			if xerr := ctrler.rewardLedger.SetFinality(rwdObj); xerr != nil {
-				ctrler.logger.Error("fail to reward to", s0.From, "err:", xerr)
+			if delegatee.TotalPower != vote.Validator.Power {
+				panic(fmt.Errorf("delegatee(%v)'s power(%v) is not same as the power(%v) of VoteInfo",
+					delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
 			}
 
-			_ = issuedReward.Add(issuedReward, rwd)
+			issued, _ := ctrler.doRewardTo(delegatee, heightForReward)
+			_ = issuedReward.Add(issuedReward, issued)
+		} else {
+			ctrler.logger.Debug("Validator didn't sign the last block", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
 		}
 	}
+
 	return issuedReward, nil
 }
+
+func (ctrler *StakeCtrler) doRewardTo(delegatee *Delegatee, height int64) (*uint256.Int, xerrors.XError) {
+
+	issuedReward := uint256.NewInt(0)
+
+	for _, s0 := range delegatee.Stakes {
+		rwdObj, xerr := ctrler.rewardLedger.GetFinality(ledger.ToLedgerKey(s0.From))
+		if xerr == xerrors.ErrNotFoundResult {
+			rwdObj = NewReward(s0.From)
+		} else if xerr != nil {
+			ctrler.logger.Error("fail to find reward object of", s0.From)
+			continue
+		}
+
+		power := uint256.NewInt(uint64(s0.Power))
+		rwd := new(uint256.Int).Mul(power, ctrler.govParams.RewardPerPower())
+		_ = rwdObj.Issue(rwd, height)
+
+		if xerr := ctrler.rewardLedger.SetFinality(rwdObj); xerr != nil {
+			ctrler.logger.Error("fail to reward to", s0.From, "err:", xerr)
+		}
+
+		_ = issuedReward.Add(issuedReward, rwd)
+	}
+
+	return issuedReward, nil
+}
+
+//// doReward() rewards to NOT ctrler.lastValidators BUT validators of `votes`.
+//// `height` is current block height.
+//// `votes` is from `RequestBeginBlock.LastCommitInfo` which is set of validators of previous block.
+//func (ctrler *StakeCtrler) doReward(height int64, lastVotes []abcitypes.VoteInfo) (*uint256.Int, xerrors.XError) {
+//
+//	// The validators power of `lastVotes` are committed at `height` - 4
+//	//   N       : commit stakes of a validator.
+//	//   N+1     : `updateValidators` is called and the updated validators are reported to consensus engine.
+//	//   (N+1)+2 : the updated validators are applied (start signing)
+//	//   (N+1)+3 : the updated validators are included into `lastVotes`.
+//	//           : At this point, the validators have their power committed at block N (= `height` - 4).
+//
+//	_height := height - 4
+//	if _height <= 0 {
+//		_height = 1
+//	}
+//	_delegateeLedger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(_height, 128)
+//	if xerr != nil {
+//		return nil, xerr
+//	}
+//
+//	issuedReward := uint256.NewInt(0)
+//	for _, vote := range lastVotes {
+//		if vote.SignedLastBlock == false {
+//			ctrler.logger.Debug("Validator didn't sign the last block", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+//			continue
+//		}
+//
+//		delegatee, xerr := _delegateeLedger.GetFinality(ledger.ToLedgerKey(vote.Validator.Address))
+//		if xerr != nil {
+//			ctrler.logger.Error("Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+//			continue
+//		} else if delegatee == nil {
+//			ctrler.logger.Debug("Not found validator", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+//			continue
+//		}
+//
+//		if delegatee.TotalPower != vote.Validator.Power {
+//			panic(fmt.Errorf("delegatee(%v)'s power(%v) is not same as the power(%v) of VoteInfo",
+//				delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
+//		}
+//
+//		//
+//		// DO REWARD !!!
+//		//
+//
+//		for _, s0 := range delegatee.Stakes {
+//			rwdObj, xerr := ctrler.rewardLedger.GetFinality(ledger.ToLedgerKey(s0.From))
+//			if xerr == xerrors.ErrNotFoundResult {
+//				rwdObj = NewReward(s0.From)
+//			} else if xerr != nil {
+//				ctrler.logger.Error("fail to find reward object of", s0.From)
+//				continue
+//			}
+//
+//			power := uint256.NewInt(uint64(s0.Power))
+//			rwd := new(uint256.Int).Mul(power, ctrler.govParams.RewardPerPower())
+//			_ = rwdObj.Issue(rwd, height)
+//
+//			if xerr := ctrler.rewardLedger.SetFinality(rwdObj); xerr != nil {
+//				ctrler.logger.Error("fail to reward to", s0.From, "err:", xerr)
+//			}
+//
+//			_ = issuedReward.Add(issuedReward, rwd)
+//		}
+//	}
+//	return issuedReward, nil
+//}
 
 func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	switch ctx.Tx.GetType() {
