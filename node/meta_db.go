@@ -52,7 +52,7 @@ func (stdb *MetaDB) ChainID() string {
 }
 
 func (stdb *MetaDB) PutChainID(chainId string) error {
-	return stdb.put(keyBlockHeight, []byte(chainId))
+	return stdb.put(keyChainID, []byte(chainId))
 }
 
 func (stdb *MetaDB) LastBlockHeight() int64 {
