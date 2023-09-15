@@ -33,7 +33,7 @@ type IGovHandler interface {
 	MaxUpdatableStakeRatio() int64
 	SlashRatio() int64
 	SignedBlocksWindow() int64
-	MinSignedRatio() int64
+	MinSignedBlocks() int64
 }
 
 type IAccountHandler interface {

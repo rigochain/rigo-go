@@ -36,7 +36,7 @@ type GovParams struct {
 	maxUpdatableStakeRatio int64 // todo: add max updatable stake: issue #34
 	slashRatio             int64
 	signedBlocksWindow     int64
-	minSignedRatio         int64
+	minSignedBlocks        int64
 
 	mtx sync.RWMutex
 }
@@ -78,7 +78,7 @@ func DefaultGovParams() *GovParams {
 		maxUpdatableStakeRatio: 30,      // 30%
 		slashRatio:             50,      // 50%
 		signedBlocksWindow:     10000,   // 10000 blocks
-		minSignedRatio:         5,       // 5%
+		minSignedBlocks:        500,     // 500 blocks
 	}
 }
 
@@ -100,7 +100,7 @@ func Test1GovParams() *GovParams {
 		maxUpdatableStakeRatio: 30,    // 30%
 		slashRatio:             50,    // 50%
 		signedBlocksWindow:     10000, // 10000 blocks
-		minSignedRatio:         5,     // 5%
+		minSignedBlocks:        500,   // 500 blocks
 	}
 }
 
@@ -122,7 +122,7 @@ func Test2GovParams() *GovParams {
 		maxUpdatableStakeRatio: 30,    // 30%
 		slashRatio:             50,    // 50%
 		signedBlocksWindow:     10000, // 10000 blocks
-		minSignedRatio:         5,     // 5%
+		minSignedBlocks:        5,     // 500 blocks
 	}
 }
 
@@ -144,7 +144,7 @@ func Test3GovParams() *GovParams {
 		maxUpdatableStakeRatio: 10,
 		slashRatio:             50,
 		signedBlocksWindow:     10000,
-		minSignedRatio:         5,
+		minSignedBlocks:        500,
 	}
 }
 
@@ -166,7 +166,7 @@ func Test4GovParams() *GovParams {
 		maxUpdatableStakeRatio: 10,
 		slashRatio:             50,
 		signedBlocksWindow:     10000,
-		minSignedRatio:         5,
+		minSignedBlocks:        500,
 	}
 }
 
@@ -229,7 +229,7 @@ func (r *GovParams) fromProto(pm *GovParamsProto) {
 	r.maxUpdatableStakeRatio = pm.MaxUpdatableStakeRatio
 	r.slashRatio = pm.SlashRatio
 	r.signedBlocksWindow = pm.SignedBlocksWindow
-	r.minSignedRatio = pm.MinSignedRatio
+	r.minSignedBlocks = pm.MinSignedBlocks
 }
 
 func (r *GovParams) toProto() *GovParamsProto {
@@ -253,7 +253,7 @@ func (r *GovParams) toProto() *GovParamsProto {
 		MaxUpdatableStakeRatio: r.maxUpdatableStakeRatio,
 		SlashRatio:             r.slashRatio,
 		SignedBlocksWindow:     r.signedBlocksWindow,
-		MinSignedRatio:         r.minSignedRatio,
+		MinSignedBlocks:        r.minSignedBlocks,
 	}
 	return a
 }
@@ -279,7 +279,7 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
 		SlashRatio             int64  `json:"slashRatio"`
 		SignedBlocksWindow     int64  `json:"signedBlocksWindow"`
-		MinSignedRatio         int64  `json:"minSignedRatio"`
+		MinSignedBlocks        int64  `json:"minSignedBlocks"`
 	}{
 		Version:                r.version,
 		MaxValidatorCnt:        r.maxValidatorCnt,
@@ -297,7 +297,7 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 		MaxUpdatableStakeRatio: r.maxUpdatableStakeRatio,
 		SlashRatio:             r.slashRatio,
 		SignedBlocksWindow:     r.signedBlocksWindow,
-		MinSignedRatio:         r.minSignedRatio,
+		MinSignedBlocks:        r.minSignedBlocks,
 	}
 	return tmjson.Marshal(tm)
 }
@@ -327,7 +327,7 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 		MaxUpdatableStakeRatio int64  `json:"maxUpdatableStakeRatio"`
 		SlashRatio             int64  `json:"slashRatio"`
 		SignedBlocksWindow     int64  `json:"signedBlocksWindow"`
-		MinSignedRatio         int64  `json:"minSignedRatio"`
+		MinSignedBlocks        int64  `json:"minSignedBlocks"`
 	}{}
 
 	err := tmjson.Unmarshal(bz, tm)
@@ -363,7 +363,7 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 	r.maxUpdatableStakeRatio = tm.MaxUpdatableStakeRatio
 	r.slashRatio = tm.SlashRatio
 	r.signedBlocksWindow = tm.SignedBlocksWindow
-	r.minSignedRatio = tm.MinSignedRatio
+	r.minSignedBlocks = tm.MinSignedBlocks
 	return nil
 }
 
@@ -501,11 +501,11 @@ func (r *GovParams) SignedBlocksWindow() int64 {
 	return r.signedBlocksWindow
 }
 
-func (r *GovParams) MinSignedRatio() int64 {
+func (r *GovParams) MinSignedBlocks() int64 {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	return r.minSignedRatio
+	return r.minSignedBlocks
 }
 
 func (r *GovParams) String() string {
@@ -617,8 +617,8 @@ func MergeGovParams(oldParams, newParams *GovParams) {
 		newParams.signedBlocksWindow = oldParams.signedBlocksWindow
 	}
 
-	if newParams.minSignedRatio == 0 {
-		newParams.minSignedRatio = oldParams.minSignedRatio
+	if newParams.minSignedBlocks == 0 {
+		newParams.minSignedBlocks = oldParams.minSignedBlocks
 	}
 }
 
