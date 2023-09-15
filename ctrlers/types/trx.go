@@ -33,15 +33,15 @@ const (
 )
 
 type trxRPL struct {
-	Version  uint32
+	Version  uint64
 	Time     uint64
 	Nonce    uint64
 	From     types.Address
 	To       types.Address
-	Amount   string
+	Amount   bytes.HexBytes
 	Gas      uint64
-	GasPrice string
-	Type     uint32
+	GasPrice bytes.HexBytes
+	Type     uint64
 	Payload  bytes.HexBytes
 	Sig      bytes.HexBytes
 }
@@ -126,15 +126,15 @@ func (tx *Trx) EncodeRLP(w io.Writer) error {
 	}
 
 	tmpTx := &trxRPL{
-		Version:  tx.Version,
+		Version:  uint64(tx.Version),
 		Time:     uint64(tx.Time),
 		Nonce:    tx.Nonce,
 		From:     tx.From,
 		To:       tx.To,
-		Amount:   tx.Amount.Hex(),
+		Amount:   tx.Amount.Bytes(),
 		Gas:      uint64(tx.Gas),
-		GasPrice: tx.GasPrice.Hex(),
-		Type:     uint32(tx.Type),
+		GasPrice: tx.GasPrice.Bytes(),
+		Type:     uint64(tx.Type),
 		Payload:  payload,
 		Sig:      tx.Sig,
 	}
@@ -148,20 +148,14 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 		return err
 	}
 
-	tx.Version = rtx.Version
+	tx.Version = uint32(rtx.Version)
 	tx.Time = int64(rtx.Time)
 	tx.Nonce = rtx.Nonce
 	tx.From = rtx.From
 	tx.To = rtx.To
-	tx.Amount, err = uint256.FromHex(rtx.Amount)
-	if err != nil {
-		return err
-	}
+	tx.Amount = new(uint256.Int).SetBytes(rtx.Amount)
 	tx.Gas = rtx.Gas
-	tx.GasPrice, err = uint256.FromHex(rtx.GasPrice)
-	if err != nil {
-		return err
-	}
+	tx.GasPrice = new(uint256.Int).SetBytes(rtx.GasPrice) //, err = uint256.FromHex(rtx.GasPrice)
 	tx.Type = int32(rtx.Type)
 	tx.Sig = rtx.Sig
 
