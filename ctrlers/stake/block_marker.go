@@ -24,8 +24,10 @@ func (bm *BlockMarker) Mark(height int64) xerrors.XError {
 	return nil
 }
 
-func (bm *BlockMarker) CountInWindow(startHeight, endHeight int64, rewin bool) int {
-	if startHeight > endHeight {
+// CountInWindow() returns the number of marked height in [startHeight, endHeight].
+// If `rewin` is true, all heights before `h0` is removed after counting.
+func (bm *BlockMarker) CountInWindow(h0, h1 int64, rewin bool) int {
+	if h0 > h1 {
 		return 0
 	}
 
@@ -35,13 +37,13 @@ func (bm *BlockMarker) CountInWindow(startHeight, endHeight int64, rewin bool) i
 	count := 0
 	preIdx := -1
 	for i, h := range bm.BlockHeights {
-		if h < startHeight {
+		if h < h0 {
 			preIdx = i
 		}
-		if h >= startHeight && h <= endHeight {
+		if h >= h0 && h <= h1 {
 			count++
 		}
-		if h >= endHeight {
+		if h >= h1 {
 			break
 		}
 	}

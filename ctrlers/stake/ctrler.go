@@ -100,7 +100,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 
 	// Slashing
 	byzantines := blockCtx.BlockInfo().ByzantineValidators
-	if byzantines != nil {
+	if byzantines != nil && len(byzantines) > 0 {
 		ctrler.logger.Debug("Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
 			if slashed, xerr := ctrler.doPunish(
@@ -137,9 +137,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	//   (N+1)+2 : the updated validators are applied (start signing)
 	//   (N+1)+3 : the updated validators are included into `lastVotes`.
 	//           : At this point, the validators have their power committed at block N (= `height` - 4).
-
 	issuedReward := uint256.NewInt(0)
-
 	heightForReward := blockCtx.Height() - 4
 	if heightForReward <= 0 {
 		heightForReward = 1
@@ -151,6 +149,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 
 	for _, vote := range blockCtx.BlockInfo().LastCommitInfo.Votes {
 		if vote.SignedLastBlock {
+			// Reward
 			delegatee, xerr := immuDelegateeLedger.Get(ledger.ToLedgerKey(vote.Validator.Address))
 			if xerr != nil || delegatee == nil {
 				ctrler.logger.Error("Reward - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
@@ -165,28 +164,30 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 			issued, _ := ctrler.doRewardTo(delegatee, heightForReward)
 			_ = issuedReward.Add(issuedReward, issued)
 		} else {
-			// check missing blocks
+			// check MinSignedBlocks
+			signedHeight := blockCtx.Height() - 1
 			delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(vote.Validator.Address))
 			if xerr != nil {
 				ctrler.logger.Error("MinSignedBlocks - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
 				continue
 			}
 
-			_ = delegatee.ProcessNotSignedBlock(blockCtx.Height())
+			_ = delegatee.ProcessNotSignedBlock(signedHeight)
+			_ = ctrler.delegateeLedger.SetFinality(delegatee)
 
-			s := blockCtx.Height() - ctrler.govParams.SignedBlocksWindow()
+			s := signedHeight - ctrler.govParams.SignedBlocksWindow()
 			if s < 0 {
 				s = 0
 			}
-			notSigned := delegatee.GetNotSignedBlockCount(s, blockCtx.Height())
+			notSigned := delegatee.GetNotSignedBlockCount(s, signedHeight)
 
 			if ctrler.govParams.SignedBlocksWindow()-int64(notSigned) < ctrler.govParams.MinSignedBlocks() {
-				// do un-staking all
+				// Stop validator: do un-staking all
 
 				ctrler.logger.Info("Validator stop",
 					"address", types.Address(vote.Validator.Address),
 					"power", vote.Validator.Power,
-					"from", s, "to", blockCtx.Height(),
+					"from", s, "to", signedHeight,
 					"signed_blocks_window", ctrler.govParams.SignedBlocksWindow(),
 					"signed_blocks", ctrler.govParams.SignedBlocksWindow()-int64(notSigned),
 					"missed_blocks", notSigned)

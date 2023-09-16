@@ -10,6 +10,7 @@ import (
 	rctypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/ctrlers/vm/evm"
 	"github.com/rigochain/rigo-go/genesis"
+	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -159,6 +160,13 @@ func (ctrler *RigoApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 
 // InitChain is called only when the ResponseInfo::LastBlockHeight which is returned in Info() is 0.
 func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
+	// set and put chain_id
+	if req.GetChainId() == "" {
+		panic("there is no chain_id")
+	}
+	ctrler.rootConfig.ChainID = req.GetChainId()
+	_ = ctrler.metaDB.PutChainID(ctrler.rootConfig.ChainID)
+
 	appState := genesis.GenesisAppState{}
 	if err := tmjson.Unmarshal(req.AppStateBytes, &appState); err != nil {
 		panic(err)
@@ -198,31 +206,27 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		}
 	}
 
-	////
-	//// start of test
-	//_w := web3.NewWallet(nil)
-	//s0 := stake.NewStakeWithPower(
-	//	_w.Address(), _w.Address(), // self staking
-	//	100,
-	//	1,
-	//	bytes.ZeroBytes(32), // 0x00... txhash
-	//)
-	//initStakes = append(initStakes, &stake.InitStake{
-	//	_w.GetPubKey(),
-	//	[]*stake.Stake{s0},
-	//})
 	//
-	//ctrler.govCtrler.GovParams = *rctypes.Test1GovParams()
-	//// end of test
-	////
+	// start of test
+	_w := web3.NewWallet(nil)
+	s0 := stake.NewStakeWithPower(
+		_w.Address(), _w.Address(), // self staking
+		100,
+		1,
+		bytes.ZeroBytes(32), // 0x00... txhash
+	)
+	initStakes = append(initStakes, &stake.InitStake{
+		_w.GetPubKey(),
+		[]*stake.Stake{s0},
+	})
+
+	ctrler.govCtrler.GovParams = *rctypes.Test1GovParams()
+	// end of test
+	//
 
 	if xerr := ctrler.stakeCtrler.InitLedger(initStakes); xerr != nil {
 		panic(xerr)
 	}
-
-	// set and put chain_id
-	ctrler.rootConfig.ChainID = req.GetChainId()
-	_ = ctrler.metaDB.PutChainID(ctrler.rootConfig.ChainID)
 
 	// these values will be saved as state of the consensus engine.
 	return abcitypes.ResponseInitChain{

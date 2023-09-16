@@ -238,8 +238,9 @@ func (delegatee *Delegatee) ProcessNotSignedBlock(height int64) xerrors.XError {
 	return delegatee.NotSignedHeights.Mark(height)
 }
 
-func (delegatee *Delegatee) GetNotSignedBlockCount(s, e int64) int {
-	return delegatee.NotSignedHeights.CountInWindow(s, e, true)
+// GetNotSignedBlockCount() returns the number of marked height in [h0, h1].
+func (delegatee *Delegatee) GetNotSignedBlockCount(h0, h1 int64) int {
+	return delegatee.NotSignedHeights.CountInWindow(h0, h1, true)
 }
 
 func (delegatee *Delegatee) DoSlash(ratio int64) int64 {

@@ -86,7 +86,7 @@ func (ctrler *GovCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcit
 	var evts []abcitypes.Event
 
 	byzantines := blockCtx.BlockInfo().ByzantineValidators
-	if byzantines != nil {
+	if byzantines != nil && len(byzantines) > 0 {
 		ctrler.logger.Debug("Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
 			if slashed, xerr := ctrler.doPunish(&evi); xerr != nil {
