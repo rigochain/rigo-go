@@ -129,6 +129,9 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	//
 	// Reward and Check MinSignedBlocks
 	//
+	if len(blockCtx.BlockInfo().LastCommitInfo.Votes) <= 0 {
+		return nil, nil
+	}
 
 	// issue #70
 	// The validators power of `lastVotes` is based on `height` - 4
@@ -138,11 +141,11 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	//   (N+1)+3 : the updated validators are included into `lastVotes`.
 	//           : At this point, the validators have their power committed at block N (= `height` - 4).
 	issuedReward := uint256.NewInt(0)
-	heightForReward := blockCtx.Height() - 4
-	if heightForReward <= 0 {
-		heightForReward = 1
+	heightOfPower := blockCtx.Height() - 4
+	if heightOfPower < 0 {
+		heightOfPower = 1
 	}
-	immuDelegateeLedger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(heightForReward, 128)
+	immuDelegateeLedger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(heightOfPower, 128)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -161,7 +164,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 					delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
 			}
 
-			issued, _ := ctrler.doRewardTo(delegatee, heightForReward)
+			issued, _ := ctrler.doRewardTo(delegatee, blockCtx.Height())
 			_ = issuedReward.Add(issuedReward, issued)
 		} else {
 			// check MinSignedBlocks
@@ -234,6 +237,10 @@ func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64) (
 }
 
 func (ctrler *StakeCtrler) DoReward(height int64, votes []abcitypes.VoteInfo) (*uint256.Int, xerrors.XError) {
+	if len(votes) <= 0 {
+		return nil, nil
+	}
+
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -261,7 +268,7 @@ func (ctrler *StakeCtrler) DoReward(height int64, votes []abcitypes.VoteInfo) (*
 					delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
 			}
 
-			issued, _ := ctrler.doRewardTo(delegatee, heightForReward)
+			issued, _ := ctrler.doRewardTo(delegatee, height)
 			_ = issuedReward.Add(issuedReward, issued)
 		} else {
 			ctrler.logger.Debug("Validator didn't sign the last block", "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)

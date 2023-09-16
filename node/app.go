@@ -179,9 +179,11 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	}
 
 	if xerr := ctrler.govCtrler.InitLedger(&appState); xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 	if xerr := ctrler.acctCtrler.InitLedger(&appState); xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 
@@ -191,6 +193,7 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		pubBytes := val.PubKey.GetSecp256K1()
 		addr, xerr := crypto.PubBytes2Addr(pubBytes)
 		if xerr != nil {
+			ctrler.logger.Error("RigoApp", "error", xerr)
 			panic(xerr)
 		}
 		s0 := stake.NewStakeWithPower(
@@ -206,6 +209,7 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 	}
 
 	if xerr := ctrler.stakeCtrler.InitLedger(initStakes); xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 
@@ -283,14 +287,17 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 
 	ev0, xerr := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
 	if xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 	ev1, xerr := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
 	if xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 	ev2, xerr := ctrler.vmCtrler.BeginBlock(ctrler.currBlockCtx)
 	if xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 
@@ -454,18 +461,22 @@ func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 
 	ev0, xerr := ctrler.govCtrler.EndBlock(ctrler.currBlockCtx)
 	if xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 	ev1, xerr := ctrler.acctCtrler.EndBlock(ctrler.currBlockCtx)
 	if xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 	ev2, xerr := ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
 	if xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 	ev3, xerr := ctrler.vmCtrler.EndBlock(ctrler.currBlockCtx)
 	if xerr != nil {
+		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
 

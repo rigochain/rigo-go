@@ -35,7 +35,7 @@ func TestWithdraw(t *testing.T) {
 	require.Equal(t, uint256.NewInt(0), rwd0.GetWithdrawn())
 	require.Equal(t, uint256.NewInt(0), rwd0.GetSlashed())
 	require.Equal(t, 1, rwd0.GetCumulated().Cmp(rwd0.GetIssued()))
-	//fmt.Println("block", at, "reward", rwd0)
+	fmt.Println("QueryReward at", at, "reward", rwd0)
 
 	// try to withdraw amount more than current reward
 	reqAmt := new(uint256.Int).AddUint64(rwd0.GetCumulated(), uint64(1))
@@ -54,13 +54,11 @@ func TestWithdraw(t *testing.T) {
 	// check reward status
 	rwd1, err := rweb3.QueryReward(val0.Address(), retTxCommit.Height)
 	require.NoError(t, err)
-
-	fmt.Println("before", rwd0)
-	fmt.Println("after", rwd1)
-
 	require.Equal(t, reqAmt, rwd1.GetWithdrawn())
+	fmt.Println("QueryReward at", retTxCommit.Height, "reward", rwd1)
 
 	blocks := rwd1.Height() - rwd0.Height()
+
 	sumIssued := new(uint256.Int).Mul(rwd1.GetIssued(), uint256.NewInt(uint64(blocks)))
 	expected := new(uint256.Int).Sub(rwd0.GetCumulated(), rwd1.GetWithdrawn())
 	_ = expected.Add(expected, sumIssued)
