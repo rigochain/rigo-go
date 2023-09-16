@@ -428,7 +428,7 @@ func (ctrler *GovCtrler) GetGovParams() ctrlertypes.GovParams {
 	return ctrler.GovParams
 }
 
-func (ctrler *GovCtrler) RealAllProposals() ([]*proposal.GovProposal, xerrors.XError) {
+func (ctrler *GovCtrler) ReadAllProposals() ([]*proposal.GovProposal, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
@@ -438,6 +438,9 @@ func (ctrler *GovCtrler) RealAllProposals() ([]*proposal.GovProposal, xerrors.XE
 		proposals = append(proposals, prop)
 		return nil
 	}); xerr != nil {
+		if xerr == xerrors.ErrNotFoundResult {
+			return nil, xerrors.ErrNotFoundProposal
+		}
 		return nil, xerr
 	}
 

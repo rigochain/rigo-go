@@ -14,7 +14,7 @@ func TestPunish(t *testing.T) {
 	valAddr := stakeHelper.PickAddress(rand.Intn(stakeHelper.valCnt))
 
 	// original proposals and voter's power
-	props, err := govCtrler.RealAllProposals()
+	props, err := govCtrler.ReadAllProposals()
 	require.NoError(t, err)
 
 	type propSnapshot struct {
@@ -46,7 +46,7 @@ func TestPunish(t *testing.T) {
 	require.NoError(t, err)
 
 	// proposals and voter's power after punishing
-	props, err = govCtrler.RealAllProposals()
+	props, err = govCtrler.ReadAllProposals()
 	require.NoError(t, err)
 
 	var props1 []propSnapshot

@@ -57,9 +57,9 @@ func QueryReward(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64
 	}
 }
 
-func QueryProposals(ctx *tmrpctypes.Context, txhash abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
+func QueryProposal(ctx *tmrpctypes.Context, txhash abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
 	height := getHeight(heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "proposals", tmbytes.HexBytes(txhash), height, false); err != nil {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "proposal", tmbytes.HexBytes(txhash), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
