@@ -216,7 +216,7 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exe
 
 	acct0 := ctrler.findAccount(from, exec)
 	if acct0 == nil {
-		return xerrors.ErrNotFoundAccount
+		return xerrors.ErrNotFoundAccount.Wrapf("address: %v", from)
 	}
 	acct1 := ctrler.findAccount(to, exec)
 	if acct1 == nil {
@@ -253,7 +253,7 @@ func (ctrler *AcctCtrler) SetDoc(addr types.Address, name, url string, exec bool
 
 	acct0 := ctrler.findAccount(addr, exec)
 	if acct0 == nil {
-		return xerrors.ErrNotFoundAccount
+		return xerrors.ErrNotFoundAccount.Wrapf("address: %v", addr)
 	}
 
 	ctrler.setDoc(acct0, name, url)
@@ -274,7 +274,7 @@ func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) 
 	defer ctrler.mtx.Unlock()
 
 	if acct := ctrler.findAccount(to, exec); acct == nil {
-		return xerrors.ErrNotFoundAccount
+		return xerrors.ErrNotFoundAccount.Wrapf("address: %v", to)
 	} else if xerr := acct.AddBalance(amt); xerr != nil {
 		return xerr
 	} else if xerr := ctrler.setAccountCommittable(acct, exec); xerr != nil {

@@ -10,7 +10,7 @@ import (
 func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
 	acct := ctrler.ReadAccount(req.Data)
 	if acct == nil {
-		return nil, xerrors.ErrNotFoundAccount
+		return nil, xerrors.ErrNotFoundAccount.Wrapf("address: %x", req.Data)
 	}
 
 	// NOTE

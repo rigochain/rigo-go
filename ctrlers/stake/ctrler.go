@@ -290,6 +290,7 @@ func (ctrler *StakeCtrler) doRewardTo(delegatee *Delegatee, height int64) (*uint
 
 		if xerr := ctrler.rewardLedger.SetFinality(rwdObj); xerr != nil {
 			ctrler.logger.Error("fail to reward to", s0.From, "err:", xerr)
+			continue
 		}
 
 		_ = issuedReward.Add(issuedReward, rwd)

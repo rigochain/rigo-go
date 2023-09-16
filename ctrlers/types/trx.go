@@ -155,7 +155,7 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 	tx.To = rtx.To
 	tx.Amount = new(uint256.Int).SetBytes(rtx.Amount)
 	tx.Gas = rtx.Gas
-	tx.GasPrice = new(uint256.Int).SetBytes(rtx.GasPrice) //, err = uint256.FromHex(rtx.GasPrice)
+	tx.GasPrice = new(uint256.Int).SetBytes(rtx.GasPrice)
 	tx.Type = int32(rtx.Type)
 	tx.Sig = rtx.Sig
 

@@ -10,7 +10,6 @@ import (
 	rctypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/ctrlers/vm/evm"
 	"github.com/rigochain/rigo-go/genesis"
-	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -206,24 +205,6 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		}
 	}
 
-	//
-	// start of test
-	_w := web3.NewWallet(nil)
-	s0 := stake.NewStakeWithPower(
-		_w.Address(), _w.Address(), // self staking
-		100,
-		1,
-		bytes.ZeroBytes(32), // 0x00... txhash
-	)
-	initStakes = append(initStakes, &stake.InitStake{
-		_w.GetPubKey(),
-		[]*stake.Stake{s0},
-	})
-
-	ctrler.govCtrler.GovParams = *rctypes.Test1GovParams()
-	// end of test
-	//
-
 	if xerr := ctrler.stakeCtrler.InitLedger(initStakes); xerr != nil {
 		panic(xerr)
 	}
@@ -257,6 +238,7 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 			})
 		if xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("CheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
 				Code: xerr.Code(),
 				Log:  xerr.Error(),
@@ -266,6 +248,7 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 		xerr = ctrler.txExecutor.ExecuteSync(txctx)
 		if xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("CheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
 				Code: xerr.Code(),
 				Log:  xerr.Error(),
@@ -298,9 +281,18 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 
 	ctrler.currBlockCtx = rctypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
 
-	ev0, _ := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
-	ev1, _ := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
-	ev2, _ := ctrler.vmCtrler.BeginBlock(ctrler.currBlockCtx)
+	ev0, xerr := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
+	if xerr != nil {
+		panic(xerr)
+	}
+	ev1, xerr := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
+	if xerr != nil {
+		panic(xerr)
+	}
+	ev2, xerr := ctrler.vmCtrler.BeginBlock(ctrler.currBlockCtx)
+	if xerr != nil {
+		panic(xerr)
+	}
 
 	return abcitypes.ResponseBeginBlock{
 		Events: append(ev0, append(ev1, ev2...)...),
@@ -329,6 +321,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 		})
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
+		ctrler.logger.Error("deliverTxSync", "error", xerr)
 		return abcitypes.ResponseDeliverTx{
 			Code: xerr.Code(),
 			Log:  xerr.Error(),
@@ -337,6 +330,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 	xerr = ctrler.txExecutor.ExecuteSync(txctx)
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
+		ctrler.logger.Error("deliverTxSync", "error", xerr)
 		return abcitypes.ResponseDeliverTx{
 			Code: xerr.Code(),
 			Log:  xerr.Error(),
@@ -458,10 +452,22 @@ func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 			"height", req.Height)
 	}()
 
-	ev0, _ := ctrler.govCtrler.EndBlock(ctrler.currBlockCtx)
-	ev1, _ := ctrler.acctCtrler.EndBlock(ctrler.currBlockCtx)
-	ev2, _ := ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
-	ev3, _ := ctrler.vmCtrler.EndBlock(ctrler.currBlockCtx)
+	ev0, xerr := ctrler.govCtrler.EndBlock(ctrler.currBlockCtx)
+	if xerr != nil {
+		panic(xerr)
+	}
+	ev1, xerr := ctrler.acctCtrler.EndBlock(ctrler.currBlockCtx)
+	if xerr != nil {
+		panic(xerr)
+	}
+	ev2, xerr := ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
+	if xerr != nil {
+		panic(xerr)
+	}
+	ev3, xerr := ctrler.vmCtrler.EndBlock(ctrler.currBlockCtx)
+	if xerr != nil {
+		panic(xerr)
+	}
 
 	var ev []abcitypes.Event
 	ev = append(ev, ev0...)

@@ -65,7 +65,7 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 
 	txctx.Sender = txctx.AcctHandler.FindAccount(tx.From, txctx.Exec)
 	if txctx.Sender == nil {
-		return nil, xerrors.ErrNotFoundAccount
+		return nil, xerrors.ErrNotFoundAccount.Wrapf("address: %v", tx.From)
 	}
 	if !rtypes.IsZeroAddress(tx.To) {
 		txctx.Receiver = txctx.AcctHandler.FindOrNewAccount(tx.To, txctx.Exec)
