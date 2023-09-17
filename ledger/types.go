@@ -44,6 +44,7 @@ type ILedgerItem interface {
 }
 
 type ILedger[T ILedgerItem] interface {
+	Version() int64
 	Set(T) xerrors.XError
 	CancelSet(LedgerKey) xerrors.XError
 	Get(LedgerKey) (T, xerrors.XError)
@@ -68,5 +69,5 @@ type IFinalityLedger[T ILedgerItem] interface {
 	IterateReadAllFinalityItems(func(T) xerrors.XError) xerrors.XError
 	IterateFinalityGotItems(func(T) xerrors.XError) xerrors.XError
 	IterateFinalityUpdatedItems(func(T) xerrors.XError) xerrors.XError
-	ImmutableLedgerAt(int64, int) (IFinalityLedger[T], xerrors.XError)
+	ImmutableLedgerAt(int64, int) (ILedger[T], xerrors.XError)
 }

@@ -1,6 +1,7 @@
 package account
 
 import (
+	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -8,9 +9,14 @@ import (
 )
 
 func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
-	acct := ctrler.ReadAccount(req.Data)
-	if acct == nil {
-		return nil, xerrors.ErrNotFoundAccount.Wrapf("address: %x", req.Data)
+	immuLedger, xerr := ctrler.acctLedger.ImmutableLedgerAt(req.Height, 0)
+	if xerr != nil {
+		return nil, xerrors.ErrQuery.Wrap(xerr)
+	}
+
+	acct, xerr := immuLedger.Read(types.Address(req.Data).Array32())
+	if xerr != nil {
+		acct = types2.NewAccount(req.Data)
 	}
 
 	// NOTE

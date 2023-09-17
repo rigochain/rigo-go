@@ -5,7 +5,6 @@ import (
 	"github.com/cosmos/iavl"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	tmdb "github.com/tendermint/tm-db"
-	"sort"
 	"sync"
 )
 
@@ -56,6 +55,13 @@ func (ledger *SimpleLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (*Simpl
 		cachedItems: newMemItems[T](),
 		getNewItem:  ledger.getNewItem,
 	}, nil
+}
+
+func (ledger *SimpleLedger[T]) Version() int64 {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	return ledger.tree.Version()
 }
 
 func (ledger *SimpleLedger[T]) Set(item T) xerrors.XError {
@@ -204,40 +210,42 @@ func (ledger *SimpleLedger[T]) read(key LedgerKey) (T, xerrors.XError) {
 }
 
 func (ledger *SimpleLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
-	ledger.mtx.Lock()
-	defer ledger.mtx.Unlock()
+	panic("DO NOT call SimpleLedger::Commit()")
 
-	// remove
-	for _, k := range ledger.cachedItems.removedKeys {
-		var vk LedgerKey
-		copy(vk[:], k[:])
-		if _, _, err := ledger.tree.Remove(vk[:]); err != nil {
-			return nil, -1, xerrors.From(err)
-		}
-	}
-
-	var keys LedgerKeyList
-	for k, _ := range ledger.cachedItems.updatedItems {
-		keys = append(keys, k)
-	}
-	sort.Sort(keys)
-
-	for _, k := range keys {
-		_val := ledger.cachedItems.updatedItems[k]
-		_key := _val.Key()
-		if bz, err := _val.Encode(); err != nil {
-			return nil, -1, err
-		} else if _, err := ledger.tree.Set(_key[:], bz); err != nil {
-			return nil, -1, xerrors.From(err)
-		}
-	}
-
-	if r1, r2, err := ledger.tree.SaveVersion(); err != nil {
-		return r1, r2, xerrors.From(err)
-	} else {
-		ledger.cachedItems.reset()
-		return r1, r2, nil
-	}
+	//ledger.mtx.Lock()
+	//defer ledger.mtx.Unlock()
+	//
+	//// remove
+	//for _, k := range ledger.cachedItems.removedKeys {
+	//	var vk LedgerKey
+	//	copy(vk[:], k[:])
+	//	if _, _, err := ledger.tree.Remove(vk[:]); err != nil {
+	//		return nil, -1, xerrors.From(err)
+	//	}
+	//}
+	//
+	//var keys LedgerKeyList
+	//for k, _ := range ledger.cachedItems.updatedItems {
+	//	keys = append(keys, k)
+	//}
+	//sort.Sort(keys)
+	//
+	//for _, k := range keys {
+	//	_val := ledger.cachedItems.updatedItems[k]
+	//	_key := _val.Key()
+	//	if bz, err := _val.Encode(); err != nil {
+	//		return nil, -1, err
+	//	} else if _, err := ledger.tree.Set(_key[:], bz); err != nil {
+	//		return nil, -1, xerrors.From(err)
+	//	}
+	//}
+	//
+	//if r1, r2, err := ledger.tree.SaveVersion(); err != nil {
+	//	return r1, r2, xerrors.From(err)
+	//} else {
+	//	ledger.cachedItems.reset()
+	//	return r1, r2, nil
+	//}
 }
 
 func (ledger *SimpleLedger[T]) Clone() ILedger[T] {

@@ -18,7 +18,7 @@ type FinalityLedger[T ILedgerItem] struct {
 func NewFinalityLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func() T) (*FinalityLedger[T], xerrors.XError) {
 	if db, err := tmdb.NewDB(name, "goleveldb", dbDir); err != nil {
 		return nil, xerrors.From(err)
-	} else if tree, err := iavl.NewMutableTree(db, cacheSize); err != nil {
+	} else if tree, err := iavl.NewMutableTreeWithOpts(db, cacheSize, nil /*&iavl.Options{Sync: true}*/); err != nil {
 		_ = db.Close()
 		return nil, xerrors.From(err)
 	} else if _, err := tree.Load(); err != nil {
@@ -37,17 +37,20 @@ func NewFinalityLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func
 	}
 }
 
-func (ledger *FinalityLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (IFinalityLedger[T], xerrors.XError) {
+func (ledger *FinalityLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (ILedger[T], xerrors.XError) {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 	simledger, xerr := ledger.SimpleLedger.ImmutableLedgerAt(n, cacheSize)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return &FinalityLedger[T]{
-		SimpleLedger:  *simledger,
-		finalityItems: newMemItems[T](),
-	}, nil
+
+	return simledger, nil
+
+	//return &FinalityLedger[T]{
+	//	SimpleLedger:  *simledger,
+	//	finalityItems: newMemItems[T](),
+	//}, nil
 }
 
 func (ledger *FinalityLedger[T]) SetFinality(item T) xerrors.XError {

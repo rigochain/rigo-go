@@ -53,27 +53,37 @@ func testDeploy(t *testing.T) {
 		creator, creator.GetNonce(), defGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Nil(t, contract.GetAddress())
 
 	// check balance - not changed
 	require.NoError(t, creator.SyncAccount(rweb3))
 	beforeBalance1 := creator.GetBalance().Clone()
 	require.Equal(t, beforeBalance0.Dec(), beforeBalance1.Dec())
 
-	// sufficient gas
+	// sufficient gas - deploy contract
 	ret, err = contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
 		creator, creator.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
-	require.NotNil(t, ret.DeliverTx.Data)
-	require.Equal(t, 20, len(ret.DeliverTx.Data))
+	require.NotNil(t, contract.GetAddress())
+
+	contAcct, err := rweb3.GetAccount(contract.GetAddress())
+	require.NoError(t, err)
+	require.Equal(t, []byte(contract.GetDeployedBytecode()), contAcct.Code)
 
 	txRet, err := waitTrxResult(ret.Hash, 30, rweb3)
 	require.NoError(t, err, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
-	require.NotNil(t, txRet.TxResult.Data)
-
-	contract.SetAddress(txRet.TxResult.Data)
+	//require.NotNil(t, txRet.TxResult.Data) // will be deprecated. deployed contract address is not returned via `Data` any more
+	require.Greater(t, len(txRet.TxResult.Events), 0)
+	require.Equal(t, "evm", txRet.TxResult.Events[0].Type, txRet.TxResult.Events[0].Type)
+	require.Greater(t, len(txRet.TxResult.Events[0].Attributes), 0)
+	require.Equal(t, "contractAddress", string(txRet.TxResult.Events[0].Attributes[0].Key), string(txRet.TxResult.Events[0].Attributes[0].Key))
+	require.Equal(t, 40, len(txRet.TxResult.Events[0].Attributes[0].Value), string(txRet.TxResult.Events[0].Attributes[0].Value))
+	_addr, err := types.HexToAddress(string(txRet.TxResult.Events[0].Attributes[0].Value))
+	require.NoError(t, err)
+	contract.SetAddress(_addr)
 	evmContract = contract
 
 	require.NoError(t, creator.SyncAccount(rweb3))

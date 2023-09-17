@@ -219,31 +219,73 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		return xerrors.ErrUnknownTrxType
 	}
 
-	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
-		// When processing a contract tx, the gas & nonce is processed in EVMCtrler
-		if xerr := postRunTrx(ctx); xerr != nil {
-			return xerr
-		}
+	if xerr := postRunTrx(ctx); xerr != nil {
+		return xerr
 	}
 
 	return nil
 }
 
 func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	// processing fee = gas * gasPrice
-	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
-	if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
-		return xerr
+
+	if ctx.Exec &&
+		ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT &&
+		ctx.Tx.To.Compare(rtypes.ZeroAddress()) == 0 {
+		// this tx is to deploy contract
+		var contractAddr rtypes.Address
+		for _, evt := range ctx.Events {
+			if evt.GetType() == "evm" {
+				for _, attr := range evt.Attributes {
+					if string(attr.Key) == "contractAddress" {
+						if caddr, err := rtypes.HexToAddress(string(attr.Value)); err != nil {
+							return xerrors.From(err)
+						} else {
+							contractAddr = caddr
+							break
+						}
+					}
+				}
+				if contractAddr != nil {
+					break
+				}
+			}
+		}
+		if contractAddr == nil {
+			return xerrors.NewOrdinary("there is no contract address")
+		}
+
+		acct := ctx.AcctHandler.FindAccount(contractAddr, ctx.Exec)
+		if acct == nil {
+			return xerrors.ErrNotFoundAccount.Wrapf("contract address: %v", contractAddr)
+		}
+
+		// mark the new account as contract account
+		acct.SetCode([]byte("contract"))
+
+		if xerr := ctx.AcctHandler.SetAccountCommittable(acct, ctx.Exec); xerr != nil {
+			return xerr
+		}
 	}
 
-	// processing nonce
-	ctx.Sender.AddNonce()
+	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
+		//
+		// The gas & nonce is already processed in `EVMCtrler` if the tx type is `TRX_CONTRACT`.
 
-	if xerr := ctx.AcctHandler.SetAccountCommittable(ctx.Sender, ctx.Exec); xerr != nil {
-		return xerr
+		// processing fee = gas * gasPrice
+		fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
+		if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
+			return xerr
+		}
+
+		// processing nonce
+		ctx.Sender.AddNonce()
+
+		if xerr := ctx.AcctHandler.SetAccountCommittable(ctx.Sender, ctx.Exec); xerr != nil {
+			return xerr
+		}
+
+		// set used gas
+		ctx.GasUsed = ctx.Tx.Gas
 	}
-
-	// set used gas
-	ctx.GasUsed = ctx.Tx.Gas
 	return nil
 }

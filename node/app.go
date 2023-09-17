@@ -30,7 +30,8 @@ var _ abcitypes.Application = (*RigoApp)(nil)
 type RigoApp struct {
 	abcitypes.BaseApplication
 
-	currBlockCtx *rctypes.BlockContext
+	lastBlockCtx *rctypes.BlockContext
+	nextBlockCtx *rctypes.BlockContext
 
 	metaDB      *MetaDB
 	acctCtrler  *account.AcctCtrler
@@ -125,13 +126,13 @@ func (ctrler *RigoApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 
 	var appHash bytes.HexBytes
 	var lastHeight int64
-	ctrler.currBlockCtx = ctrler.metaDB.LastBlockContext()
-	if ctrler.currBlockCtx == nil {
+	ctrler.lastBlockCtx = ctrler.metaDB.LastBlockContext()
+	if ctrler.lastBlockCtx == nil {
 		// to ensure backward compatibility
 		lastHeight = ctrler.metaDB.LastBlockHeight()
 		appHash = ctrler.metaDB.LastBlockAppHash()
 
-		ctrler.currBlockCtx = rctypes.NewBlockContext(
+		ctrler.lastBlockCtx = rctypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				Header: tmproto.Header{
 					Height: lastHeight,
@@ -139,10 +140,10 @@ func (ctrler *RigoApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 				},
 			},
 			nil, nil, nil)
-		ctrler.currBlockCtx.SetAppHash(appHash)
+		ctrler.lastBlockCtx.SetAppHash(appHash)
 	} else {
-		lastHeight = ctrler.currBlockCtx.Height()
-		appHash = ctrler.currBlockCtx.AppHash()
+		lastHeight = ctrler.lastBlockCtx.Height()
+		appHash = ctrler.lastBlockCtx.AppHash()
 	}
 
 	// get chain_id
@@ -226,8 +227,8 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
 		txctx, xerr := rctypes.NewTrxContext(req.Tx,
-			ctrler.currBlockCtx.Height()+int64(1), // issue #39: set block number expected to include current tx.
-			ctrler.currBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
+			ctrler.lastBlockCtx.Height()+int64(1), // issue #39: set block number expected to include current tx.
+			ctrler.lastBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
 			func(_txctx *rctypes.TrxContext) xerrors.XError {
 				_txctx.TrxGovHandler = ctrler.govCtrler
@@ -273,8 +274,8 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 }
 
 func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	if req.Header.Height != ctrler.currBlockCtx.Height()+1 {
-		panic(fmt.Errorf("error block height: expected(%v), actural(%v)", ctrler.currBlockCtx.Height()+1, req.Header.Height))
+	if req.Header.Height != ctrler.lastBlockCtx.Height()+1 {
+		panic(fmt.Errorf("error block height: expected(%v), actural(%v)", ctrler.lastBlockCtx.Height()+1, req.Header.Height))
 	}
 	ctrler.logger.Debug("RigoApp::BeginBlock",
 		"height", req.Header.Height,
@@ -283,19 +284,19 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 
 	ctrler.mtx.Lock() // this lock will be unlocked at EndBlock
 
-	ctrler.currBlockCtx = rctypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
+	ctrler.nextBlockCtx = rctypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
 
-	ev0, xerr := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
+	ev0, xerr := ctrler.govCtrler.BeginBlock(ctrler.nextBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
-	ev1, xerr := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
+	ev1, xerr := ctrler.stakeCtrler.BeginBlock(ctrler.nextBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
-	ev2, xerr := ctrler.vmCtrler.BeginBlock(ctrler.currBlockCtx)
+	ev2, xerr := ctrler.vmCtrler.BeginBlock(ctrler.nextBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
@@ -309,12 +310,12 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 
 	txctx, xerr := rctypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx.Height(),
-		ctrler.currBlockCtx.TimeSeconds(),
+		ctrler.nextBlockCtx.Height(),
+		ctrler.nextBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *rctypes.TrxContext) xerrors.XError {
-			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt()
-			ctrler.currBlockCtx.AddTxsCnt(1)
+			_txctx.TxIdx = ctrler.nextBlockCtx.TxsCnt()
+			ctrler.nextBlockCtx.AddTxsCnt(1)
 
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
@@ -344,7 +345,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 		}
 	} else {
 
-		ctrler.currBlockCtx.AddFee(rctypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.nextBlockCtx.AddFee(rctypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
@@ -371,12 +372,12 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 // deliverTxAsync is not fully implemented yet
 // todo: Fully implement deliverTxAsync which processes txs in parallel.
 func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	txIdx := ctrler.currBlockCtx.TxsCnt()
-	ctrler.currBlockCtx.AddTxsCnt(1)
+	txIdx := ctrler.nextBlockCtx.TxsCnt()
+	ctrler.nextBlockCtx.AddTxsCnt(1)
 
 	txctx, xerr := rctypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx.Height(),
-		ctrler.currBlockCtx.TimeSeconds(),
+		ctrler.nextBlockCtx.Height(),
+		ctrler.nextBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *rctypes.TrxContext) xerrors.XError {
 			_txctx.TxIdx = txIdx
@@ -415,7 +416,7 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 						},
 					}
 
-					ctrler.currBlockCtx.AddFee(rctypes.GasToFee(ctx.GasUsed, ctrler.govCtrler.GasPrice()))
+					ctrler.nextBlockCtx.AddFee(rctypes.GasToFee(ctx.GasUsed, ctrler.govCtrler.GasPrice()))
 				}
 				ctrler.localClient.(*rigoLocalClient).OnTrxExecFinished(ctrler.localClient, ctx.TxIdx, &req, &response)
 			}
@@ -459,22 +460,22 @@ func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 			"height", req.Height)
 	}()
 
-	ev0, xerr := ctrler.govCtrler.EndBlock(ctrler.currBlockCtx)
+	ev0, xerr := ctrler.govCtrler.EndBlock(ctrler.nextBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
-	ev1, xerr := ctrler.acctCtrler.EndBlock(ctrler.currBlockCtx)
+	ev1, xerr := ctrler.acctCtrler.EndBlock(ctrler.nextBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
-	ev2, xerr := ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
+	ev2, xerr := ctrler.stakeCtrler.EndBlock(ctrler.nextBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
 	}
-	ev3, xerr := ctrler.vmCtrler.EndBlock(ctrler.currBlockCtx)
+	ev3, xerr := ctrler.vmCtrler.EndBlock(ctrler.nextBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("RigoApp", "error", xerr)
 		panic(xerr)
@@ -487,7 +488,7 @@ func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 	ev = append(ev, ev3...)
 
 	return abcitypes.ResponseEndBlock{
-		ValidatorUpdates: ctrler.currBlockCtx.ValUpdates,
+		ValidatorUpdates: ctrler.nextBlockCtx.ValUpdates,
 		Events:           ev,
 	}
 }
@@ -496,7 +497,7 @@ func (ctrler *RigoApp) Commit() abcitypes.ResponseCommit {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("RigoApp::Commit", "height", ctrler.currBlockCtx.Height())
+	ctrler.logger.Debug("RigoApp::Commit", "height", ctrler.nextBlockCtx.Height())
 
 	appHash0, ver0, err := ctrler.govCtrler.Commit()
 	if err != nil {
@@ -527,11 +528,14 @@ func (ctrler *RigoApp) Commit() abcitypes.ResponseCommit {
 	}
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
-	ctrler.logger.Debug("RigoApp::Commit", "height", ver0, "txs", ctrler.currBlockCtx.TxsCnt(), "app hash", bytes.HexBytes(appHash))
+	ctrler.nextBlockCtx.SetAppHash(appHash)
+	ctrler.logger.Debug("RigoApp::Commit", "height", ver0, "txs", ctrler.nextBlockCtx.TxsCnt(), "app hash", ctrler.nextBlockCtx.AppHash())
 
-	ctrler.currBlockCtx.SetAppHash(appHash)
-	ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
+	ctrler.metaDB.PutLastBlockContext(ctrler.nextBlockCtx)
 	ctrler.metaDB.PutLastBlockHeight(ver0)
+
+	ctrler.lastBlockCtx = ctrler.nextBlockCtx
+	ctrler.nextBlockCtx = nil
 
 	return abcitypes.ResponseCommit{
 		Data: appHash[:],

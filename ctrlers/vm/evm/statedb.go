@@ -17,8 +17,8 @@ import (
 
 type StateDBWrapper struct {
 	*state.StateDB
-	acctLedger ctrlertypes.IAccountHandler
-	immutable  bool
+	acctHandler ctrlertypes.IAccountHandler
+	immutable   bool
 
 	accessedObjAddrs map[common.Address]int
 	snapshot         int
@@ -28,18 +28,15 @@ type StateDBWrapper struct {
 	mtx    sync.RWMutex
 }
 
-func NewStateDBWrapper(db ethdb.Database, lastRootHash []byte, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) (*StateDBWrapper, error) {
-	var hash common.Hash
-	copy(hash[:], lastRootHash)
-
-	stateDB, err := state.New(hash, state.NewDatabase(db), nil)
+func NewStateDBWrapper(db ethdb.Database, rootHash bytes.HexBytes, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) (*StateDBWrapper, error) {
+	stateDB, err := state.New(rootHash.Array32(), state.NewDatabase(db), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &StateDBWrapper{
 		StateDB:          stateDB,
-		acctLedger:       acctHandler,
+		acctHandler:      acctHandler,
 		accessedObjAddrs: make(map[common.Address]int),
 		logger:           logger,
 	}, nil
@@ -57,17 +54,17 @@ func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to type
 }
 
 func (s *StateDBWrapper) Finish() {
-	for addr, v := range s.accessedObjAddrs {
+	for addr, _ := range s.accessedObjAddrs {
 		amt := uint256.MustFromBig(s.StateDB.GetBalance(addr))
 		nonce := s.StateDB.GetNonce(addr)
 
-		acct := s.acctLedger.FindOrNewAccount(addr[:], s.exec)
+		acct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
 		acct.SetBalance(amt)
 		acct.SetNonce(nonce)
 
-		_ = s.acctLedger.SetAccountCommittable(acct, s.exec)
+		_ = s.acctHandler.SetAccountCommittable(acct, s.exec)
 
-		s.logger.Debug("Finish", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec(), "snap", v)
+		//s.logger.Debug("Finish", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec(), "snap", v)
 	}
 
 	// issue #68
@@ -195,13 +192,13 @@ func (s *StateDBWrapper) addAccessedObjAddr(addr common.Address) {
 	if _, ok := s.accessedObjAddrs[addr]; !ok {
 		stateObject := s.GetOrNewStateObject(addr)
 		if stateObject != nil {
-			rigoAcct := s.acctLedger.FindOrNewAccount(addr[:], s.exec)
+			rigoAcct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
 			stateObject.SetNonce(rigoAcct.Nonce)
 			stateObject.SetBalance(rigoAcct.Balance.ToBig())
 
 			s.accessedObjAddrs[addr] = s.snapshot + 1
 
-			s.logger.Debug("addAccessedObjAddr", "address", rigoAcct.Address, "nonce", rigoAcct.Nonce, "balance", rigoAcct.Balance.Dec(), "snap", s.snapshot+1)
+			//s.logger.Debug("addAccessedObjAddr", "address", rigoAcct.Address, "nonce", rigoAcct.Nonce, "balance", rigoAcct.Balance.Dec(), "snap", s.snapshot+1)
 		}
 	}
 }

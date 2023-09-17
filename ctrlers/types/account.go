@@ -81,6 +81,20 @@ func (acct *Account) GetName() string {
 	return acct.Name
 }
 
+func (acct *Account) SetDocURL(s string) {
+	acct.mtx.Lock()
+	defer acct.mtx.Unlock()
+
+	acct.DocURL = s
+}
+
+func (acct *Account) GetDocURL() string {
+	acct.mtx.RLock()
+	defer acct.mtx.RUnlock()
+
+	return acct.DocURL
+}
+
 func (acct *Account) AddNonce() {
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()

@@ -29,7 +29,7 @@ var (
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
 	defGas           = uint64(100_000)
 	smallGas         = uint64(99_999)
-	contractGas      = uint64(30_000_00)
+	contractGas      = uint64(3_000_000)
 	defGasPrice      = uint256.NewInt(10_000_000_000)
 	baseFee          = uint256.NewInt(1_000_000_000_000_000)
 	//smallFee         = uint256.NewInt(999_999_999_999_999)
@@ -93,6 +93,16 @@ func waitTrxResult(txhash []byte, maxTimes int, rweb3 *rigoweb3.RigoWeb3) (*rweb
 		}
 	}
 	return nil, xerrors.NewOrdinary("timeout")
+}
+
+func waitBlock(n int64) {
+	subWg, err := waitEvent(fmt.Sprintf("tm.event='NewBlock' AND block.height = %v", n), func(event *coretypes.ResultEvent, err error) bool {
+		return true
+	})
+	if err != nil {
+		panic(err)
+	}
+	subWg.Wait()
 }
 
 func waitEvent(query string, cb func(*coretypes.ResultEvent, error) bool) (*sync.WaitGroup, error) {

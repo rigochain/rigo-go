@@ -9,6 +9,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
+	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"os"
@@ -55,6 +56,14 @@ func (ec *EVMContract) GetAddress() types.Address {
 	return ec.addr
 }
 
+func (ec *EVMContract) GetBytecode() rbytes.HexBytes {
+	return rbytes.HexBytes(ec.buildInfo.Bytecode)
+}
+
+func (ec *EVMContract) GetDeployedBytecode() rbytes.HexBytes {
+	return rbytes.HexBytes(ec.buildInfo.DeployedBytecode)
+}
+
 func (ec *EVMContract) Call(name string, args []interface{}, from types.Address, height int64, rweb3 *web3.RigoWeb3) ([]interface{}, error) {
 	if ec.addr == nil {
 		return nil, errors.New("no contract address")
@@ -70,7 +79,7 @@ func (ec *EVMContract) Call(name string, args []interface{}, from types.Address,
 	return ec.unpack(name, ret0.ReturnData)
 }
 
-func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (rbytes.HexBytes, error) {
 	to := ec.addr
 
 	data, err := ec.pack(name, args...)
@@ -93,11 +102,8 @@ func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wal
 	if err != nil {
 		return nil, err
 	}
-	if ret.Code == xerrors.ErrCodeSuccess && len(ret.Data) == types.AddrSize {
-		ec.addr = types.Address(ret.Data)
-	}
 
-	return ret, nil
+	return rbytes.HexBytes(ret.Hash), nil
 }
 
 func (ec *EVMContract) ExecSync(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
@@ -123,9 +129,13 @@ func (ec *EVMContract) ExecSync(name string, args []interface{}, from *web3.Wall
 	if err != nil {
 		return nil, err
 	}
-	if ret.Code == xerrors.ErrCodeSuccess && len(ret.Data) == types.AddrSize {
-		ec.addr = types.Address(ret.Data)
-	}
+
+	//
+	// it will be deprecated.
+	// the deployed contract address will be not returned via `ret.Data`.
+	//if ret.Code == xerrors.ErrCodeSuccess && len(ret.Data) == types.AddrSize {
+	//	ec.addr = types.Address(ret.Data)
+	//}
 
 	return ret, nil
 }
@@ -153,8 +163,11 @@ func (ec *EVMContract) ExecCommit(name string, args []interface{}, from *web3.Wa
 	if err != nil {
 		return nil, err
 	}
-	if ret.DeliverTx.Code == xerrors.ErrCodeSuccess && len(ret.DeliverTx.Data) == types.AddrSize {
-		ec.addr = types.Address(ret.DeliverTx.Data)
+	if ret.CheckTx.Code == xerrors.ErrCodeSuccess && ret.DeliverTx.Code == xerrors.ErrCodeSuccess && name == "" {
+		ec.addr, err = types.HexToAddress(string(ret.DeliverTx.Events[0].Attributes[0].Value))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return ret, nil

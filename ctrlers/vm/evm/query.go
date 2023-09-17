@@ -5,7 +5,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
@@ -31,7 +30,7 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 	}
 	btm := block.Block.Time.Unix()
 
-	execRet, xerr := ctrler.queryVM(from, to, data, height, btm)
+	execRet, xerr := ctrler.callVM(from, to, data, height, btm)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -52,15 +51,19 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 	return retbz, nil
 }
 
-func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
-
-	// block<height> 시점의 stateDB 와 account ledger(acctCtrler) 를 갖는 `stateDBWrapper` 획득
-	hash, err := ctrler.metadb.Get(blockKey(height))
-	if err != nil {
-		return nil, xerrors.From(err)
+func (ctrler *EVMCtrler) QueryCode(addr types.Address, height int64) ([]byte, xerrors.XError) {
+	state, xerr := ctrler.ImmutableStateAt(height)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	state, xerr := ctrler.ImmutableStateAt(height, hash)
+	return state.GetCode(addr.Array20()), nil
+}
+
+func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
+
+	// block<height> 시점의 stateDB 와 account ledger(acctCtrler) 를 갖는 `stateDBWrapper` 획득
+	state, xerr := ctrler.ImmutableStateAt(height)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -95,14 +98,6 @@ func (ctrler *EVMCtrler) queryVM(from, to types.Address, data []byte, height, bl
 	}
 	if err != nil {
 		return nil, xerrors.From(fmt.Errorf("err: %w (supplied gas %d)", err, vmmsg.Gas()))
-	}
-
-	if vmmsg.To() == nil {
-		// contract 생성.
-		// EVM은 ReturnData 에 deployed code 를 리턴한다.
-		// deployed code 를 contract 주소로 대치 한다.
-		contractAddr := crypto.CreateAddress(vmevm.TxContext.Origin, vmmsg.Nonce())
-		result.ReturnData = contractAddr[:]
 	}
 
 	return result, nil

@@ -99,11 +99,11 @@ func TestInvalidStakeAmount(t *testing.T) {
 func TestDelegating(t *testing.T) {
 	rweb3 := randRigoWeb3()
 
-	var w *web3.Wallet
+	var delegatorWallet *web3.Wallet
 	for {
-		w = randCommonWallet()
-		require.NoError(t, w.SyncAccount(rweb3))
-		if w.GetBalance().Sign() > 0 {
+		delegatorWallet = randCommonWallet()
+		require.NoError(t, delegatorWallet.SyncAccount(rweb3))
+		if delegatorWallet.GetBalance().Sign() > 0 {
 			break
 		}
 	}
@@ -119,24 +119,20 @@ func TestDelegating(t *testing.T) {
 	stakeAmt := uint256.NewInt(1_000_000_000_000_000_000) // 10^18
 	stakePower := int64(1)
 
-	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, delegatorWallet.Unlock(defaultRpcNode.Pass))
 
 	// self staking
-	ret, err := w.StakingSync(valAddr, defGas, defGasPrice, stakeAmt, rweb3)
+	ret, err := delegatorWallet.StakingCommit(valAddr, defGas, defGasPrice, stakeAmt, rweb3)
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 	txHash := ret.Hash
 
-	txRet, err := waitTrxResult(txHash, 30, rweb3)
-	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
-	require.Equal(t, txHash, txRet.Hash)
-	require.Equal(t, defGas, txRet.TxDetail.Gas)
-	require.Equal(t, stakeAmt, txRet.TxDetail.Amount)
+	require.Equal(t, defGas, uint64(ret.DeliverTx.GasUsed))
 
 	// check stakes
 	found := false
-	stakes, err := rweb3.GetStakes(w.Address())
+	stakes, err := rweb3.GetStakes(delegatorWallet.Address())
 	require.NoError(t, err)
 	require.True(t, len(stakes) > 0)
 	for _, s0 := range stakes {
@@ -157,9 +153,15 @@ func TestDelegating(t *testing.T) {
 	fmt.Println("Wait 5 seconds...")
 	time.Sleep(5 * time.Second)
 
+	//waitBlock(ret.Height + 4)
+
 	vals, err = queryValidators(0, rweb3)
 	require.NoError(t, err)
+
 	fmt.Println("query validator power", vals.Validators[0].VotingPower)
+	fmt.Println("query valStakes0", valStakes0.TotalPower)
+	fmt.Println("query valStakes1", valStakes1.TotalPower)
+	require.Equal(t, valStakes1.TotalPower, vals.Validators[0].VotingPower)
 }
 
 func TestMinValidatorStake(t *testing.T) {

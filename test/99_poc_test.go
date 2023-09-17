@@ -276,7 +276,19 @@ func TestPoc3(t *testing.T) {
 	err = tmjson.Unmarshal(resp.Result, resp2)
 	require.NoError(t, err, string(resp.Result))
 
-	contractAddr := bytes.HexBytes(resp2.DeliverTx.Data)
+	require.Greater(t, len(resp2.DeliverTx.Events), 1)
+
+	var contractAddr types.Address
+	for _, evt := range resp2.DeliverTx.Events {
+		if evt.Type == "evm" {
+			require.GreaterOrEqual(t, len(evt.Attributes), 1)
+			require.Equal(t, "contractAddress", string(evt.Attributes[0].Key), string(evt.Attributes[0].Key))
+			require.Equal(t, 40, len(evt.Attributes[0].Value), string(evt.Attributes[0].Value))
+			contractAddr, err = types.HexToAddress(string(evt.Attributes[0].Value))
+			require.NoError(t, err)
+		}
+	}
+
 	fmt.Println("contract address", contractAddr)
 
 	nonce++
@@ -465,6 +477,10 @@ func TestPoC4(t *testing.T) {
 
 func TestPoC5(t *testing.T) {
 	rweb3 := rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(defaultRpcNode.RPCURL))
+	for i, w := range validatorWallets {
+		require.NoError(t, w.SyncAccount(rweb3))
+		fmt.Println("validator", i, w.Address(), w.GetBalance())
+	}
 
 	w0 := wallets[0]
 	require.NoError(t, w0.Unlock(defaultRpcNode.Pass))
@@ -487,6 +503,8 @@ func TestPoC5(t *testing.T) {
 	fmt.Println("targetWallet", targetWallet.Address(), "balance", targetWallet.GetBalance().Dec())
 	expectedTargetWalletBalance := targetWallet.GetBalance().Clone()
 
+	gasSum := uint64(0)
+
 	contract, err := vm.NewEVMContract("./PoC5.json")
 	require.NoError(t, err)
 
@@ -494,10 +512,13 @@ func TestPoC5(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	require.NotNil(t, contract.GetAddress())
 
 	fmt.Printf("Set contract address: %x\n", contract.GetAddress())
+	fmt.Println("tx_", ret.Hash, "height", ret.Height, "gas", ret.DeliverTx.GasUsed)
+	gasSum += uint64(ret.DeliverTx.GasUsed)
 
-	contAcct := getAccountData(ret.DeliverTx.Data)
+	contAcct := getAccountData(contract.GetAddress())
 	fmt.Printf("Contract balance: %v\n", contAcct.Balance)
 
 	// first tx - evm tx
@@ -505,17 +526,18 @@ func TestPoC5(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		w0.AddNonce()
-		retAsync, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), defGas, defGasPrice, uint256.NewInt(123), rweb3)
+		txhash, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), defGas, defGasPrice, uint256.NewInt(123), rweb3)
 		require.NoError(t, err)
 
-		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		retTx, err := waitTrxResult(txhash, 30, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
 
 		_ = expectedTargetWalletBalance.Add(expectedTargetWalletBalance, uint256.NewInt(123))
 		wg.Done()
 
-		fmt.Println("tx0", retTx.Hash, "height", retTx.Height)
+		fmt.Println("tx0", retTx.Hash, "height", retTx.Height, "index", retTx.Index, "gas", retTx.TxResult.GasUsed)
+		gasSum += uint64(retTx.TxResult.GasUsed)
 	}()
 
 	// second tx - rigo account tx
@@ -532,28 +554,36 @@ func TestPoC5(t *testing.T) {
 		_ = expectedTargetWalletBalance.Add(expectedTargetWalletBalance, uint256.NewInt(123))
 		wg.Done()
 
-		fmt.Println("tx1", retTx.Hash, "height", retTx.Height)
+		fmt.Println("tx1", retTx.Hash, "height", retTx.Height, "index", retTx.Index, "gas", retTx.TxResult.GasUsed)
+		gasSum += uint64(retTx.TxResult.GasUsed)
 	}()
 
 	// third tx - evm tx (revert)
 	wg.Add(1)
 	go func() {
 		time.Sleep(20 * time.Millisecond) // tx order 2
-		retAsync, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), defGas, defGasPrice, uint256.NewInt(0), rweb3)
+		txhash, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), defGas, defGasPrice, uint256.NewInt(0), rweb3)
 		require.NoError(t, err)
 
-		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		retTx, err := waitTrxResult(txhash, 30, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeDeliverTx, retTx.TxResult.Code, retTx.TxResult.Log)
 
 		wg.Done()
 
-		fmt.Println("tx2", retTx.Hash, "height", retTx.Height)
+		fmt.Println("tx2", retTx.Hash, "height", retTx.Height, "index", retTx.Index, "gas", retTx.TxResult.GasUsed)
+		gasSum += uint64(retTx.TxResult.GasUsed)
 	}()
 
 	wg.Wait()
 
+	if isValidator(targetWallet.Address()) {
+		feeSum := new(uint256.Int).Mul(uint256.NewInt(gasSum), defGasPrice)
+		_ = expectedTargetWalletBalance.Add(expectedTargetWalletBalance, feeSum)
+	}
+
 	require.NoError(t, targetWallet.SyncAccount(rweb3))
-	// Sometimes, expected: 93000004981025701000000246, actual: 93000004979811026000000246, diff: 1,214,675,000,000,000
+	// When targetWallet is validator, diff:3,146,750,000,000,000
+	fmt.Println("expected", expectedTargetWalletBalance.Dec(), "actual", targetWallet.GetBalance().Dec())
 	require.Equal(t, expectedTargetWalletBalance.Dec(), targetWallet.GetBalance().Dec())
 }

@@ -200,7 +200,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 		}
 		require.NoError(t, err)
 
-		if ret.Code == xerrors.ErrCodeCheckTx &&
+		if ret.Code != xerrors.ErrCodeSuccess &&
 			strings.Contains(ret.Log, "invalid nonce") {
 
 			subWg.Done()
