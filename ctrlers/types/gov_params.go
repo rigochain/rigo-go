@@ -65,11 +65,11 @@ func DefaultGovParams() *GovParams {
 		//			= 4,756,468,797 * 31,536,000(blocks in 1Y)
 		//			= 149,999,999,982,192,000 amount [per 1RIGO, 1Y]
 		// , it's about 15% of 1 power
-		rewardPerPower:         uint256.NewInt(4_756_468_797),  // amount
-		lazyRewardBlocks:       2592000,                        // = 60 * 60 * 24 * 30 => 30 days
-		lazyApplyingBlocks:     259200,                         // = 60 * 60 * 24 * 3 => 3 days
-		gasPrice:               uint256.NewInt(10_000_000_000), // 10Gwei
-		minTrxGas:              uint64(100_000),                // 0.001 RIGO = 10^15 wei
+		rewardPerPower:         uint256.NewInt(4_756_468_797),   // amount
+		lazyRewardBlocks:       2592000,                         // = 60 * 60 * 24 * 30 => 30 days
+		lazyApplyingBlocks:     259200,                          // = 60 * 60 * 24 * 3 => 3 days
+		gasPrice:               uint256.NewInt(250_000_000_000), // 250Gwei
+		minTrxGas:              uint64(4000),                    // 0.001 RIGO = 10^15 wei
 		maxTrxGas:              math.MaxUint64,
 		maxBlockGas:            math.MaxUint64,
 		minVotingPeriodBlocks:  259200,  // = 60 * 60 * 24 * 3 => 3 days
