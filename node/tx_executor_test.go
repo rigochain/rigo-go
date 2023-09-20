@@ -47,55 +47,55 @@ func init() {
 
 	//
 	// Wrong GasPrice
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, uint64(100_000), uint256.NewInt(10_000_000_001), uint256.NewInt(0))
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), uint256.NewInt(10_000_000_001), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
 	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidGasPrice})
 
 	//
 	// Wrong Signature - sign with proto encoding
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, uint64(100_000), govParams.GasPrice(), uint256.NewInt(0))
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxProto(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
 	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidTrxSig})
 
 	//
 	// Wrong Signature - no signature
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, uint64(100_000), govParams.GasPrice(), uint256.NewInt(0))
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	txctx = makeTrxCtx(tx, 1)
 	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidTrxSig})
 
 	//
 	// Wrong Signature - other's signature
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, uint64(100_000), govParams.GasPrice(), uint256.NewInt(0))
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w1.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
 	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidTrxSig})
 
 	//
 	// Wrong Signature - wrong chainId
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, uint64(100_000), govParams.GasPrice(), uint256.NewInt(0))
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain_wrong")
 	txctx = makeTrxCtx(tx, 1)
 	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidTrxSig})
 
 	//
 	// Invalid nonce
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 1, uint64(100_000), govParams.GasPrice(), uint256.NewInt(1000))
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 1, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
 	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidNonce})
 
 	//
 	// Insufficient fund
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, uint64(100_000), govParams.GasPrice(), uint256.NewInt(1001))
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1001))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
 	cases = append(cases, &caseObj{txctx, xerrors.ErrInsufficientFund})
 
 	//
 	// Success
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, uint64(100_000), govParams.GasPrice(), uint256.NewInt(1000))
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
 	cases = append(cases, &caseObj{txctx, nil})

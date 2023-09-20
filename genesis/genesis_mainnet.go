@@ -9,13 +9,12 @@ func MainnetGenesisDoc(chainId string) (*tmtypes.GenesisDoc, error) {
 	if err != nil {
 		return nil, err
 	}
-	genDoc.ChainID = chainId
 	return genDoc, nil
 }
 
 var jsonBlobMainnetGenesis = []byte(`{
-  "genesis_time": "2021-08-06T08:29:24.827484Z",
-  "chain_id": "",
+  "genesis_time": "2023-09-20T06:45:01.333168Z",
+  "chain_id": "mainnet",
   "initial_height": "0",
   "consensus_params": {
     "block": {
@@ -39,112 +38,90 @@ var jsonBlobMainnetGenesis = []byte(`{
   },
   "validators": [
     {
-      "address": "B9ADC66777A1900A8F5CF22F07E7641CC3C3CF48",
+      "address": "EE273B53C7D654CBF0D660D6781D7FC15BAED707",
       "pub_key": {
         "type": "tendermint/PubKeySecp256k1",
-        "value": "A9uTzg7ST634ZtmfksDrQspEGt2n+GUsmk31X6P2yRjj"
+        "value": "A+wvscISumm42piANW2CJYH/qiU0bx2okyPabIkIf9aS"
       },
-      "power": "10",
-      "name": ""
+      "power": "10000000",
+      "name": "Validator#1"
     },
     {
-      "address": "82F4C6D5498A2CA1E194E3C5AD9AD1EEEC9E7AF0",
+      "address": "1D459DCCC6A7AE76496044E3FB886BFB0FB714D4",
       "pub_key": {
         "type": "tendermint/PubKeySecp256k1",
-        "value": "AroU/zplM+sz7oIYUUycXmZx4mruoplpXaRhpteoQpZa"
+        "value": "A/lvsF0qTmZL7CLHrbzj5YvmFlGe8Tv9SuPGcz3F3lkS"
       },
-      "power": "10",
-      "name": ""
+      "power": "10000000",
+      "name": "Validator#2"
     },
     {
-      "address": "51398BA5613C62D2566B523C6E49D94B88F55D54",
+      "address": "9E57D69287D5EEF9E8F03206B5B53FC6AA222CB9",
       "pub_key": {
         "type": "tendermint/PubKeySecp256k1",
-        "value": "AnhrTQzRUNs1VLRuc3WF5kOXJ6qLE0nUNGprYM1rvQF1"
+        "value": "AvyfnTQ8kAWtXlPU+9vKss1IjkR23pNp/bjN4BeTvRsz"
       },
-      "power": "10",
-      "name": ""
+      "power": "10000000",
+      "name": "Validator#3"
     },
     {
-      "address": "0EC62329BE52FDB338448C53DDB082A2E0AAF864",
+      "address": "0F9894E0262002254F300BFEC2B2087096C6586E",
       "pub_key": {
         "type": "tendermint/PubKeySecp256k1",
-        "value": "AmlK2xCcj6RbabvdwtfmK65Zty4lX9YPswpsoUqW2LHI"
+        "value": "Ah+5oHoVb1nODcAoAKQXiJO0mcs4gknXB3QIjHsP8dDF"
       },
-      "power": "10",
-      "name": ""
+      "power": "10000000",
+      "name": "Validator#4"
     },
     {
-      "address": "D8AEAC7E12BD6488036505262FE71767D3996792",
+      "address": "EFAC306C301C7B110DF0631F3B74F4C1AC93EEBF",
       "pub_key": {
         "type": "tendermint/PubKeySecp256k1",
-        "value": "AtjFfclYPh0/cC46/BeOJIuJWPsjhOg5js8azJyiaal2"
+        "value": "A3CSHEWwsZgk0lfF/Qhw/1Lbu3gHlpDRzCZ/59zYwpe3"
       },
-      "power": "10",
-      "name": ""
+      "power": "10000000",
+      "name": "Validator#5"
     }
   ],
-  "app_hash": "0BB80C199AC01DA31D82B8DA95C941F91E796908A6546B96D0EF1BE55CED9E16",
+  "app_hash": "9965D70B33A5B4EDEB50BFC295DE1DEB83AE7A210C0F5FFF560F3331A1766B07",
   "app_state": {
     "assetHolders": [
       {
-        "address": "B9ADC66777A1900A8F5CF22F07E7641CC3C3CF48",
-        "balance": "100000000000000000000000000"
+        "address": "64621D5A507D566451E3947341B6AED9B500B40E",
+        "balance": "923800000000000000000000000"
       },
       {
-        "address": "82F4C6D5498A2CA1E194E3C5AD9AD1EEEC9E7AF0",
-        "balance": "100000000000000000000000000"
+        "address": "2EFE6619BB6B784025D839C76410D089B43B4BB6",
+        "balance": "6000000000000000000000000"
       },
       {
-        "address": "51398BA5613C62D2566B523C6E49D94B88F55D54",
-        "balance": "100000000000000000000000000"
+        "address": "9600F2786A663E4D679D470555CF1FB871836888",
+        "balance": "200000000000000000000000"
       },
       {
-        "address": "0EC62329BE52FDB338448C53DDB082A2E0AAF864",
-        "balance": "100000000000000000000000000"
-      },
-      {
-        "address": "D8AEAC7E12BD6488036505262FE71767D3996792",
-        "balance": "100000000000000000000000000"
-      },
-      {
-        "address": "22E94B8CD68867197BBEC78BD5F290E77EB0955E",
-        "balance": "100000000000000000000000000"
-      },
-      {
-        "address": "99F954D4EA8DB0CFB7932404E004C7C5DE35977F",
-        "balance": "100000000000000000000000000"
-      },
-      {
-        "address": "2E8F04F3F5CE9C8EB60586043D16F6D542539A47",
-        "balance": "100000000000000000000000000"
-      },
-      {
-        "address": "CC2A6D5B73D438A282C6C811C5E6837DE40A3CB1",
-        "balance": "100000000000000000000000000"
-      },
-      {
-        "address": "4979E92CFF082C6ADAE085CA51818B70D7754B21",
-        "balance": "100000000000000000000000000"
+        "address": "46937D479A555F5CEE42E47346AEF4C36DB15EC3",
+        "balance": "20000000000000000000000000"
       }
-    ], 
-	"govParams": {
+    ],
+    "govParams": {
       "version": "1",
       "maxValidatorCnt": "21",
       "minValidatorStake": "7000000000000000000000000",
       "rewardPerPower": "4756468797",
       "lazyRewardBlocks": "2592000",
       "lazyApplyingBlocks": "259200",
-      "gasPrice": "10000000000",
-      "minTrxGas": "100000",
-      "maxTrxGas": "18446744073709551615",
+      "gasPrice": "250000000000",
+      "minTrxGas": "4000",
+      "maxTrxGas": "25000000",
       "maxBlockGas": "18446744073709551615",
       "minVotingPeriodBlocks": "259200",
       "maxVotingPeriodBlocks": "2592000",
       "minSelfStakeRatio": "50",
       "maxUpdatableStakeRatio": "30",
-      "slashRatio": "50"
-	}
+      "slashRatio": "50",
+      "signedBlocksWindow": "10000",
+      "minSignedBlocks": "500"
+    }
   }
 }
 `)
