@@ -70,7 +70,7 @@ func DefaultGovParams() *GovParams {
 		lazyApplyingBlocks:     259200,                          // = 60 * 60 * 24 * 3 => 3 days
 		gasPrice:               uint256.NewInt(250_000_000_000), // 250Gwei
 		minTrxGas:              uint64(4000),                    // 0.001 RIGO = 10^15 wei
-		maxTrxGas:              math.MaxUint64,
+		maxTrxGas:              25_000_000,
 		maxBlockGas:            math.MaxUint64,
 		minVotingPeriodBlocks:  259200,  // = 60 * 60 * 24 * 3 => 3 days
 		maxVotingPeriodBlocks:  2592000, // = 60 * 60 * 24 * 30 => 30 days
