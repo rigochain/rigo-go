@@ -69,7 +69,7 @@ func makeTestWallets(n int) []*web3.Wallet {
 	wallets := make([]*web3.Wallet, n)
 	for i := 0; i < n; i++ {
 		w := web3.NewWallet([]byte("1"))
-		w.GetAccount().AddBalance(types.ToSAU(100000000))
+		w.GetAccount().AddBalance(types.ToFons(100000000))
 		w.Unlock([]byte("1"))
 
 		wallets[i] = w

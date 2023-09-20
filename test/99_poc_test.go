@@ -149,7 +149,7 @@ func TestPoC1(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, commitRet.CheckTx.Code, commitRet.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, commitRet.DeliverTx.Code, commitRet.DeliverTx.Log)
-	fmt.Println("TestPoC1", "used", commitRet.DeliverTx.GasUsed, "wanted", commitRet.DeliverTx.GasWanted)
+	fmt.Println("TestPoC1", "deploy contract - gas used", commitRet.DeliverTx.GasUsed, "wanted", commitRet.DeliverTx.GasWanted)
 
 	//submitTrx(wallet, trxObj)
 	//fmt.Printf("%s\n", submitTrx(wallet, trxObj))
@@ -382,7 +382,7 @@ func TestPoC4(t *testing.T) {
 
 	// set accessedObjAddrs - walletMain
 	bytedata, _ := hex.DecodeString("1234")
-	trx1 := web3.NewTrxContract(walletB.Address(), walletMain.Address(), walletB.GetNonce(), defGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
+	trx1 := web3.NewTrxContract(walletB.Address(), walletMain.Address(), walletB.GetNonce(), contGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
 	_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
 
 	// transfer all money to walletMoneCopy with NewTrxTransfer
@@ -394,7 +394,7 @@ func TestPoC4(t *testing.T) {
 
 	// use evm stated(accessedObjAddrs[walletMain] is true)
 	// overwrite walletMain's state(balance)
-	trx3 := web3.NewTrxContract(walletA.Address(), walletMain.Address(), walletA.GetNonce(), defGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
+	trx3 := web3.NewTrxContract(walletA.Address(), walletMain.Address(), walletA.GetNonce(), contGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
 	_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
 
 	wg := sync.WaitGroup{}
@@ -406,7 +406,7 @@ func TestPoC4(t *testing.T) {
 		require.NoError(t, err)
 		//submitTrxAsync(walletB, trx1)
 
-		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		retTx, err := waitTrxResult(retAsync.Hash, 60, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
 
@@ -421,7 +421,7 @@ func TestPoC4(t *testing.T) {
 		require.NoError(t, err)
 		//submitTrxAsync(walletMain, trx2)
 
-		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		retTx, err := waitTrxResult(retAsync.Hash, 60, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
 
@@ -437,7 +437,7 @@ func TestPoC4(t *testing.T) {
 		require.NoError(t, err)
 		//submitTrxAsync(walletA, trx3)
 
-		retTx, err := waitTrxResult(retAsync.Hash, 30, rweb3)
+		retTx, err := waitTrxResult(retAsync.Hash, 60, rweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
 
@@ -515,7 +515,7 @@ func TestPoC5(t *testing.T) {
 	require.NotNil(t, contract.GetAddress())
 
 	fmt.Printf("Set contract address: %x\n", contract.GetAddress())
-	fmt.Println("tx_", ret.Hash, "height", ret.Height, "gas", ret.DeliverTx.GasUsed)
+	fmt.Println("tx_", ret.Hash, "height", ret.Height, "deploy used gas", ret.DeliverTx.GasUsed)
 	gasSum += uint64(ret.DeliverTx.GasUsed)
 
 	contAcct := getAccountData(contract.GetAddress())
@@ -526,7 +526,7 @@ func TestPoC5(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		w0.AddNonce()
-		txhash, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), defGas, defGasPrice, uint256.NewInt(123), rweb3)
+		txhash, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), contGas, defGasPrice, uint256.NewInt(123), rweb3)
 		require.NoError(t, err)
 
 		retTx, err := waitTrxResult(txhash, 30, rweb3)
@@ -536,7 +536,7 @@ func TestPoC5(t *testing.T) {
 		_ = expectedTargetWalletBalance.Add(expectedTargetWalletBalance, uint256.NewInt(123))
 		wg.Done()
 
-		fmt.Println("tx0", retTx.Hash, "height", retTx.Height, "index", retTx.Index, "gas", retTx.TxResult.GasUsed)
+		fmt.Println("tx0", retTx.Hash, "height", retTx.Height, "index", retTx.Index, "transfer(contract) used gas", retTx.TxResult.GasUsed)
 		gasSum += uint64(retTx.TxResult.GasUsed)
 	}()
 
@@ -554,7 +554,7 @@ func TestPoC5(t *testing.T) {
 		_ = expectedTargetWalletBalance.Add(expectedTargetWalletBalance, uint256.NewInt(123))
 		wg.Done()
 
-		fmt.Println("tx1", retTx.Hash, "height", retTx.Height, "index", retTx.Index, "gas", retTx.TxResult.GasUsed)
+		fmt.Println("tx1", retTx.Hash, "height", retTx.Height, "index", retTx.Index, "transfer used gas", retTx.TxResult.GasUsed)
 		gasSum += uint64(retTx.TxResult.GasUsed)
 	}()
 
@@ -562,7 +562,7 @@ func TestPoC5(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		time.Sleep(20 * time.Millisecond) // tx order 2
-		txhash, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), defGas, defGasPrice, uint256.NewInt(0), rweb3)
+		txhash, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), contGas, defGasPrice, uint256.NewInt(0), rweb3)
 		require.NoError(t, err)
 
 		retTx, err := waitTrxResult(txhash, 30, rweb3)
@@ -571,7 +571,7 @@ func TestPoC5(t *testing.T) {
 
 		wg.Done()
 
-		fmt.Println("tx2", retTx.Hash, "height", retTx.Height, "index", retTx.Index, "gas", retTx.TxResult.GasUsed)
+		fmt.Println("tx2", retTx.Hash, "height", retTx.Height, "index", retTx.Index, "callRevert used gas", retTx.TxResult.GasUsed)
 		gasSum += uint64(retTx.TxResult.GasUsed)
 	}()
 

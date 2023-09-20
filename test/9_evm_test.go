@@ -68,6 +68,8 @@ func testDeploy(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 	require.NotNil(t, contract.GetAddress())
 
+	fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
+
 	contAcct, err := rweb3.GetAccount(contract.GetAddress())
 	require.NoError(t, err)
 	require.Equal(t, []byte(contract.GetDeployedBytecode()), contAcct.Code)
@@ -158,6 +160,8 @@ func testPayable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 
+	fmt.Println("giveMeAsset", "usedGas", txRet.TxResult.GasUsed)
+
 	expectedAmt = new(uint256.Int).Add(sender.GetBalance(), refundAmt)
 	_ = expectedAmt.Sub(expectedAmt, gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice))
 	require.NoError(t, sender.SyncAccount(rweb3))
@@ -207,6 +211,8 @@ func testEvents(t *testing.T) {
 	txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
+
+	fmt.Println("transfer(contract)", "usedGas", txRet.TxResult.GasUsed)
 
 	subWg.Wait()
 

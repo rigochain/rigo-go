@@ -27,11 +27,13 @@ var (
 	W0               *rigoweb3.Wallet
 	W1               *rigoweb3.Wallet
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
-	defGas           = uint64(100_000)
-	smallGas         = uint64(99_999)
+	defGovParams     = rtypes1.DefaultGovParams()
+	defGas           = defGovParams.MinTrxGas()
+	contGas          = defGas * 10
+	smallGas         = defGas - 1
 	contractGas      = uint64(3_000_000)
-	defGasPrice      = uint256.NewInt(10_000_000_000)
-	baseFee          = uint256.NewInt(1_000_000_000_000_000)
+	defGasPrice      = defGovParams.GasPrice()
+	baseFee          = new(uint256.Int).Mul(uint256.NewInt(defGas), defGasPrice)
 	//smallFee         = uint256.NewInt(999_999_999_999_999)
 	defaultRpcNode *PeerMock
 )

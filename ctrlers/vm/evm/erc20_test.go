@@ -73,6 +73,7 @@ func Test_callEVM_Deploy(t *testing.T) {
 	}
 
 	fmt.Println("TestDeploy", "contract address", contractAddr)
+	fmt.Println("TestDeploy", "used gas", txctx.GasUsed)
 
 	_, height, xerr := rigoEVM.Commit()
 	require.NoError(t, xerr)
@@ -201,6 +202,9 @@ func execMethod(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint25
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	fmt.Println("execMethod", methodName, "used_gas", txctx.GasUsed)
+
 	retUnpack, err := abiContract.Unpack(methodName, txctx.RetData)
 	if err != nil {
 		return nil, xerrors.From(err)
