@@ -22,18 +22,17 @@ const (
 // Simplest Asset Unit (FONS)
 
 var (
-	//XCOInFons, _ = new(big.Int).SetString(XCO, 10)
-	XCOInFons = uint256.MustFromDecimal(COIN)
+	oneCoinInFons = uint256.MustFromDecimal(COIN)
 )
 
 // Coin to fons
 func ToFons(n uint64) *uint256.Int {
-	return new(uint256.Int).Mul(uint256.NewInt(n), XCOInFons)
+	return new(uint256.Int).Mul(uint256.NewInt(n), oneCoinInFons)
 }
 
 // from fons to COIN and Remain
 func FromFons(sau *uint256.Int) (uint64, uint64) {
 	r := new(uint256.Int)
-	q, r := new(uint256.Int).DivMod(sau, XCOInFons, r)
+	q, r := new(uint256.Int).DivMod(sau, oneCoinInFons, r)
 	return q.Uint64(), r.Uint64()
 }
