@@ -115,15 +115,30 @@ func (ctrler *AcctCtrler) EndBlock(ctx *atypes.BlockContext) ([]abcitypes.Event,
 
 	header := ctx.BlockInfo().Header
 	if header.GetProposerAddress() != nil && ctx.SumFee().Sign() > 0 {
+		//
 		// give fee to block proposer
-		acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(header.GetProposerAddress()))
+
+		//acct, xerr := ctrler.acctLedger.GetFinality(ledger.ToLedgerKey(header.GetProposerAddress()))
+		//if xerr != nil {
+		//	return nil, xerr
+		//}
+		//xerr = acct.AddBalance(ctx.SumFee())
+		//if xerr != nil {
+		//	return nil, xerr
+		//}
+
+		// If the validator(proposer) has no balance in genesis and
+		// this is first tx fee reward,
+		// there is no the account of validator in ledger.
+		acct := ctrler.findAccount(header.GetProposerAddress(), true)
+		if acct == nil {
+			acct = atypes.NewAccount(header.GetProposerAddress())
+		}
+		xerr := acct.AddBalance(ctx.SumFee())
 		if xerr != nil {
 			return nil, xerr
 		}
-		xerr = acct.AddBalance(ctx.SumFee())
-		if xerr != nil {
-			return nil, xerr
-		}
+
 		return nil, ctrler.setAccountCommittable(acct, true)
 	}
 	return nil, nil
