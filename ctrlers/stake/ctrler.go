@@ -160,8 +160,10 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 			}
 
 			if delegatee.TotalPower != vote.Validator.Power {
-				panic(fmt.Errorf("delegatee(%v)'s power(%v) is not same as the power(%v) of VoteInfo",
-					delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
+				//panic(fmt.Errorf("delegatee(%v)'s power(%v) is not same as the power(%v) of VoteInfo",
+				//	delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
+				ctrler.logger.Error("Wrong power", "delegatee", delegatee.Addr, "power of ledger", delegatee.TotalPower, "power of VoteInfo", vote.Validator.Power)
+				continue
 			}
 
 			issued, _ := ctrler.doRewardTo(delegatee, blockCtx.Height())

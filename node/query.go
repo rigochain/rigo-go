@@ -58,7 +58,7 @@ func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 	}
 
 	if xerr != nil {
-		ctrler.logger.Error("RigoApp - Query returns error", "error", xerr)
+		ctrler.logger.Error("RigoApp - Query returns error", "error", xerr, "request", req)
 		response.Code = xerr.Code()
 		response.Log = xerr.Error()
 	}

@@ -156,7 +156,9 @@ func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 				Power:   types.AmountToPower(types.DefaultGovParams().MinValidatorStake()),
 			}}
 
-			walkeys = append(walkeys, pvWalKey)
+			// validator is not included to initial holders
+			//walkeys = append(walkeys, pvWalKey)
+
 			holders := make([]*genesis.GenesisAssetHolder, len(walkeys))
 			for i, wk := range walkeys {
 				if err := wk.Unlock(secret); err != nil {

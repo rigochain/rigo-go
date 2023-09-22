@@ -45,6 +45,7 @@ func prepareTest(peers []*PeerMock) {
 			panic(err)
 		} else {
 			addValidatorWallet(w)
+			fmt.Println("Validator", w.Address(), w.GetBalance())
 		}
 
 		// wallets
@@ -66,10 +67,11 @@ func prepareTest(peers []*PeerMock) {
 					acctKey := rtypes1.ToAcctKey(w.Address())
 					walletsMap[acctKey] = w
 
-					//if err := w.SyncAccount(rweb3); err != nil {
-					//	panic(err)
-					//}
-					//fmt.Println(w.Address(), w.GetBalance())
+					rweb3 := rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(peer.RPCURL))
+					if err := w.SyncAccount(rweb3); err != nil {
+						panic(err)
+					}
+					fmt.Println("Init Holder", w.Address(), w.GetBalance())
 				}
 			}
 		}

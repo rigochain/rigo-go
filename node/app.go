@@ -188,7 +188,7 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		panic(xerr)
 	}
 
-	// initial stakes
+	// validator - initial stakes
 	initStakes := make([]*stake.InitStake, len(req.Validators))
 	for i, val := range req.Validators {
 		pubBytes := val.PubKey.GetSecp256K1()
@@ -206,6 +206,13 @@ func (ctrler *RigoApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Respo
 		initStakes[i] = &stake.InitStake{
 			pubBytes,
 			[]*stake.Stake{s0},
+		}
+
+		// Generate account of validator,
+		// if validator account is not initialized at acctCtrler.InitLedger,
+
+		if ctrler.acctCtrler.FindOrNewAccount(addr, true) == nil {
+			panic("fail to create account of validator")
 		}
 	}
 
