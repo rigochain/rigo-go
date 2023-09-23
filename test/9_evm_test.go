@@ -49,38 +49,51 @@ func testDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	// insufficient gas
-	ret, err := contract.Exec("", []interface{}{"RigoToken", "RGT"},
-		creator, creator.GetNonce(), baseFee, uint256.NewInt(0), rweb3)
+	ret, err := contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
+		creator, creator.GetNonce(), defGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
-	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Nil(t, contract.GetAddress())
 
 	// check balance - not changed
 	require.NoError(t, creator.SyncAccount(rweb3))
 	beforeBalance1 := creator.GetBalance().Clone()
 	require.Equal(t, beforeBalance0.Dec(), beforeBalance1.Dec())
 
-	// sufficient gas
-	ret, err = contract.Exec("", []interface{}{"RigoToken", "RGT"},
-		creator, creator.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
+	// sufficient gas - deploy contract
+	ret, err = contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
+		creator, creator.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
-	require.NotNil(t, ret.Data)
-	require.Equal(t, 20, len(ret.Data))
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	require.NotNil(t, contract.GetAddress())
+
+	fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
+
+	contAcct, err := rweb3.GetAccount(contract.GetAddress())
+	require.NoError(t, err)
+	require.Equal(t, []byte(contract.GetDeployedBytecode()), contAcct.Code)
 
 	txRet, err := waitTrxResult(ret.Hash, 30, rweb3)
 	require.NoError(t, err, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
-	require.NotNil(t, txRet.TxResult.Data)
-
-	contract.SetAddress(txRet.TxResult.Data)
+	//require.NotNil(t, txRet.TxResult.Data) // will be deprecated. deployed contract address is not returned via `Data` any more
+	require.Greater(t, len(txRet.TxResult.Events), 0)
+	require.Equal(t, "evm", txRet.TxResult.Events[0].Type, txRet.TxResult.Events[0].Type)
+	require.Greater(t, len(txRet.TxResult.Events[0].Attributes), 0)
+	require.Equal(t, "contractAddress", string(txRet.TxResult.Events[0].Attributes[0].Key), string(txRet.TxResult.Events[0].Attributes[0].Key))
+	require.Equal(t, 40, len(txRet.TxResult.Events[0].Attributes[0].Value), string(txRet.TxResult.Events[0].Attributes[0].Value))
+	_addr, err := types.HexToAddress(string(txRet.TxResult.Events[0].Attributes[0].Value))
+	require.NoError(t, err)
+	contract.SetAddress(_addr)
 	evmContract = contract
 
 	require.NoError(t, creator.SyncAccount(rweb3))
 	afterBalance := creator.GetBalance().Clone()
 
 	// check balance - changed by gas
-	usedGas := new(uint256.Int).Sub(beforeBalance1, afterBalance).Uint64()
-	require.Equal(t, uint64(txRet.TxResult.GasUsed), usedGas)
+	usedGas := new(uint256.Int).Sub(beforeBalance1, afterBalance)
+	require.Equal(t, gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice), usedGas)
 }
 
 func testQuery(t *testing.T) {
@@ -113,7 +126,7 @@ func testPayable(t *testing.T) {
 	randAmt := bytes.RandU256IntN(sender.GetBalance())
 	_ = randAmt.Sub(randAmt, baseFee)
 
-	ret, err := sender.TransferSync(evmContract.GetAddress(), baseFee, randAmt, rweb3)
+	ret, err := sender.TransferSync(evmContract.GetAddress(), defGas, defGasPrice, randAmt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
@@ -121,7 +134,7 @@ func testPayable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 
-	expectedAmt := new(uint256.Int).Sub(sender.GetBalance(), uint256.NewInt(uint64(txRet.TxResult.GasUsed)))
+	expectedAmt := new(uint256.Int).Sub(sender.GetBalance(), gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice))
 	_ = expectedAmt.Sub(expectedAmt, randAmt)
 	require.NotEqual(t, sender.GetBalance(), expectedAmt)
 	require.NoError(t, sender.SyncAccount(rweb3))
@@ -139,7 +152,7 @@ func testPayable(t *testing.T) {
 	//
 
 	refundAmt := bytes.RandU256IntN(randAmt)
-	ret, err = evmContract.Exec("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
+	ret, err = evmContract.ExecSync("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
@@ -147,8 +160,10 @@ func testPayable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 
+	fmt.Println("giveMeAsset", "usedGas", txRet.TxResult.GasUsed)
+
 	expectedAmt = new(uint256.Int).Add(sender.GetBalance(), refundAmt)
-	_ = expectedAmt.Sub(expectedAmt, uint256.NewInt(uint64(txRet.TxResult.GasUsed)))
+	_ = expectedAmt.Sub(expectedAmt, gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice))
 	require.NoError(t, sender.SyncAccount(rweb3))
 	require.Equal(t, expectedAmt, sender.GetBalance())
 
@@ -189,13 +204,15 @@ func testEvents(t *testing.T) {
 
 	rAddr := types.RandAddress()
 	// Transfer Event sig: ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
-	ret, err := evmContract.Exec("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), limitFee, uint256.NewInt(0), rweb3)
+	ret, err := evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
 	txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
+
+	fmt.Println("transfer(contract)", "usedGas", txRet.TxResult.GasUsed)
 
 	subWg.Wait()
 

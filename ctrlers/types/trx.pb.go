@@ -25,16 +25,17 @@ type TrxProto struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Version  uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
-	Time     int64  `protobuf:"varint,2,opt,name=time,proto3" json:"time,omitempty"`
-	Nonce    uint64 `protobuf:"varint,3,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	From     []byte `protobuf:"bytes,4,opt,name=from,proto3" json:"from,omitempty"`
-	To       []byte `protobuf:"bytes,5,opt,name=to,proto3" json:"to,omitempty"`
-	XAmount  []byte `protobuf:"bytes,6,opt,name=_amount,json=Amount,proto3" json:"_amount,omitempty"`
-	XGas     []byte `protobuf:"bytes,7,opt,name=_gas,json=Gas,proto3" json:"_gas,omitempty"`
-	Type     int32  `protobuf:"varint,8,opt,name=type,proto3" json:"type,omitempty"`
-	XPayload []byte `protobuf:"bytes,9,opt,name=_payload,json=Payload,proto3" json:"_payload,omitempty"`
-	Sig      []byte `protobuf:"bytes,10,opt,name=sig,proto3" json:"sig,omitempty"`
+	Version   uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	Time      int64  `protobuf:"varint,2,opt,name=time,proto3" json:"time,omitempty"`
+	Nonce     uint64 `protobuf:"varint,3,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	From      []byte `protobuf:"bytes,4,opt,name=from,proto3" json:"from,omitempty"`
+	To        []byte `protobuf:"bytes,5,opt,name=to,proto3" json:"to,omitempty"`
+	XAmount   []byte `protobuf:"bytes,6,opt,name=_amount,json=Amount,proto3" json:"_amount,omitempty"`
+	Gas       uint64 `protobuf:"varint,7,opt,name=gas,proto3" json:"gas,omitempty"`
+	XGasPrice []byte `protobuf:"bytes,8,opt,name=_gasPrice,json=GasPrice,proto3" json:"_gasPrice,omitempty"`
+	Type      int32  `protobuf:"varint,9,opt,name=type,proto3" json:"type,omitempty"`
+	XPayload  []byte `protobuf:"bytes,10,opt,name=_payload,json=Payload,proto3" json:"_payload,omitempty"`
+	Sig       []byte `protobuf:"bytes,11,opt,name=sig,proto3" json:"sig,omitempty"`
 }
 
 func (x *TrxProto) Reset() {
@@ -111,9 +112,16 @@ func (x *TrxProto) GetXAmount() []byte {
 	return nil
 }
 
-func (x *TrxProto) GetXGas() []byte {
+func (x *TrxProto) GetGas() uint64 {
 	if x != nil {
-		return x.XGas
+		return x.Gas
+	}
+	return 0
+}
+
+func (x *TrxProto) GetXGasPrice() []byte {
+	if x != nil {
+		return x.XGasPrice
 	}
 	return nil
 }
@@ -139,6 +147,44 @@ func (x *TrxProto) GetSig() []byte {
 	return nil
 }
 
+type TrxPayloadAssetTransferProto struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *TrxPayloadAssetTransferProto) Reset() {
+	*x = TrxPayloadAssetTransferProto{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_trx_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TrxPayloadAssetTransferProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TrxPayloadAssetTransferProto) ProtoMessage() {}
+
+func (x *TrxPayloadAssetTransferProto) ProtoReflect() protoreflect.Message {
+	mi := &file_trx_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TrxPayloadAssetTransferProto.ProtoReflect.Descriptor instead.
+func (*TrxPayloadAssetTransferProto) Descriptor() ([]byte, []int) {
+	return file_trx_proto_rawDescGZIP(), []int{1}
+}
+
 type TrxPayloadStakingProto struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -148,7 +194,7 @@ type TrxPayloadStakingProto struct {
 func (x *TrxPayloadStakingProto) Reset() {
 	*x = TrxPayloadStakingProto{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_trx_proto_msgTypes[1]
+		mi := &file_trx_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -161,7 +207,7 @@ func (x *TrxPayloadStakingProto) String() string {
 func (*TrxPayloadStakingProto) ProtoMessage() {}
 
 func (x *TrxPayloadStakingProto) ProtoReflect() protoreflect.Message {
-	mi := &file_trx_proto_msgTypes[1]
+	mi := &file_trx_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -174,7 +220,7 @@ func (x *TrxPayloadStakingProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrxPayloadStakingProto.ProtoReflect.Descriptor instead.
 func (*TrxPayloadStakingProto) Descriptor() ([]byte, []int) {
-	return file_trx_proto_rawDescGZIP(), []int{1}
+	return file_trx_proto_rawDescGZIP(), []int{2}
 }
 
 type TrxPayloadUnstakingProto struct {
@@ -188,7 +234,7 @@ type TrxPayloadUnstakingProto struct {
 func (x *TrxPayloadUnstakingProto) Reset() {
 	*x = TrxPayloadUnstakingProto{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_trx_proto_msgTypes[2]
+		mi := &file_trx_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -201,7 +247,7 @@ func (x *TrxPayloadUnstakingProto) String() string {
 func (*TrxPayloadUnstakingProto) ProtoMessage() {}
 
 func (x *TrxPayloadUnstakingProto) ProtoReflect() protoreflect.Message {
-	mi := &file_trx_proto_msgTypes[2]
+	mi := &file_trx_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -214,12 +260,59 @@ func (x *TrxPayloadUnstakingProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrxPayloadUnstakingProto.ProtoReflect.Descriptor instead.
 func (*TrxPayloadUnstakingProto) Descriptor() ([]byte, []int) {
-	return file_trx_proto_rawDescGZIP(), []int{2}
+	return file_trx_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *TrxPayloadUnstakingProto) GetTxHash() []byte {
 	if x != nil {
 		return x.TxHash
+	}
+	return nil
+}
+
+type TrxPayloadWithdrawProto struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	XReqAmt []byte `protobuf:"bytes,1,opt,name=_reqAmt,json=ReqAmt,proto3" json:"_reqAmt,omitempty"`
+}
+
+func (x *TrxPayloadWithdrawProto) Reset() {
+	*x = TrxPayloadWithdrawProto{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_trx_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TrxPayloadWithdrawProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TrxPayloadWithdrawProto) ProtoMessage() {}
+
+func (x *TrxPayloadWithdrawProto) ProtoReflect() protoreflect.Message {
+	mi := &file_trx_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TrxPayloadWithdrawProto.ProtoReflect.Descriptor instead.
+func (*TrxPayloadWithdrawProto) Descriptor() ([]byte, []int) {
+	return file_trx_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TrxPayloadWithdrawProto) GetXReqAmt() []byte {
+	if x != nil {
+		return x.XReqAmt
 	}
 	return nil
 }
@@ -235,7 +328,7 @@ type TrxPayloadContractProto struct {
 func (x *TrxPayloadContractProto) Reset() {
 	*x = TrxPayloadContractProto{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_trx_proto_msgTypes[3]
+		mi := &file_trx_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -248,7 +341,7 @@ func (x *TrxPayloadContractProto) String() string {
 func (*TrxPayloadContractProto) ProtoMessage() {}
 
 func (x *TrxPayloadContractProto) ProtoReflect() protoreflect.Message {
-	mi := &file_trx_proto_msgTypes[3]
+	mi := &file_trx_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -261,7 +354,7 @@ func (x *TrxPayloadContractProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrxPayloadContractProto.ProtoReflect.Descriptor instead.
 func (*TrxPayloadContractProto) Descriptor() ([]byte, []int) {
-	return file_trx_proto_rawDescGZIP(), []int{3}
+	return file_trx_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TrxPayloadContractProto) GetXData() []byte {
@@ -286,7 +379,7 @@ type TrxPayloadProposalProto struct {
 func (x *TrxPayloadProposalProto) Reset() {
 	*x = TrxPayloadProposalProto{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_trx_proto_msgTypes[4]
+		mi := &file_trx_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -299,7 +392,7 @@ func (x *TrxPayloadProposalProto) String() string {
 func (*TrxPayloadProposalProto) ProtoMessage() {}
 
 func (x *TrxPayloadProposalProto) ProtoReflect() protoreflect.Message {
-	mi := &file_trx_proto_msgTypes[4]
+	mi := &file_trx_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -312,7 +405,7 @@ func (x *TrxPayloadProposalProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrxPayloadProposalProto.ProtoReflect.Descriptor instead.
 func (*TrxPayloadProposalProto) Descriptor() ([]byte, []int) {
-	return file_trx_proto_rawDescGZIP(), []int{4}
+	return file_trx_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TrxPayloadProposalProto) GetMessage() string {
@@ -362,7 +455,7 @@ type TrxPayloadVotingProto struct {
 func (x *TrxPayloadVotingProto) Reset() {
 	*x = TrxPayloadVotingProto{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_trx_proto_msgTypes[5]
+		mi := &file_trx_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -375,7 +468,7 @@ func (x *TrxPayloadVotingProto) String() string {
 func (*TrxPayloadVotingProto) ProtoMessage() {}
 
 func (x *TrxPayloadVotingProto) ProtoReflect() protoreflect.Message {
-	mi := &file_trx_proto_msgTypes[5]
+	mi := &file_trx_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -388,7 +481,7 @@ func (x *TrxPayloadVotingProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrxPayloadVotingProto.ProtoReflect.Descriptor instead.
 func (*TrxPayloadVotingProto) Descriptor() ([]byte, []int) {
-	return file_trx_proto_rawDescGZIP(), []int{5}
+	return file_trx_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TrxPayloadVotingProto) GetTxHash() []byte {
@@ -417,7 +510,7 @@ type TrxPayloadSetDocProto struct {
 func (x *TrxPayloadSetDocProto) Reset() {
 	*x = TrxPayloadSetDocProto{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_trx_proto_msgTypes[6]
+		mi := &file_trx_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -430,7 +523,7 @@ func (x *TrxPayloadSetDocProto) String() string {
 func (*TrxPayloadSetDocProto) ProtoMessage() {}
 
 func (x *TrxPayloadSetDocProto) ProtoReflect() protoreflect.Message {
-	mi := &file_trx_proto_msgTypes[6]
+	mi := &file_trx_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -443,7 +536,7 @@ func (x *TrxPayloadSetDocProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrxPayloadSetDocProto.ProtoReflect.Descriptor instead.
 func (*TrxPayloadSetDocProto) Descriptor() ([]byte, []int) {
-	return file_trx_proto_rawDescGZIP(), []int{6}
+	return file_trx_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TrxPayloadSetDocProto) GetName() string {
@@ -464,7 +557,7 @@ var File_trx_proto protoreflect.FileDescriptor
 
 var file_trx_proto_rawDesc = []byte{
 	0x0a, 0x09, 0x74, 0x72, 0x78, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05, 0x74, 0x79, 0x70,
-	0x65, 0x73, 0x22, 0xdf, 0x01, 0x0a, 0x08, 0x54, 0x72, 0x78, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x12,
+	0x65, 0x73, 0x22, 0xfb, 0x01, 0x0a, 0x08, 0x54, 0x72, 0x78, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x12,
 	0x18, 0x0a, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d,
 	0x52, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x69, 0x6d,
 	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x12, 0x14, 0x0a,
@@ -473,17 +566,24 @@ var file_trx_proto_rawDesc = []byte{
 	0x0c, 0x52, 0x04, 0x66, 0x72, 0x6f, 0x6d, 0x12, 0x0e, 0x0a, 0x02, 0x74, 0x6f, 0x18, 0x05, 0x20,
 	0x01, 0x28, 0x0c, 0x52, 0x02, 0x74, 0x6f, 0x12, 0x17, 0x0a, 0x07, 0x5f, 0x61, 0x6d, 0x6f, 0x75,
 	0x6e, 0x74, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x41, 0x6d, 0x6f, 0x75, 0x6e, 0x74,
-	0x12, 0x11, 0x0a, 0x04, 0x5f, 0x67, 0x61, 0x73, 0x18, 0x07, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x03,
-	0x47, 0x61, 0x73, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x08, 0x20, 0x01, 0x28,
-	0x05, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x12, 0x19, 0x0a, 0x08, 0x5f, 0x70, 0x61, 0x79, 0x6c,
-	0x6f, 0x61, 0x64, 0x18, 0x09, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f,
-	0x61, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x73, 0x69, 0x67, 0x18, 0x0a, 0x20, 0x01, 0x28, 0x0c, 0x52,
-	0x03, 0x73, 0x69, 0x67, 0x22, 0x18, 0x0a, 0x16, 0x54, 0x72, 0x78, 0x50, 0x61, 0x79, 0x6c, 0x6f,
-	0x61, 0x64, 0x53, 0x74, 0x61, 0x6b, 0x69, 0x6e, 0x67, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x33,
-	0x0a, 0x18, 0x54, 0x72, 0x78, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x55, 0x6e, 0x73, 0x74,
-	0x61, 0x6b, 0x69, 0x6e, 0x67, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x17, 0x0a, 0x07, 0x74, 0x78,
-	0x5f, 0x68, 0x61, 0x73, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x74, 0x78, 0x48,
-	0x61, 0x73, 0x68, 0x22, 0x2e, 0x0a, 0x17, 0x54, 0x72, 0x78, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61,
+	0x12, 0x10, 0x0a, 0x03, 0x67, 0x61, 0x73, 0x18, 0x07, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x67,
+	0x61, 0x73, 0x12, 0x1b, 0x0a, 0x09, 0x5f, 0x67, 0x61, 0x73, 0x50, 0x72, 0x69, 0x63, 0x65, 0x18,
+	0x08, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x08, 0x47, 0x61, 0x73, 0x50, 0x72, 0x69, 0x63, 0x65, 0x12,
+	0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x09, 0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x74,
+	0x79, 0x70, 0x65, 0x12, 0x19, 0x0a, 0x08, 0x5f, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x18,
+	0x0a, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x12, 0x10,
+	0x0a, 0x03, 0x73, 0x69, 0x67, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x03, 0x73, 0x69, 0x67,
+	0x22, 0x1e, 0x0a, 0x1c, 0x54, 0x72, 0x78, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x41, 0x73,
+	0x73, 0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x66, 0x65, 0x72, 0x50, 0x72, 0x6f, 0x74, 0x6f,
+	0x22, 0x18, 0x0a, 0x16, 0x54, 0x72, 0x78, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x53, 0x74,
+	0x61, 0x6b, 0x69, 0x6e, 0x67, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x33, 0x0a, 0x18, 0x54, 0x72,
+	0x78, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x55, 0x6e, 0x73, 0x74, 0x61, 0x6b, 0x69, 0x6e,
+	0x67, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x17, 0x0a, 0x07, 0x74, 0x78, 0x5f, 0x68, 0x61, 0x73,
+	0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x74, 0x78, 0x48, 0x61, 0x73, 0x68, 0x22,
+	0x32, 0x0a, 0x17, 0x54, 0x72, 0x78, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x57, 0x69, 0x74,
+	0x68, 0x64, 0x72, 0x61, 0x77, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x17, 0x0a, 0x07, 0x5f, 0x72,
+	0x65, 0x71, 0x41, 0x6d, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x52, 0x65, 0x71,
+	0x41, 0x6d, 0x74, 0x22, 0x2e, 0x0a, 0x17, 0x54, 0x72, 0x78, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61,
 	0x64, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x13,
 	0x0a, 0x05, 0x5f, 0x64, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x44,
 	0x61, 0x74, 0x61, 0x22, 0xbd, 0x01, 0x0a, 0x17, 0x54, 0x72, 0x78, 0x50, 0x61, 0x79, 0x6c, 0x6f,
@@ -525,15 +625,17 @@ func file_trx_proto_rawDescGZIP() []byte {
 	return file_trx_proto_rawDescData
 }
 
-var file_trx_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_trx_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_trx_proto_goTypes = []interface{}{
-	(*TrxProto)(nil),                 // 0: types.TrxProto
-	(*TrxPayloadStakingProto)(nil),   // 1: types.TrxPayloadStakingProto
-	(*TrxPayloadUnstakingProto)(nil), // 2: types.TrxPayloadUnstakingProto
-	(*TrxPayloadContractProto)(nil),  // 3: types.TrxPayloadContractProto
-	(*TrxPayloadProposalProto)(nil),  // 4: types.TrxPayloadProposalProto
-	(*TrxPayloadVotingProto)(nil),    // 5: types.TrxPayloadVotingProto
-	(*TrxPayloadSetDocProto)(nil),    // 6: types.TrxPayloadSetDocProto
+	(*TrxProto)(nil),                     // 0: types.TrxProto
+	(*TrxPayloadAssetTransferProto)(nil), // 1: types.TrxPayloadAssetTransferProto
+	(*TrxPayloadStakingProto)(nil),       // 2: types.TrxPayloadStakingProto
+	(*TrxPayloadUnstakingProto)(nil),     // 3: types.TrxPayloadUnstakingProto
+	(*TrxPayloadWithdrawProto)(nil),      // 4: types.TrxPayloadWithdrawProto
+	(*TrxPayloadContractProto)(nil),      // 5: types.TrxPayloadContractProto
+	(*TrxPayloadProposalProto)(nil),      // 6: types.TrxPayloadProposalProto
+	(*TrxPayloadVotingProto)(nil),        // 7: types.TrxPayloadVotingProto
+	(*TrxPayloadSetDocProto)(nil),        // 8: types.TrxPayloadSetDocProto
 }
 var file_trx_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -562,7 +664,7 @@ func file_trx_proto_init() {
 			}
 		}
 		file_trx_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*TrxPayloadStakingProto); i {
+			switch v := v.(*TrxPayloadAssetTransferProto); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -574,7 +676,7 @@ func file_trx_proto_init() {
 			}
 		}
 		file_trx_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*TrxPayloadUnstakingProto); i {
+			switch v := v.(*TrxPayloadStakingProto); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -586,7 +688,7 @@ func file_trx_proto_init() {
 			}
 		}
 		file_trx_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*TrxPayloadContractProto); i {
+			switch v := v.(*TrxPayloadUnstakingProto); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -598,7 +700,7 @@ func file_trx_proto_init() {
 			}
 		}
 		file_trx_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*TrxPayloadProposalProto); i {
+			switch v := v.(*TrxPayloadWithdrawProto); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -610,7 +712,7 @@ func file_trx_proto_init() {
 			}
 		}
 		file_trx_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*TrxPayloadVotingProto); i {
+			switch v := v.(*TrxPayloadContractProto); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -622,6 +724,30 @@ func file_trx_proto_init() {
 			}
 		}
 		file_trx_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*TrxPayloadProposalProto); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_trx_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*TrxPayloadVotingProto); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_trx_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*TrxPayloadSetDocProto); i {
 			case 0:
 				return &v.state
@@ -640,7 +766,7 @@ func file_trx_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_trx_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

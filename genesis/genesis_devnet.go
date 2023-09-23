@@ -4,13 +4,18 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-func DevnetGenesisDoc() (*tmtypes.GenesisDoc, error) {
-	return tmtypes.GenesisDocFromJSON(jsonBlobDevnetGenesis)
+func DevnetGenesisDoc(chainId string) (*tmtypes.GenesisDoc, error) {
+	genDoc, err := tmtypes.GenesisDocFromJSON(jsonBlobDevnetGenesis)
+	if err != nil {
+		return nil, err
+	}
+	genDoc.ChainID = chainId
+	return genDoc, nil
 }
 
 var jsonBlobDevnetGenesis = []byte(`{
   "genesis_time": "2021-08-06T08:29:24.827484Z",
-  "chain_id": "DEVNET",
+  "chain_id": "",
   "initial_height": "0",
   "consensus_params": {
     "block": {
@@ -84,55 +89,61 @@ var jsonBlobDevnetGenesis = []byte(`{
     "assetHolders": [
       {
         "address": "B9ADC66777A1900A8F5CF22F07E7641CC3C3CF48",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       },
       {
         "address": "82F4C6D5498A2CA1E194E3C5AD9AD1EEEC9E7AF0",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       },
       {
         "address": "51398BA5613C62D2566B523C6E49D94B88F55D54",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       },
       {
         "address": "0EC62329BE52FDB338448C53DDB082A2E0AAF864",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       },
       {
         "address": "D8AEAC7E12BD6488036505262FE71767D3996792",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       },
       {
         "address": "22E94B8CD68867197BBEC78BD5F290E77EB0955E",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       },
       {
         "address": "99F954D4EA8DB0CFB7932404E004C7C5DE35977F",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       },
       {
         "address": "2E8F04F3F5CE9C8EB60586043D16F6D542539A47",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       },
       {
         "address": "CC2A6D5B73D438A282C6C811C5E6837DE40A3CB1",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       },
       {
         "address": "4979E92CFF082C6ADAE085CA51818B70D7754B21",
-        "balance": "0x52b7d2dcc80cd2e4000000"
+        "balance": "100000000000000000000000000"
       }
     ], 
-	"govRule": {
-      "version": "0",
+	"govParams": {
+      "version": "1",
       "maxValidatorCnt": "21",
-      "amountPerPower": "0xde0b6b3a7640000",
-      "rewardPerPower": "0x3b9aca00",
-      "lazyRewardBlocks": "10",
-      "lazyApplyingBlocks": "10",
-      "minTrxFee": "0xde0b6b3a7640000",
+      "minValidatorStake": "7000000000000000000000000",
+      "rewardPerPower": "4756468797",
+      "lazyRewardBlocks": "2592000",
+      "lazyApplyingBlocks": "259200",
+      "gasPrice": "10000000000",
+      "minTrxGas": "100000",
+      "maxTrxGas": "18446744073709551615",
+      "maxBlockGas": "18446744073709551615",
       "minVotingPeriodBlocks": "259200",
-	  "maxVotingPeriodBlocks": "2592000"
+      "maxVotingPeriodBlocks": "2592000",
+      "minSelfStakeRatio": "50",
+      "maxUpdatableStakeRatio": "30",
+      "slashRatio": "50"
 	}
   }
 }

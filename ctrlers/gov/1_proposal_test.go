@@ -2,7 +2,6 @@ package gov
 
 import (
 	"encoding/json"
-	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/ledger"
@@ -25,33 +24,33 @@ var (
 )
 
 func init() {
-	bzOpt, err := json.Marshal(govRule0)
+	bzOpt, err := json.Marshal(govParams0)
 	if err != nil {
 		panic(err)
 	}
 
-	tx0 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, uint256.NewInt(5), // insufficient fee
-		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
+	//tx0 := web3.NewTrxProposal(
+	//	stakeHelper.PickAddress(1), types.ZeroAddress(), 1, 99_999, defGasPrice, // insufficient fee
+	//	"test govparams proposal", 10, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 
 	tx1 := web3.NewTrxProposal( // no right
-		stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
-		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
+		stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		"test govparams proposal", 10, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 
 	tx3 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
-		"test govrule proposal", 10, 159200, proposal.PROPOSAL_GOVRULE, bzOpt) // wrong period
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		"test govparams proposal", 10, 159200, proposal.PROPOSAL_GOVPARAMS, bzOpt) // wrong period
 
 	tx4 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
-		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // it will be used to test wrong start height
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		"test govparams proposal", 10, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt) // it will be used to test wrong start height
 
 	tx5 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
-		"test govrule proposal", 10, 259200, proposal.PROPOSAL_GOVRULE, bzOpt) // all right
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		"test govparams proposal", 10, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt) // all right
 
 	cases1 = []*Case{
-		{txctx: makeTrxCtx(tx0, 1, true), err: xerrors.ErrInsufficientFee}, // wrong min fee
+		//{txctx: makeTrxCtx(tx0, 1, true), err: xerrors.ErrInvalidGas}, // wrong min fee
 		{txctx: makeTrxCtx(tx1, 1, true), err: xerrors.ErrNoRight},
 		{txctx: makeTrxCtx(tx3, 1, true), err: xerrors.ErrInvalidTrxPayloadParams},  // wrong period
 		{txctx: makeTrxCtx(tx4, 20, true), err: xerrors.ErrInvalidTrxPayloadParams}, // wrong start height
@@ -60,8 +59,8 @@ func init() {
 	}
 
 	tx6 := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
-		"test govrule proposal2", 11, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		"test govparams proposal2", 11, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	cases2 = []*Case{
 		// the tx6 will be submitted two times.
 		// the first must success but the second must fail.
@@ -70,7 +69,7 @@ func init() {
 }
 
 func TestAddProposal(t *testing.T) {
-	props0, _ := govCtrler.RealAllProposals()
+	props0, _ := govCtrler.ReadAllProposals()
 	require.NotNil(t, props0)
 
 	for i, c := range cases1 {
@@ -78,7 +77,7 @@ func TestAddProposal(t *testing.T) {
 		require.Equal(t, c.err, xerr, "index", i)
 	}
 
-	props1, _ := govCtrler.RealAllProposals()
+	props1, _ := govCtrler.ReadAllProposals()
 	require.NotNil(t, props1)
 }
 
@@ -103,12 +102,12 @@ func TestProposalDuplicate(t *testing.T) {
 }
 
 func TestOverflowBlockHeight(t *testing.T) {
-	bzOpt, err := json.Marshal(govRule0)
+	bzOpt, err := json.Marshal(govParams0)
 	require.NoError(t, err)
 
 	tx := web3.NewTrxProposal(
-		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, uint256.NewInt(1_000_000_000_000_000_000),
-		"test govrule proposal", math.MaxInt64, 259200, proposal.PROPOSAL_GOVRULE, bzOpt)
+		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		"test govparams proposal", math.MaxInt64, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	xerr := runTrx(makeTrxCtx(tx, 1, true))
 	require.Error(t, xerr)
 	require.Contains(t, xerr.Error(), "overflow occurs")

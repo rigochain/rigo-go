@@ -81,6 +81,20 @@ func (acct *Account) GetName() string {
 	return acct.Name
 }
 
+func (acct *Account) SetDocURL(s string) {
+	acct.mtx.Lock()
+	defer acct.mtx.Unlock()
+
+	acct.DocURL = s
+}
+
+func (acct *Account) GetDocURL() string {
+	acct.mtx.RLock()
+	defer acct.mtx.RUnlock()
+
+	return acct.DocURL
+}
+
 func (acct *Account) AddNonce() {
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()
@@ -106,7 +120,7 @@ func (acct *Account) CheckNonce(n uint64) xerrors.XError {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
-	// Change `tx_nonce == nonce + 1` to `tx_nonce == nonce`
+	// Change to `tx_nonce == nonce` from `tx_nonce == nonce + 1`
 	if acct.Nonce != n {
 		return xerrors.ErrInvalidNonce
 	}
@@ -118,7 +132,7 @@ func (acct *Account) AddBalance(amt *uint256.Int) xerrors.XError {
 	defer acct.mtx.Unlock()
 
 	if amt.Sign() < 0 {
-		return xerrors.ErrNegAmount
+		return xerrors.ErrInvalidAmount
 	}
 	_ = acct.Balance.Add(acct.Balance, amt)
 
@@ -130,7 +144,7 @@ func (acct *Account) SubBalance(amt *uint256.Int) xerrors.XError {
 	defer acct.mtx.Unlock()
 
 	if amt.Sign() < 0 {
-		return xerrors.ErrNegAmount
+		return xerrors.ErrInvalidAmount
 	}
 	if amt.Cmp(acct.Balance) > 0 {
 		return xerrors.ErrInsufficientFund

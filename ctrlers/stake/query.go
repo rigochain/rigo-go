@@ -14,12 +14,30 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 	defer ctrler.mtx.RUnlock()
 
 	switch req.Path {
+	case "reward":
+		atledger, xerr := ctrler.rewardLedger.ImmutableLedgerAt(req.Height, 0)
+		if xerr != nil {
+			return nil, xerrors.ErrQuery.Wrap(xerr)
+		}
+		rwd, xerr := atledger.Read(ledger.ToLedgerKey(req.Data))
+		if rwd == nil {
+			return nil, xerrors.ErrQuery.Wrap(xerr)
+		}
+		bz, err := tmjson.Marshal(rwd)
+		if err != nil {
+			return nil, xerrors.ErrQuery.Wrap(err)
+		}
+		return bz, nil
 	case "stakes":
-		addr := types.Address(req.Data)
+		atledger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(req.Height, 0)
+		if xerr != nil {
+			return nil, xerrors.ErrQuery.Wrap(xerr)
+		}
+
 		var stakes []*Stake
-		if err := ctrler.delegateeLedger.IterateReadAllItems(func(d *Delegatee) xerrors.XError {
+		if err := atledger.IterateReadAllItems(func(d *Delegatee) xerrors.XError {
 			for _, s0 := range d.Stakes {
-				if bytes.Compare(s0.From, addr) == 0 {
+				if bytes.Compare(s0.From, types.Address(req.Data)) == 0 {
 					stakes = append(stakes, s0)
 				}
 			}
@@ -32,10 +50,14 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 			return bz, nil
 		}
 	case "delegatee":
-		addr := types.Address(req.Data)
-		if delegatee, xerr := ctrler.delegateeLedger.Read(ledger.ToLedgerKey(addr)); xerr != nil {
+		atledger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(req.Height, 0)
+		if xerr != nil {
+			return nil, xerrors.ErrQuery.Wrap(xerr)
+		}
+
+		if delegatee, xerr := atledger.Read(ledger.ToLedgerKey(req.Data)); xerr != nil {
 			if xerr == xerrors.ErrNotFoundResult {
-				return nil, xerrors.ErrNotFoundDelegatee
+				return nil, xerrors.ErrQuery.Wrap(xerrors.ErrNotFoundDelegatee)
 			}
 			return nil, xerr
 		} else if v, err := tmjson.Marshal(delegatee); err != nil {

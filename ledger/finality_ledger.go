@@ -18,7 +18,7 @@ type FinalityLedger[T ILedgerItem] struct {
 func NewFinalityLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func() T) (*FinalityLedger[T], xerrors.XError) {
 	if db, err := tmdb.NewDB(name, "goleveldb", dbDir); err != nil {
 		return nil, xerrors.From(err)
-	} else if tree, err := iavl.NewMutableTree(db, cacheSize); err != nil {
+	} else if tree, err := iavl.NewMutableTreeWithOpts(db, cacheSize, nil /*&iavl.Options{Sync: true}*/); err != nil {
 		_ = db.Close()
 		return nil, xerrors.From(err)
 	} else if _, err := tree.Load(); err != nil {
@@ -37,17 +37,20 @@ func NewFinalityLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func
 	}
 }
 
-func (ledger *FinalityLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (IFinalityLedger[T], xerrors.XError) {
+func (ledger *FinalityLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (ILedger[T], xerrors.XError) {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 	simledger, xerr := ledger.SimpleLedger.ImmutableLedgerAt(n, cacheSize)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return &FinalityLedger[T]{
-		SimpleLedger:  *simledger,
-		finalityItems: newMemItems[T](),
-	}, nil
+
+	return simledger, nil
+
+	//return &FinalityLedger[T]{
+	//	SimpleLedger:  *simledger,
+	//	finalityItems: newMemItems[T](),
+	//}, nil
 }
 
 func (ledger *FinalityLedger[T]) SetFinality(item T) xerrors.XError {
@@ -76,11 +79,17 @@ func (ledger *FinalityLedger[T]) GetFinality(key LedgerKey) (T, xerrors.XError) 
 }
 
 func (ledger *FinalityLedger[T]) getFinality(key LedgerKey) (T, xerrors.XError) {
+	var emptyNil T
+
+	// if the item is already removed, return xerrors.ErrNotFoundResult
+	if ledger.finalityItems.isRemovedKey(key) {
+		return emptyNil, xerrors.ErrNotFoundResult
+	}
+
 	if item, ok := ledger.finalityItems.getGotItem(key); ok {
 		return item, nil
 	}
 
-	var emptyNil T
 	if item, xerr := ledger.read(key); xerr != nil {
 		return emptyNil, xerr
 	} else {
@@ -152,6 +161,7 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 		// If SetFinality is called again (recreated) after calling DelFinality for the item,
 		// the item's key may exist not only `removedKeys` but also `updatedItems`.
 		// this item is removed at here but should be added again at the following code to update tree.
+		// Thus, the operation for `removeKeys` MUST be run prior to operation for `updatedItems`.
 
 		//delete(ledger.finalityItems.gotItems, vk)
 		//delete(ledger.finalityItems.updatedItems, vk)

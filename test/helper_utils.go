@@ -27,10 +27,15 @@ var (
 	W0               *rigoweb3.Wallet
 	W1               *rigoweb3.Wallet
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
-	baseFee          = uint256.NewInt(1_000_000_000_000_000)
-	smallFee         = uint256.NewInt(999_999_999_999_999)
-	limitFee         = uint256.NewInt(15_000_000_000_000_000)
-	defaultRpcNode   *PeerMock
+	defGovParams     = rtypes1.DefaultGovParams()
+	defGas           = defGovParams.MinTrxGas()
+	contGas          = defGas * 10
+	smallGas         = defGas - 1
+	contractGas      = uint64(3_000_000)
+	defGasPrice      = defGovParams.GasPrice()
+	baseFee          = new(uint256.Int).Mul(uint256.NewInt(defGas), defGasPrice)
+	//smallFee         = uint256.NewInt(999_999_999_999_999)
+	defaultRpcNode *PeerMock
 )
 
 func prepareTest(peers []*PeerMock) {
@@ -40,6 +45,7 @@ func prepareTest(peers []*PeerMock) {
 			panic(err)
 		} else {
 			addValidatorWallet(w)
+			fmt.Println("Validator", w.Address(), w.GetBalance())
 		}
 
 		// wallets
@@ -61,10 +67,11 @@ func prepareTest(peers []*PeerMock) {
 					acctKey := rtypes1.ToAcctKey(w.Address())
 					walletsMap[acctKey] = w
 
-					//if err := w.SyncAccount(rweb3); err != nil {
-					//	panic(err)
-					//}
-					//fmt.Println(w.Address(), w.GetBalance())
+					rweb3 := rigoweb3.NewRigoWeb3(rigoweb3.NewHttpProvider(peer.RPCURL))
+					if err := w.SyncAccount(rweb3); err != nil {
+						panic(err)
+					}
+					fmt.Println("Init Holder", w.Address(), w.GetBalance())
 				}
 			}
 		}
@@ -90,6 +97,16 @@ func waitTrxResult(txhash []byte, maxTimes int, rweb3 *rigoweb3.RigoWeb3) (*rweb
 		}
 	}
 	return nil, xerrors.NewOrdinary("timeout")
+}
+
+func waitBlock(n int64) {
+	subWg, err := waitEvent(fmt.Sprintf("tm.event='NewBlock' AND block.height = %v", n), func(event *coretypes.ResultEvent, err error) bool {
+		return true
+	})
+	if err != nil {
+		panic(err)
+	}
+	subWg.Wait()
 }
 
 func waitEvent(query string, cb func(*coretypes.ResultEvent, error) bool) (*sync.WaitGroup, error) {
@@ -162,4 +179,8 @@ func randCommonWallet() *rigoweb3.Wallet {
 func saveWallet(w *rigoweb3.Wallet) error {
 	path := filepath.Join(defaultRpcNode.WalletPath(), fmt.Sprintf("wk%X.json", w.Address()))
 	return w.Save(libs.NewFileWriter(path))
+}
+
+func gasToFee(gas uint64, gasPrice *uint256.Int) *uint256.Int {
+	return new(uint256.Int).Mul(gasPrice, uint256.NewInt(gas))
 }

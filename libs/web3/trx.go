@@ -7,42 +7,57 @@ import (
 	"github.com/rigochain/rigo-go/types/bytes"
 )
 
-func NewTrxTransfer(from, to types.Address, nonce uint64, gas, amt *uint256.Int) *types2.Trx {
+func NewTrxTransfer(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int) *types2.Trx {
 	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
 		gas,
+		gasPrice,
 		amt,
 		&types2.TrxPayloadAssetTransfer{})
 }
 
-func NewTrxStaking(from, to types.Address, nonce uint64, gas, amt *uint256.Int) *types2.Trx {
+func NewTrxStaking(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int) *types2.Trx {
 	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
 		gas,
+		gasPrice,
 		amt,
 		&types2.TrxPayloadStaking{})
 }
 
-func NewTrxUnstaking(from, to types.Address, nonce uint64, gas *uint256.Int, txhash bytes.HexBytes) *types2.Trx {
+func NewTrxUnstaking(from, to types.Address, nonce, gas uint64, gasPrice *uint256.Int, txhash bytes.HexBytes) *types2.Trx {
 	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
 		gas,
+		gasPrice,
 		uint256.NewInt(0),
 		&types2.TrxPayloadUnstaking{TxHash: txhash})
 }
 
-func NewTrxProposal(from, to types.Address, nonce uint64, gas *uint256.Int, msg string, start, period int64, optType int32, options ...[]byte) *types2.Trx {
+func NewTrxWithdraw(from, to types.Address, nonce, gas uint64, gasPrice, req *uint256.Int) *types2.Trx {
 	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
 		gas,
+		gasPrice,
+		uint256.NewInt(0),
+		&types2.TrxPayloadWithdraw{ReqAmt: req})
+}
+
+func NewTrxProposal(from, to types.Address, nonce, gas uint64, gasPrice *uint256.Int, msg string, start, period int64, optType int32, options ...[]byte) *types2.Trx {
+	return types2.NewTrx(
+		uint32(1),
+		from, to,
+		nonce,
+		gas,
+		gasPrice,
 		uint256.NewInt(0),
 		&types2.TrxPayloadProposal{
 			Message:            msg,
@@ -53,12 +68,13 @@ func NewTrxProposal(from, to types.Address, nonce uint64, gas *uint256.Int, msg 
 		})
 }
 
-func NewTrxVoting(from, to types.Address, nonce uint64, gas *uint256.Int, txHash bytes.HexBytes, choice int32) *types2.Trx {
+func NewTrxVoting(from, to types.Address, nonce, gas uint64, gasPrice *uint256.Int, txHash bytes.HexBytes, choice int32) *types2.Trx {
 	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
 		gas,
+		gasPrice,
 		uint256.NewInt(0),
 		&types2.TrxPayloadVoting{
 			TxHash: txHash,
@@ -66,24 +82,26 @@ func NewTrxVoting(from, to types.Address, nonce uint64, gas *uint256.Int, txHash
 		})
 }
 
-func NewTrxContract(from, to types.Address, nonce uint64, gas, amt *uint256.Int, data bytes.HexBytes) *types2.Trx {
+func NewTrxContract(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data bytes.HexBytes) *types2.Trx {
 	return types2.NewTrx(
 		uint32(1),
 		from, to,
 		nonce,
 		gas,
+		gasPrice,
 		amt,
 		&types2.TrxPayloadContract{
 			Data: data,
 		})
 }
 
-func NewTrxSetDoc(from types.Address, nonce uint64, gas *uint256.Int, name, docUrl string) *types2.Trx {
+func NewTrxSetDoc(from types.Address, nonce, gas uint64, gasPrice *uint256.Int, name, docUrl string) *types2.Trx {
 	return types2.NewTrx(
 		uint32(1),
 		from, types.ZeroAddress(),
 		nonce,
 		gas,
+		gasPrice,
 		uint256.NewInt(0),
 		&types2.TrxPayloadSetDoc{name, docUrl},
 	)

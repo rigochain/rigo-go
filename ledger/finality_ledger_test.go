@@ -106,9 +106,8 @@ func TestFinalityLedger_Del(t *testing.T) {
 
 	// not finally deleted yet
 	item, err = testLedger.Get(testItem1.Key())
-	require.NoError(t, err)
-	require.NotNil(t, item)
-	require.Equal(t, testItem1, item)
+	require.Error(t, err)
+	require.Nil(t, item)
 
 	// not finally deleted yet
 	item, err = testLedger.Read(testItem1.Key())
@@ -125,9 +124,8 @@ func TestFinalityLedger_DelFinality(t *testing.T) {
 
 	// not finally deleted and committed
 	item, err = testLedger.Get(testItem1.Key())
-	require.NoError(t, err)
-	require.NotNil(t, item)
-	require.Equal(t, testItem1, item)
+	require.Error(t, err)
+	require.Nil(t, item)
 
 	// commit finality items
 	_, _, err = testLedger.Commit()

@@ -15,6 +15,19 @@ func newMemItems[T ILedgerItem]() *memItems[T] {
 	}
 }
 
+func (m *memItems[T]) appendRemovedKey(key LedgerKey) {
+	m.removedKeys = append(m.removedKeys, key)
+}
+
+func (m *memItems[T]) isRemovedKey(key LedgerKey) bool {
+	for _, k := range m.removedKeys {
+		if key == k {
+			return true
+		}
+	}
+	return false
+}
+
 //func (m *memItems[T]) set(item T) xerrors.XError {
 //	m.gotItems[item.Key()] = item
 //	m.updatedItems[item.Key()] = item
@@ -27,10 +40,6 @@ func (m *memItems[T]) setGotItem(item T) {
 
 func (m *memItems[T]) setUpdatedItem(item T) {
 	m.updatedItems[item.Key()] = item
-}
-
-func (m *memItems[T]) appendRemovedKey(key LedgerKey) {
-	m.removedKeys = append(m.removedKeys, key)
 }
 
 func (m *memItems[T]) getGotItem(key LedgerKey) (T, bool) {

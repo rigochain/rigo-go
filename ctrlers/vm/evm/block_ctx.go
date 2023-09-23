@@ -14,15 +14,6 @@ var (
 	gasTipCap = uint256.NewInt(0)
 )
 
-func feeToGas(fee, gasPrice *uint256.Int) uint64 {
-	gas := new(uint256.Int).Div(fee, gasPrice)
-	return gas.Uint64()
-}
-
-func gasToFee(gas uint64, gasPrice *uint256.Int) *uint256.Int {
-	return new(uint256.Int).Mul(uint256.NewInt(gas), gasPrice)
-}
-
 // CanTransfer checks whether there are enough funds in the address' account to make a transfer.
 // This does not take the necessary gas in to account to make the transfer valid.
 func CanTransfer(db vm.StateDB, addr common.Address, amount *big.Int) bool {

@@ -1,14 +1,13 @@
 package node
 
 import (
-	"bytes"
 	"fmt"
+	"github.com/holiman/uint256"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
-	"github.com/rigochain/rigo-go/types"
-	abytes "github.com/rigochain/rigo-go/types/bytes"
-	"github.com/rigochain/rigo-go/types/crypto"
+	rtypes "github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/log"
+	"math"
 	"runtime"
 	"strconv"
 	"strings"
@@ -103,50 +102,91 @@ func executionRoutine(name string, ch chan *ctrlertypes.TrxContext, logger log.L
 	}
 }
 
-func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if len(ctx.Tx.From) != types.AddrSize {
+func commonValidation0(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	//
+	// the following CAN be parellely done
+	//
+	tx := ctx.Tx
+
+	if len(tx.From) != rtypes.AddrSize {
 		return xerrors.ErrInvalidAddress
 	}
-
-	if len(ctx.Tx.To) != types.AddrSize {
+	if len(tx.To) != rtypes.AddrSize {
 		return xerrors.ErrInvalidAddress
 	}
+	if tx.Amount.Sign() < 0 {
+		return xerrors.ErrInvalidAmount
+	}
+	if tx.Gas < 0 || tx.Gas > math.MaxInt64 {
+		return xerrors.ErrInvalidGas
+	}
+	if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(ctx.GovHandler.GasPrice()) != 0 {
+		return xerrors.ErrInvalidGasPrice
+	}
 
-	// check signature
-	var fromAddr types.Address
-	var pubBytes abytes.HexBytes
+	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+	if feeAmt.Cmp(ctx.GovHandler.MinTrxFee()) < 0 {
+		return xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
+	}
 
 	if ctx.Exec {
-		tx := ctx.Tx
-		sig := tx.Sig
-		tx.Sig = nil
-		_txbz, xerr := tx.Encode()
-		tx.Sig = sig
+		_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx, ctx.ChainID)
 		if xerr != nil {
 			return xerr
 		}
-		if fromAddr, pubBytes, xerr = crypto.Sig2Addr(_txbz, sig); xerr != nil {
-			return xerr
-		}
-		if bytes.Compare(fromAddr, tx.From) != 0 {
-			return xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address or sig - expected: %v, actual: %v", tx.From, fromAddr))
-		}
-		ctx.SenderPubKey = pubBytes
+		ctx.SenderPubKey = pubKeyBytes
 	}
+	return nil
+}
+
+func commonValidation1(ctx *ctrlertypes.TrxContext) xerrors.XError {
+
+	//
+	// this validation MUST be serially done
+	//
+	tx := ctx.Tx
+
+	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+	needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
+	if xerr := ctx.Sender.CheckBalance(needAmt); xerr != nil {
+		return xerr
+	}
+	if xerr := ctx.Sender.CheckNonce(tx.Nonce); xerr != nil {
+		return xerr.Wrap(fmt.Errorf("invalid nonce - ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), tx.Nonce, ctx.Sender.Address, ctx.TxHash))
+	}
+	return nil
+}
+
+func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
 	// tx validation
-	if xerr := ctx.TrxGovHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	if xerr := commonValidation0(ctx); xerr != nil {
 		return xerr
 	}
-	if xerr := ctx.TrxAcctHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	if xerr := commonValidation1(ctx); xerr != nil {
 		return xerr
 	}
-	if xerr := ctx.TrxStakeHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-		return xerr
-	}
-	if xerr := ctx.TrxEVMHandler.ValidateTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
-		return xerr
+
+	switch ctx.Tx.GetType() {
+	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
+		if xerr := ctx.TrxGovHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
+		if xerr := ctx.TrxAcctHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
+		if xerr := ctx.TrxStakeHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_CONTRACT:
+		if xerr := ctx.TrxEVMHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	default:
+		return xerrors.ErrUnknownTrxType
 	}
 
 	return nil
@@ -156,23 +196,96 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
 	// tx execution
-	if ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT {
+	switch ctx.Tx.GetType() {
+	case ctrlertypes.TRX_CONTRACT:
 		if xerr := ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 			return xerr
 		}
-	} else {
-		if xerr := ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
+		if xerr := ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
-		if xerr := ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
+		if xerr := ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil {
 			// todo: rollback changes in TrxGovHandler.ExecuteTrx
 			return xerr
 		}
-		if xerr := ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
+		if xerr := ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil {
 			// todo: rollback changes in TrxGovHandler.ExecuteTrx and TrxAcctHandler.ExecuteTrx
+			return xerr
+		}
+	default:
+		return xerrors.ErrUnknownTrxType
+	}
+
+	if xerr := postRunTrx(ctx); xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+
+	if ctx.Exec &&
+		ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT &&
+		ctx.Tx.To.Compare(rtypes.ZeroAddress()) == 0 {
+		// this tx is to deploy contract
+		var contractAddr rtypes.Address
+		for _, evt := range ctx.Events {
+			if evt.GetType() == "evm" {
+				for _, attr := range evt.Attributes {
+					if string(attr.Key) == "contractAddress" {
+						if caddr, err := rtypes.HexToAddress(string(attr.Value)); err != nil {
+							return xerrors.From(err)
+						} else {
+							contractAddr = caddr
+							break
+						}
+					}
+				}
+				if contractAddr != nil {
+					break
+				}
+			}
+		}
+		if contractAddr == nil {
+			return xerrors.NewOrdinary("there is no contract address")
+		}
+
+		acct := ctx.AcctHandler.FindAccount(contractAddr, ctx.Exec)
+		if acct == nil {
+			return xerrors.ErrNotFoundAccount.Wrapf("contract address: %v", contractAddr)
+		}
+
+		// mark the new account as contract account
+		acct.SetCode([]byte("contract"))
+
+		if xerr := ctx.AcctHandler.SetAccountCommittable(acct, ctx.Exec); xerr != nil {
 			return xerr
 		}
 	}
 
+	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
+		//
+		// The gas & nonce is already processed in `EVMCtrler` if the tx type is `TRX_CONTRACT`.
+
+		// processing fee = gas * gasPrice
+		fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
+		if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
+			return xerr
+		}
+
+		// processing nonce
+		ctx.Sender.AddNonce()
+
+		if xerr := ctx.AcctHandler.SetAccountCommittable(ctx.Sender, ctx.Exec); xerr != nil {
+			return xerr
+		}
+
+		// set used gas
+		ctx.GasUsed = ctx.Tx.Gas
+	}
 	return nil
 }

@@ -69,7 +69,7 @@ func makeTestWallets(n int) []*web3.Wallet {
 	wallets := make([]*web3.Wallet, n)
 	for i := 0; i < n; i++ {
 		w := web3.NewWallet([]byte("1"))
-		w.GetAccount().AddBalance(types.ToSAU(100000000))
+		w.GetAccount().AddBalance(types.ToFons(100000000))
 		w.Unlock([]byte("1"))
 
 		wallets[i] = w
@@ -81,27 +81,32 @@ func randMakeStakingToSelfTrxContext() (*ctrlertypes.TrxContext, error) {
 	from := Wallets[rand.Intn(len(Wallets))]
 	to := from
 
-	power := rand.Int63n(1000)
+	power := ctrlertypes.AmountToPower(govParams.MinValidatorStake()) + rand.Int63n(10000)
 
 	if txCtx, err := makeStakingTrxContext(from, to, power); err != nil {
 		return nil, err
 	} else {
-		DelegateeWallets = append(DelegateeWallets, from)
+		DelegateeWallets = append(DelegateeWallets, to)
 		return txCtx, nil
 	}
 
 }
 
 func randMakeStakingTrxContext() (*ctrlertypes.TrxContext, error) {
-	from, to := Wallets[rand.Intn(len(Wallets))], DelegateeWallets[rand.Intn(len(DelegateeWallets))]
-	power := rand.Int63n(1000) + 10
-	return makeStakingTrxContext(from, to, power)
+	for {
+		from, to := Wallets[rand.Intn(len(Wallets))], DelegateeWallets[rand.Intn(len(DelegateeWallets))]
+		if bytes.Compare(from.Address(), to.Address()) == 0 {
+			continue
+		}
+		power := rand.Int63n(1000) + 10
+		return makeStakingTrxContext(from, to, power)
+	}
 }
 
 func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*ctrlertypes.TrxContext, error) {
 	amt := ctrlertypes.PowerToAmount(power)
 
-	tx := web3.NewTrxStaking(from.Address(), to.Address(), dummyNonce, dummyGas, amt)
+	tx := web3.NewTrxStaking(from.Address(), to.Address(), dummyNonce, dummyGas, dummyGasPrice, amt)
 	bz, err := tx.Encode()
 	if err != nil {
 		return nil, err
@@ -115,9 +120,9 @@ func makeStakingTrxContext(from, to *web3.Wallet, power int64) (*ctrlertypes.Trx
 		SenderPubKey: from.GetPubKey(),
 		Sender:       from.GetAccount(),
 		Receiver:     to.GetAccount(),
-		NeedAmt:      nil,
-		GasUsed:      nil,
+		GasUsed:      0,
 		GovHandler:   govParams,
+		AcctHandler:  acctHelper,
 	}, nil
 }
 
@@ -148,8 +153,8 @@ func randMakeUnstakingTrxContext() (*ctrlertypes.TrxContext, error) {
 
 func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes) (*ctrlertypes.TrxContext, error) {
 
-	tx := web3.NewTrxUnstaking(from.Address(), to.Address(), dummyNonce, dummyGas, txhash)
-	tzbz, _, err := from.SignTrx(tx)
+	tx := web3.NewTrxUnstaking(from.Address(), to.Address(), dummyNonce, dummyGas, dummyGasPrice, txhash)
+	tzbz, _, err := from.SignTrxRLP(tx, "stake_test_chain")
 	if err != nil {
 		return nil, err
 	}

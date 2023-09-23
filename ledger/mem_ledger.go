@@ -21,6 +21,10 @@ func NewMemLedger[T ILedgerItem](name, cb func() T) (*MemLedger[T], xerrors.XErr
 	}, nil
 }
 
+func (ledger *MemLedger[T]) Version() int64 {
+	return 0
+}
+
 func (ledger *MemLedger[T]) Set(item T) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()

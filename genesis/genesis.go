@@ -1,53 +1,17 @@
 package genesis
 
 import (
-	"github.com/holiman/uint256"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
-	"github.com/rigochain/rigo-go/types"
-	"github.com/rigochain/rigo-go/types/crypto"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
-type GenesisAssetHolder struct {
-	Address types.Address `json:"address"`
-	Balance *uint256.Int  `json:"balance"`
-}
-
-func (gh *GenesisAssetHolder) Hash() []byte {
-	hasher := crypto.DefaultHasher()
-	hasher.Write(gh.Address[:])
-	hasher.Write(gh.Balance.Bytes())
-	return hasher.Sum(nil)
-}
-
-type GenesisAppState struct {
-	AssetHolders []*GenesisAssetHolder `json:"assetHolders"`
-	GovRule      *types2.GovRule       `json:"govRule"`
-}
-
-func (ga *GenesisAppState) Hash() ([]byte, error) {
-	hasher := crypto.DefaultHasher()
-	if bz, err := ga.GovRule.Encode(); err != nil {
-		return nil, err
-	} else if _, err := hasher.Write(bz); err != nil {
-		return nil, err
-	} else {
-		for _, h := range ga.AssetHolders {
-			if _, err := hasher.Write(h.Hash()); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return hasher.Sum(nil), nil
-}
-
-func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govRule *types2.GovRule) (*tmtypes.GenesisDoc, error) {
+func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govParams *types2.GovParams) (*tmtypes.GenesisDoc, error) {
 	appState := GenesisAppState{
 		AssetHolders: assetHolders,
-		GovRule:      govRule,
+		GovParams:    govParams,
 	}
 	appStateJsonBlob, err := tmjson.Marshal(appState)
 	if err != nil {

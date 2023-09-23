@@ -41,7 +41,7 @@ func ParseConfig() (*cfg.Config, error) {
 	if err := conf.ValidateBasic(); err != nil {
 		return nil, fmt.Errorf("error in rootConfig file: %v", err)
 	}
-	return &cfg.Config{conf}, nil
+	return &cfg.Config{conf, ""}, nil
 }
 
 // RootCmd is the root command for Tendermint core.

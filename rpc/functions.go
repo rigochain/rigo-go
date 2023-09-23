@@ -13,41 +13,61 @@ import (
 
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
-func QueryAccount(ctx *tmrpctypes.Context, addr abytes.HexBytes) (*QueryResult, error) {
-	if resp, err := tmrpccore.ABCIQuery(ctx, "account", tmbytes.HexBytes(addr), 0, false); err != nil {
+func adjustHeight(ctx *tmrpctypes.Context, heightPtr *int64) int64 {
+	if heightPtr == nil {
+		return 0
+	}
+	return *heightPtr
+}
+
+func QueryAccount(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "account", tmbytes.HexBytes(addr), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
 	}
 }
 
-func QueryDelegatee(ctx *tmrpctypes.Context, addr abytes.HexBytes) (*QueryResult, error) {
-	if resp, err := tmrpccore.ABCIQuery(ctx, "delegatee", tmbytes.HexBytes(addr), 0, false); err != nil {
+func QueryDelegatee(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "delegatee", tmbytes.HexBytes(addr), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
 	}
 }
 
-func QueryStakes(ctx *tmrpctypes.Context, addr abytes.HexBytes) (*QueryResult, error) {
-	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes", tmbytes.HexBytes(addr), 0, false); err != nil {
+func QueryStakes(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes", tmbytes.HexBytes(addr), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
 	}
 }
 
-func QueryProposals(ctx *tmrpctypes.Context, txhash abytes.HexBytes) (*QueryResult, error) {
-	if resp, err := tmrpccore.ABCIQuery(ctx, "proposals", tmbytes.HexBytes(txhash), 0, false); err != nil {
+func QueryReward(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "reward", tmbytes.HexBytes(addr), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
 	}
 }
 
-func QueryRule(ctx *tmrpctypes.Context) (*QueryResult, error) {
+func QueryProposal(ctx *tmrpctypes.Context, txhash abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "proposal", tmbytes.HexBytes(txhash), height, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
 
-	if resp, err := tmrpccore.ABCIQuery(ctx, "rule", nil, 0, false); err != nil {
+func QueryGovParams(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "gov_params", nil, height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -66,7 +86,8 @@ func QueryVM(
 	copy(params[len(addr):], to)
 	copy(params[len(addr)+len(to):], data)
 
-	if resp, err := tmrpccore.ABCIQuery(ctx, "vm_call", params, *heightPtr, false); err != nil {
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "vm_call", params, height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil

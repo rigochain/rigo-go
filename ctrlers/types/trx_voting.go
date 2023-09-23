@@ -57,13 +57,6 @@ func (tx *TrxPayloadVoting) Encode() ([]byte, xerrors.XError) {
 	return bz, xerrors.From(err)
 }
 
-func (tx *TrxPayloadVoting) RLPEncode() ([]byte, error) {
-	return rlp.EncodeToBytes(tx)
-}
-func (tx *TrxPayloadVoting) RLPDecode(bz []byte) error {
-	return rlp.DecodeBytes(bz, tx)
-}
-
 func (tx *TrxPayloadVoting) EncodeRLP(w io.Writer) error {
 	rlpPayload := &struct {
 		TxHash []byte

@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	ethcore "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -39,11 +39,11 @@ type EVMCtrler struct {
 	ethChainConfig *params.ChainConfig
 	ethDB          ethdb.Database
 	stateDBWrapper *StateDBWrapper
-	acctLedger     ctrlertypes.IAccountHandler
-	blockGasPool   *core.GasPool
+	acctHandler    ctrlertypes.IAccountHandler
+	blockGasPool   *ethcore.GasPool
 
 	metadb          tmdb.DB
-	lastRootHash    []byte
+	lastRootHash    bytes.HexBytes
 	lastBlockHeight int64
 
 	logger tmlog.Logger
@@ -85,7 +85,7 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 		ethChainConfig:  RIGOMainnetEVMCtrlerChainConfig,
 		ethDB:           db,
 		metadb:          metadb,
-		acctLedger:      acctHandler,
+		acctHandler:     acctHandler,
 		lastRootHash:    hash,
 		lastBlockHeight: bn,
 		logger:          logger,
@@ -108,7 +108,7 @@ func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 	}
 
 	ctrler.stateDBWrapper = stdb
-	ctrler.blockGasPool = new(core.GasPool).AddGas(gasLimit)
+	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
 	return nil, nil
 }
 
@@ -123,23 +123,44 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	if payload.Data == nil || len(payload.Data) == 0 {
 		return xerrors.ErrInvalidTrxPayloadParams
 	}
+
+	// Check intrinsic gas if everything is correct
+	bn := big.NewInt(ctx.Height)
+	gas, err := ethcore.IntrinsicGas(payload.Data, nil, types.IsZeroAddress(ctx.Tx.To), ctrler.ethChainConfig.IsHomestead(bn), ctrler.ethChainConfig.IsIstanbul(bn))
+	if err != nil {
+		return xerrors.From(err)
+	}
+
+	if ctx.Tx.Gas < gas {
+		return xerrors.ErrInvalidGas
+	}
+
 	return nil
 }
 
 func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	if ctx.Exec == false {
+		// issue #71
+		// Execute a contract transaction only on `deliveryTx`
+		return nil
+	}
 	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
 		return xerrors.ErrUnknownTrxType
 	}
 
-	// issue #48
-	ctrler.stateDBWrapper.Prepare(ctx.TxHash, ctx.TxIdx, ctx.Tx.From, ctx.Tx.To, ctx.Exec)
-	snap := ctrler.stateDBWrapper.Snapshot()
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
 
-	ret, xerr := ctrler.execVM(
+	// issue #69 - in order to pass `snap` to `Prepare`, call `Snapshot` before `Prepare`
+	snap := ctrler.stateDBWrapper.Snapshot()
+	// issue #48 - prepare hash and index of tx
+	ctrler.stateDBWrapper.Prepare(ctx.TxHash, ctx.TxIdx, ctx.Tx.From, ctx.Tx.To, snap, ctx.Exec)
+
+	evmResult, xerr := ctrler.execVM(
 		ctx.Tx.From,
 		ctx.Tx.To,
 		ctx.Tx.Nonce,
-		feeToGas(ctx.Tx.Gas, ctx.GovHandler.GasPrice()),
+		ctx.Tx.Gas,
 		ctx.GovHandler.GasPrice(),
 		ctx.Tx.Amount,
 		ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data,
@@ -153,10 +174,10 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		return xerr
 	}
 
-	if ret.Failed() {
+	if evmResult.Failed() {
 		ctrler.stateDBWrapper.RevertToSnapshot(snap)
 		ctrler.stateDBWrapper.Finish()
-		return xerrors.From(ret.Err)
+		return xerrors.From(evmResult.Err)
 	}
 
 	ctrler.stateDBWrapper.Finish()
@@ -169,73 +190,90 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctrler.lastRootHash = ctrler.stateDBWrapper.IntermediateRoot(ctrler.ethChainConfig.IsEIP158(blockNumber)).Bytes()
 	}
 
-	ctx.RetData = ret.ReturnData
-
-	// Gas is already applied in EVM.
+	// Gas is already applied to accounts by buyGas and refundGas of EVM.
 	// the `EVM` handles nonce, amount and gas.
-	ctx.GasUsed = new(uint256.Int).Add(ctx.GasUsed, gasToFee(ret.UsedGas, ctx.GovHandler.GasPrice()))
+	ctx.GasUsed = evmResult.UsedGas
 
+	ctx.RetData = evmResult.ReturnData
+
+	//
 	// Add events from evm.
-	if ctx.Exec {
-		logs := ctrler.stateDBWrapper.GetLogs(ctx.TxHash.Array32(), common.Hash{})
-		if logs != nil && len(logs) > 0 {
-			var attrs []abcitypes.EventAttribute
-			for _, l := range logs {
-				// Contract Address
-				strVal := hex.EncodeToString(l.Address[:])
+	var attrs []abcitypes.EventAttribute
+	if ctx.Tx.To == nil || types.IsZeroAddress(ctx.Tx.To) {
+		// contract 생성.
+		createdAddr := crypto.CreateAddress(ctx.Tx.From.Array20(), ctx.Tx.Nonce)
+		ctrler.logger.Debug("Create contract", "address", createdAddr)
+
+		// EVM은 ReturnData 에 deployed code 를 리턴한다.
+		// contract 생성 주소를 계산하여 리턴.
+		ctx.RetData = createdAddr[:]
+
+		// Event 로도 컨트랙트 주소 리턴
+		attrs = []abcitypes.EventAttribute{
+			{
+				Key:   []byte("contractAddress"),
+				Value: []byte(bytes.HexBytes(ctx.RetData).String()),
+				Index: false,
+			},
+		}
+	}
+
+	logs := ctrler.stateDBWrapper.GetLogs(ctx.TxHash.Array32(), common.Hash{})
+	if logs != nil && len(logs) > 0 {
+		for _, l := range logs {
+			// Contract Address
+			strVal := hex.EncodeToString(l.Address[:])
+			attrs = append(attrs, abcitypes.EventAttribute{
+				Key:   []byte("contract"),
+				Value: []byte(strVal),
+				Index: true,
+			})
+
+			// Topics (indexed)
+			for i, t := range l.Topics {
+				strVal := hex.EncodeToString(t.Bytes())
 				attrs = append(attrs, abcitypes.EventAttribute{
-					Key:   []byte("contract"),
-					Value: []byte(strVal),
+					Key:   []byte(fmt.Sprintf("topic.%d", i)),
+					Value: []byte(strings.ToUpper(strVal)),
 					Index: true,
 				})
+			}
 
-				// Topics (indexed)
-				for i, t := range l.Topics {
-					strVal := hex.EncodeToString(t.Bytes())
-					attrs = append(attrs, abcitypes.EventAttribute{
-						Key:   []byte(fmt.Sprintf("topic.%d", i)),
-						Value: []byte(strings.ToUpper(strVal)),
-						Index: true,
-					})
-				}
-
-				// Data (not indexed)
-				if l.Data != nil && len(l.Data) > 0 {
-					strVal := hex.EncodeToString(l.Data)
-					attrs = append(attrs, abcitypes.EventAttribute{
-						Key:   []byte("data"),
-						Value: []byte(strVal),
-						Index: false,
-					})
-				}
-
-				// Removed
-				strVal = "false"
-				if l.Removed {
-					strVal = "true"
-				}
+			// Data (not indexed)
+			if l.Data != nil && len(l.Data) > 0 {
+				strVal := hex.EncodeToString(l.Data)
 				attrs = append(attrs, abcitypes.EventAttribute{
-					Key:   []byte("removed"),
+					Key:   []byte("data"),
 					Value: []byte(strVal),
 					Index: false,
 				})
 			}
-			ctx.Events = append(ctx.Events, abcitypes.Event{
-				Type:       "evm",
-				Attributes: attrs,
+
+			// Removed
+			strVal = "false"
+			if l.Removed {
+				strVal = "true"
+			}
+			attrs = append(attrs, abcitypes.EventAttribute{
+				Key:   []byte("removed"),
+				Value: []byte(strVal),
+				Index: false,
 			})
 		}
 	}
+	ctx.Events = append(ctx.Events, abcitypes.Event{
+		Type:       "evm",
+		Attributes: attrs,
+	})
 
 	return nil
 }
 
-func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data []byte, height, blockTime int64, exec bool) (*core.ExecutionResult, xerrors.XError) {
+func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data []byte, height, blockTime int64, exec bool) (*ethcore.ExecutionResult, xerrors.XError) {
 	var sender common.Address
 	var toAddr *common.Address
 	copy(sender[:], from)
-	if to != nil &&
-		!types.IsZeroAddress(to) {
+	if to != nil && !types.IsZeroAddress(to) {
 		toAddr = new(common.Address)
 		copy(toAddr[:], to)
 	}
@@ -243,26 +281,20 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPr
 	vmmsg := evmMessage(sender, toAddr, nonce, gas, gasPrice, amt, data, false)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
-	txContext := core.NewEVMTxContext(vmmsg)
+	txContext := ethcore.NewEVMTxContext(vmmsg)
 
 	vmevm := vm.NewEVM(blockContext, txContext, ctrler.stateDBWrapper, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
-	result, err := core.ApplyMessage(vmevm, vmmsg, ctrler.blockGasPool)
+	result, err := ethcore.ApplyMessage(vmevm, vmmsg, ctrler.blockGasPool)
 	if err != nil {
 		return nil, xerrors.From(err)
-	}
-
-	if vmmsg.To() == nil && !result.Failed() {
-		contractAddr := crypto.CreateAddress(vmevm.TxContext.Origin, vmmsg.Nonce())
-		result.ReturnData = contractAddr[:]
-		ctrler.logger.Debug("Create contract", "address", contractAddr)
 	}
 
 	return result, nil
 }
 
 func (ctrler *EVMCtrler) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	ctrler.blockGasPool = new(core.GasPool).AddGas(gasLimit)
+	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
 	return nil, nil
 }
 
@@ -283,7 +315,7 @@ func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	batch.WriteSync()
 	batch.Close()
 
-	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, ctrler.acctLedger, ctrler.logger)
+	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, ctrler.acctHandler, ctrler.logger)
 	if err != nil {
 		panic(err)
 	}
@@ -304,20 +336,24 @@ func (ctrler *EVMCtrler) Close() xerrors.XError {
 	return xerrors.From(ctrler.stateDBWrapper.Close())
 }
 
-func (ctrler *EVMCtrler) ImmutableStateAt(n int64, hash []byte) (*StateDBWrapper, xerrors.XError) {
-	rootHash := bytes.HexBytes(hash).Array32()
-	stateDB, err := state.New(rootHash, state.NewDatabase(ctrler.ethDB), nil)
+func (ctrler *EVMCtrler) ImmutableStateAt(height int64) (*StateDBWrapper, xerrors.XError) {
+	hash, err := ctrler.metadb.Get(blockKey(height))
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
 
-	acctLedger, xerr := ctrler.acctLedger.ImmutableAcctCtrlerAt(n)
+	stateDB, err := state.New(bytes.HexBytes(hash).Array32(), state.NewDatabase(ctrler.ethDB), nil)
+	if err != nil {
+		return nil, xerrors.From(err)
+	}
+
+	immuAcctHandler, xerr := ctrler.acctHandler.ImmutableAcctCtrlerAt(height)
 	if xerr != nil {
 		return nil, xerr
 	}
 	return &StateDBWrapper{
 		StateDB:          stateDB,
-		acctLedger:       acctLedger,
+		acctHandler:      immuAcctHandler,
 		accessedObjAddrs: make(map[common.Address]int),
 		immutable:        true,
 		logger:           ctrler.logger,

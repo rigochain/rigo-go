@@ -31,7 +31,7 @@ func TestQueryValidators(t *testing.T) {
 func TestMinSelfStakeRatio(t *testing.T) {
 	rweb3 := randRigoWeb3()
 
-	govRule, err := rweb3.GetRule()
+	govParams, err := rweb3.GetGovParams()
 	require.NoError(t, err)
 
 	valWal := validatorWallets[0]
@@ -43,29 +43,29 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	require.NoError(t, sender.SyncAccount(rweb3))
 
 	// get allowed delegating
-	maxAllowedAmt := valStakes.TotalAmount
-	ret, err := sender.StakingSync(valWal.Address(), baseFee, maxAllowedAmt, rweb3)
+	maxAllowedAmt := ctrlertypes.PowerToAmount(valStakes.TotalPower)
+	ret, err := sender.StakingSync(valWal.Address(), defGas, defGasPrice, maxAllowedAmt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
 	sender.AddNonce()
 
 	// not allowed delegating, because `maxAllowedAmt` is already delegated.
-	ret, err = sender.StakingSync(valWal.Address(), baseFee, uint256.NewInt(1_000_000_000_000_000_000), rweb3)
+	ret, err = sender.StakingSync(valWal.Address(), defGas, defGasPrice, uint256.NewInt(1_000_000_000_000_000_000), rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
 
 	// self-staking must be allowed.
-	// already stake + new stake >= govRule.MinValidatorStake
-	allowedMinStake := new(uint256.Int).Sub(govRule.MinValidatorStake(), valStakes.SelfAmount)
+	// already stake + new stake >= govParams.MinValidatorStake
+	allowedMinStake := new(uint256.Int).Sub(govParams.MinValidatorStake(), ctrlertypes.PowerToAmount(valStakes.SelfPower))
 	if allowedMinStake.Sign() <= 0 {
 		allowedMinStake = uint256.NewInt(10_000_000_000_000_000_000)
 	}
 
 	require.NoError(t, valWal.SyncAccount(rweb3))
 	require.NoError(t, valWal.Unlock(defaultRpcNode.Pass))
-	ret, err = valWal.StakingSync(valWal.Address(), baseFee, allowedMinStake, rweb3)
+	ret, err = valWal.StakingSync(valWal.Address(), defGas, defGasPrice, allowedMinStake, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, allowedMinStake.Dec())
 
@@ -84,14 +84,14 @@ func TestInvalidStakeAmount(t *testing.T) {
 	// too small
 	stakeAmt := uint256.MustFromDecimal("1111")
 
-	ret, err := w.StakingSync(w.Address(), baseFee, stakeAmt, rweb3)
+	ret, err := w.StakingSync(w.Address(), defGas, defGasPrice, stakeAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
 	// not multiple
 	stakeAmt = uint256.MustFromDecimal("1000000000000000001")
 
-	ret, err = w.StakingSync(w.Address(), baseFee, stakeAmt, rweb3)
+	ret, err = w.StakingSync(w.Address(), defGas, defGasPrice, stakeAmt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 }
@@ -99,11 +99,11 @@ func TestInvalidStakeAmount(t *testing.T) {
 func TestDelegating(t *testing.T) {
 	rweb3 := randRigoWeb3()
 
-	var w *web3.Wallet
+	var delegatorWallet *web3.Wallet
 	for {
-		w = randCommonWallet()
-		require.NoError(t, w.SyncAccount(rweb3))
-		if w.GetBalance().Sign() > 0 {
+		delegatorWallet = randCommonWallet()
+		require.NoError(t, delegatorWallet.SyncAccount(rweb3))
+		if delegatorWallet.GetBalance().Sign() > 0 {
 			break
 		}
 	}
@@ -119,29 +119,25 @@ func TestDelegating(t *testing.T) {
 	stakeAmt := uint256.NewInt(1_000_000_000_000_000_000) // 10^18
 	stakePower := int64(1)
 
-	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, delegatorWallet.Unlock(defaultRpcNode.Pass))
 
 	// self staking
-	ret, err := w.StakingSync(valAddr, baseFee, stakeAmt, rweb3)
+	ret, err := delegatorWallet.StakingCommit(valAddr, defGas, defGasPrice, stakeAmt, rweb3)
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 	txHash := ret.Hash
 
-	txRet, err := waitTrxResult(txHash, 30, rweb3)
-	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
-	require.Equal(t, txHash, txRet.Hash)
-	require.Equal(t, baseFee, txRet.TxDetail.Gas)
-	require.Equal(t, stakeAmt, txRet.TxDetail.Amount)
+	require.Equal(t, defGas, uint64(ret.DeliverTx.GasUsed))
 
 	// check stakes
 	found := false
-	stakes, err := rweb3.GetStakes(w.Address())
+	stakes, err := rweb3.GetStakes(delegatorWallet.Address())
 	require.NoError(t, err)
 	require.True(t, len(stakes) > 0)
 	for _, s0 := range stakes {
 		if bytes.Compare(s0.TxHash, txHash) == 0 {
-			require.Equal(t, stakeAmt, s0.Amount)
+			require.Equal(t, stakeAmt, ctrlertypes.PowerToAmount(s0.Power))
 			found = true
 		}
 	}
@@ -152,29 +148,35 @@ func TestDelegating(t *testing.T) {
 
 	require.Equal(t, valStakes0.SelfPower, valStakes1.SelfPower)
 	require.Equal(t, valStakes0.TotalPower+stakePower, valStakes1.TotalPower)
-	require.Equal(t, new(uint256.Int).Add(valStakes0.TotalAmount, stakeAmt), valStakes1.TotalAmount)
+	require.Equal(t, new(uint256.Int).Add(ctrlertypes.PowerToAmount(valStakes0.TotalPower), stakeAmt), ctrlertypes.PowerToAmount(valStakes1.TotalPower))
 
 	fmt.Println("Wait 5 seconds...")
 	time.Sleep(5 * time.Second)
 
+	//waitBlock(ret.Height + 4)
+
 	vals, err = queryValidators(0, rweb3)
 	require.NoError(t, err)
+
 	fmt.Println("query validator power", vals.Validators[0].VotingPower)
+	fmt.Println("query valStakes0", valStakes0.TotalPower)
+	fmt.Println("query valStakes1", valStakes1.TotalPower)
+	require.Equal(t, valStakes1.TotalPower, vals.Validators[0].VotingPower)
 }
 
 func TestMinValidatorStake(t *testing.T) {
 	rweb3 := randRigoWeb3()
 
-	govRule, err := rweb3.GetRule()
+	govParams, err := rweb3.GetGovParams()
 	require.NoError(t, err)
 
 	sender := randCommonWallet()
 	require.NoError(t, sender.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, sender.SyncAccount(rweb3))
 
-	minValidatorStake := govRule.MinValidatorStake()
+	minValidatorStake := govParams.MinValidatorStake()
 	_amt := new(uint256.Int).Sub(minValidatorStake, ctrlertypes.AmountPerPower())
-	ret, err := sender.StakingSync(sender.Address(), baseFee, _amt, rweb3)
+	ret, err := sender.StakingSync(sender.Address(), defGas, defGasPrice, _amt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
 	require.Contains(t, ret.Log, "too small stake to become validator", ret.Log)

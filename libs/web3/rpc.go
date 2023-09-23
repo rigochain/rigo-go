@@ -1,7 +1,6 @@
 package web3
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ctrlers/stake"
@@ -15,10 +14,42 @@ import (
 	"strings"
 )
 
-func (rweb3 *RigoWeb3) GetRule() (*ctrlertypes.GovRule, error) {
+func (rweb3 *RigoWeb3) Status() (*coretypes.ResultStatus, error) {
+	retStatus := &coretypes.ResultStatus{}
+
+	if req, err := rweb3.NewRequest("status"); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, retStatus); err != nil {
+		return nil, err
+	}
+
+	return retStatus, nil
+}
+
+func (rweb3 *RigoWeb3) Genesis() (*coretypes.ResultGenesis, error) {
+	retGen := &coretypes.ResultGenesis{}
+
+	if req, err := rweb3.NewRequest("genesis"); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, retGen); err != nil {
+		return nil, err
+	}
+
+	return retGen, nil
+}
+
+func (rweb3 *RigoWeb3) GetGovParams() (*ctrlertypes.GovParams, error) {
 	queryResp := &rpc.QueryResult{}
 
-	if req, err := rweb3.NewRequest("rule"); err != nil {
+	if req, err := rweb3.NewRequest("gov_params", strconv.FormatInt(0, 10)); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -28,17 +59,17 @@ func (rweb3 *RigoWeb3) GetRule() (*ctrlertypes.GovRule, error) {
 		return nil, err
 	}
 
-	govRule := &ctrlertypes.GovRule{}
-	if err := tmjson.Unmarshal(queryResp.Value, govRule); err != nil {
+	govParams := &ctrlertypes.GovParams{}
+	if err := tmjson.Unmarshal(queryResp.Value, govParams); err != nil {
 		return nil, err
 	}
-	return govRule, nil
+	return govParams, nil
 
 }
 func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, error) {
 	queryResp := &rpc.QueryResult{}
 
-	if req, err := rweb3.NewRequest("account", addr.String()); err != nil {
+	if req, err := rweb3.NewRequest("account", addr.String(), strconv.FormatInt(0, 10)); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -82,7 +113,7 @@ func (rweb3 *RigoWeb3) GetDelegatee(addr types.Address) (*stake.Delegatee, error
 	queryResp := &rpc.QueryResult{}
 	delegatee := stake.NewDelegatee(nil, nil)
 
-	if req, err := rweb3.NewRequest("delegatee", addr.String()); err != nil {
+	if req, err := rweb3.NewRequest("delegatee", addr.String(), strconv.FormatInt(0, 10)); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -100,7 +131,7 @@ func (rweb3 *RigoWeb3) GetDelegatee(addr types.Address) (*stake.Delegatee, error
 func (rweb3 *RigoWeb3) GetStakes(addr types.Address) ([]*stake.Stake, error) {
 	queryResp := &rpc.QueryResult{}
 	var stakes []*stake.Stake
-	if req, err := rweb3.NewRequest("stakes", addr.String()); err != nil {
+	if req, err := rweb3.NewRequest("stakes", addr.String(), strconv.FormatInt(0, 10)); err != nil {
 		panic(err)
 	} else if resp, err := rweb3.provider.Call(req); err != nil {
 		return nil, err
@@ -115,17 +146,62 @@ func (rweb3 *RigoWeb3) GetStakes(addr types.Address) ([]*stake.Stake, error) {
 	}
 }
 
-func (rweb3 *RigoWeb3) SendTransactionAsync(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
-	return rweb3.sendTransaction(tx, "broadcast_tx_async")
-}
-func (rweb3 *RigoWeb3) SendTransactionSync(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
-	return rweb3.sendTransaction(tx, "broadcast_tx_sync")
-}
-func (rweb3 *RigoWeb3) SendTransactionCommit(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
-	return rweb3.sendTransaction(tx, "broadcast_tx_commit")
+func (rweb3 *RigoWeb3) QueryReward(addr types.Address, height int64) (*stake.Reward, error) {
+	queryResp := &rpc.QueryResult{}
+	rwd := stake.NewReward(addr)
+	if req, err := rweb3.NewRequest("reward", addr.String(), strconv.FormatInt(height, 10)); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return nil, err
+	} else if err := tmjson.Unmarshal(queryResp.Value, rwd); err != nil {
+		return nil, err
+	} else {
+		return rwd, nil
+	}
 }
 
-func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*coretypes.ResultBroadcastTx, error) {
+func (rweb3 *RigoWeb3) SendTransactionAsync(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
+	resp, err := rweb3.sendTransaction(tx, "broadcast_tx_async")
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &coretypes.ResultBroadcastTx{}
+	if err := tmjson.Unmarshal(resp.Result, ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+func (rweb3 *RigoWeb3) SendTransactionSync(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
+	resp, err := rweb3.sendTransaction(tx, "broadcast_tx_sync")
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &coretypes.ResultBroadcastTx{}
+	if err := tmjson.Unmarshal(resp.Result, ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+func (rweb3 *RigoWeb3) SendTransactionCommit(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTxCommit, error) {
+	resp, err := rweb3.sendTransaction(tx, "broadcast_tx_commit")
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &coretypes.ResultBroadcastTxCommit{}
+	if err := tmjson.Unmarshal(resp.Result, ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*rweb3types.JSONRpcResp, error) {
 
 	if txbz, err := tx.Encode(); err != nil {
 		return nil, err
@@ -136,20 +212,7 @@ func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*cor
 	} else if resp.Error != nil {
 		return nil, errors.New("provider error: " + string(resp.Error))
 	} else {
-		switch method {
-		case "broadcast_tx_async":
-			return nil, errors.New("not supported method: " + method)
-		case "broadcast_tx_sync":
-			ret := &coretypes.ResultBroadcastTx{}
-			if err := json.Unmarshal(resp.Result, ret); err != nil {
-				return nil, err
-			}
-			return ret, nil
-		case "broadcast_tx_commit":
-			return nil, errors.New("not supported method: " + method)
-		default:
-			return nil, errors.New("unknown method: " + method)
-		}
+		return resp, nil
 	}
 }
 

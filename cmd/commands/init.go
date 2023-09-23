@@ -112,15 +112,15 @@ func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 		var err error
 		var genDoc *tmtypes.GenesisDoc
 		if chainID == "mainnet" {
-			if genDoc, err = genesis.MainnetGenesisDoc(); err != nil {
+			if genDoc, err = genesis.MainnetGenesisDoc(chainID); err != nil {
 				return err
 			}
 		} else if chainID == "testnet" {
-			if genDoc, err = genesis.TestnetGenesisDoc(); err != nil {
+			if genDoc, err = genesis.TestnetGenesisDoc(chainID); err != nil {
 				return err
 			}
 		} else if chainID == "devnet" {
-			if genDoc, err = genesis.DevnetGenesisDoc(); err != nil {
+			if genDoc, err = genesis.DevnetGenesisDoc(chainID); err != nil {
 				return err
 			}
 		} else { // anything (e.g. loclanet)
@@ -153,10 +153,12 @@ func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 			valset := []tmtypes.GenesisValidator{{
 				Address: pubKey.Address(),
 				PubKey:  pubKey,
-				Power:   10,
+				Power:   types.AmountToPower(types.DefaultGovParams().MinValidatorStake()),
 			}}
 
-			walkeys = append(walkeys, pvWalKey)
+			// validator is not included to initial holders
+			//walkeys = append(walkeys, pvWalKey)
+
 			holders := make([]*genesis.GenesisAssetHolder, len(walkeys))
 			for i, wk := range walkeys {
 				if err := wk.Unlock(secret); err != nil {
@@ -173,7 +175,7 @@ func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 				}
 			}()
 
-			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovRule())
+			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovParams())
 			if err != nil {
 				return err
 			}

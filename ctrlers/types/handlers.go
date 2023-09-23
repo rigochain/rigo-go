@@ -18,23 +18,22 @@ type IGovHandler interface {
 	Version() int64
 	MaxValidatorCnt() int64
 	MinValidatorStake() *uint256.Int
-	RewardPerPower() int64
-	LazyRewardBlocks() int64
+	RewardPerPower() *uint256.Int
+	LazyRewardBlocks() int64 // todo: rename LazyrewardBlocks to UnbondingPeriodBlockcs(?)
 	LazyApplyingBlocks() int64
 	GasPrice() *uint256.Int
+	MinTrxGas() uint64
 	MinTrxFee() *uint256.Int
+	MaxTrxGas() uint64
+	MaxTrxFee() *uint256.Int
+	MaxBlockGas() uint64
 	MinVotingPeriodBlocks() int64
 	MaxVotingPeriodBlocks() int64
 	MinSelfStakeRatio() int64
 	MaxUpdatableStakeRatio() int64
 	SlashRatio() int64
-
-	//// utility methods
-	//MaxStakeAmount() *uint256.Int
-	//MaxTotalPower() int64
-	//AmountToPower(*uint256.Int) int64
-	//PowerToAmount(int64) *uint256.Int
-	//PowerToReward(int64) *uint256.Int
+	SignedBlocksWindow() int64
+	MinSignedBlocks() int64
 }
 
 type IAccountHandler interface {
@@ -49,5 +48,13 @@ type IAccountHandler interface {
 type IStakeHandler interface {
 	Validators() ([]*abcitypes.Validator, int64)
 	IsValidator(types.Address) bool
-	PowerOf(types.Address) int64
+	TotalPowerOf(types.Address) int64
+	SelfPowerOf(types.Address) int64
+	DelegatedPowerOf(types.Address) int64
+}
+
+type IDelegatee interface {
+	GetAddress() types.Address
+	GetTotalPower() int64
+	GetSelfPower() int64
 }

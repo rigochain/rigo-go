@@ -9,6 +9,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/libs/web3"
 	"github.com/rigochain/rigo-go/types"
+	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"os"
@@ -55,6 +56,14 @@ func (ec *EVMContract) GetAddress() types.Address {
 	return ec.addr
 }
 
+func (ec *EVMContract) GetBytecode() rbytes.HexBytes {
+	return rbytes.HexBytes(ec.buildInfo.Bytecode)
+}
+
+func (ec *EVMContract) GetDeployedBytecode() rbytes.HexBytes {
+	return rbytes.HexBytes(ec.buildInfo.DeployedBytecode)
+}
+
 func (ec *EVMContract) Call(name string, args []interface{}, from types.Address, height int64, rweb3 *web3.RigoWeb3) ([]interface{}, error) {
 	if ec.addr == nil {
 		return nil, errors.New("no contract address")
@@ -70,7 +79,7 @@ func (ec *EVMContract) Call(name string, args []interface{}, from types.Address,
 	return ec.unpack(name, ret0.ReturnData)
 }
 
-func (ec *EVMContract) Exec(name string, args []interface{}, from *web3.Wallet, nonce uint64, gas, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (rbytes.HexBytes, error) {
 	to := ec.addr
 
 	data, err := ec.pack(name, args...)
@@ -83,8 +92,35 @@ func (ec *EVMContract) Exec(name string, args []interface{}, from *web3.Wallet, 
 		to = types.ZeroAddress()
 		data = append(ec.buildInfo.Bytecode, data...)
 	}
-	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, amt, data)
-	_, _, err = from.SignTrx(tx)
+	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
+	_, _, err = from.SignTrxRLP(tx, rweb3.ChainID())
+	if err != nil {
+		return nil, err
+	}
+
+	ret, err := rweb3.SendTransactionAsync(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return rbytes.HexBytes(ret.Hash), nil
+}
+
+func (ec *EVMContract) ExecSync(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+	to := ec.addr
+
+	data, err := ec.pack(name, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	if name == "" {
+		// constructor
+		to = types.ZeroAddress()
+		data = append(ec.buildInfo.Bytecode, data...)
+	}
+	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
+	_, _, err = from.SignTrxRLP(tx, rweb3.ChainID())
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +129,45 @@ func (ec *EVMContract) Exec(name string, args []interface{}, from *web3.Wallet, 
 	if err != nil {
 		return nil, err
 	}
-	if ret.Code == xerrors.ErrCodeSuccess && len(ret.Data) == types.AddrSize {
-		ec.addr = types.Address(ret.Data)
+
+	//
+	// it will be deprecated.
+	// the deployed contract address will be not returned via `ret.Data`.
+	//if ret.Code == xerrors.ErrCodeSuccess && len(ret.Data) == types.AddrSize {
+	//	ec.addr = types.Address(ret.Data)
+	//}
+
+	return ret, nil
+}
+
+func (ec *EVMContract) ExecCommit(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+	to := ec.addr
+
+	data, err := ec.pack(name, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	if name == "" {
+		// constructor
+		to = types.ZeroAddress()
+		data = append(ec.buildInfo.Bytecode, data...)
+	}
+	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
+	_, _, err = from.SignTrxRLP(tx, rweb3.ChainID())
+	if err != nil {
+		return nil, err
+	}
+
+	ret, err := rweb3.SendTransactionCommit(tx)
+	if err != nil {
+		return nil, err
+	}
+	if ret.CheckTx.Code == xerrors.ErrCodeSuccess && ret.DeliverTx.Code == xerrors.ErrCodeSuccess && name == "" {
+		ec.addr, err = types.HexToAddress(string(ret.DeliverTx.Events[0].Attributes[0].Value))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return ret, nil

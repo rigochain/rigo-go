@@ -12,7 +12,7 @@ import (
 
 type BlockContext struct {
 	blockInfo abcitypes.RequestBeginBlock
-	gasSum    *uint256.Int
+	feeSum    *uint256.Int
 	txsCnt    int
 	appHash   bytes.HexBytes
 
@@ -28,7 +28,7 @@ type BlockContext struct {
 func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, s IStakeHandler) *BlockContext {
 	return &BlockContext{
 		blockInfo:    bi,
-		gasSum:       uint256.NewInt(0),
+		feeSum:       uint256.NewInt(0),
 		txsCnt:       0,
 		appHash:      nil,
 		GovHandler:   g,
@@ -105,18 +105,18 @@ func (bctx *BlockContext) ExpectedNextBlockTimeSeconds(interval time.Duration) i
 	return bctx.blockInfo.Header.GetTime().Unix() + secs
 }
 
-func (bctx *BlockContext) GasSum() *uint256.Int {
+func (bctx *BlockContext) SumFee() *uint256.Int {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
-	return bctx.gasSum.Clone()
+	return bctx.feeSum.Clone()
 }
 
-func (bctx *BlockContext) AddGas(gas *uint256.Int) {
+func (bctx *BlockContext) AddFee(fee *uint256.Int) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
-	_ = bctx.gasSum.Add(bctx.gasSum, gas)
+	_ = bctx.feeSum.Add(bctx.feeSum, fee)
 }
 
 func (bctx *BlockContext) TxsCnt() int {
@@ -153,12 +153,12 @@ func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 
 	_bctx := &struct {
 		BlockInfo abcitypes.RequestBeginBlock `json:"blockInfo"`
-		GasSum    *uint256.Int                `json:"gasSum"`
+		GasSum    *uint256.Int                `json:"feeSum"`
 		TxsCnt    int                         `json:"txsCnt"`
 		AppHash   []byte                      `json:"appHash"`
 	}{
 		BlockInfo: bctx.blockInfo,
-		GasSum:    bctx.gasSum,
+		GasSum:    bctx.feeSum,
 		TxsCnt:    bctx.txsCnt,
 		AppHash:   bctx.appHash,
 	}
@@ -172,7 +172,7 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 
 	_bctx := &struct {
 		BlockInfo abcitypes.RequestBeginBlock `json:"blockInfo"`
-		GasSum    *uint256.Int                `json:"gasSum"`
+		GasSum    *uint256.Int                `json:"feeSum"`
 		TxsCnt    int                         `json:"txsCnt"`
 		AppHash   []byte                      `json:"appHash"`
 	}{}
@@ -181,7 +181,7 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 		return err
 	}
 	bctx.blockInfo = _bctx.BlockInfo
-	bctx.gasSum = _bctx.GasSum
+	bctx.feeSum = _bctx.GasSum
 	bctx.txsCnt = _bctx.TxsCnt
 	bctx.appHash = _bctx.AppHash
 	return nil
