@@ -152,7 +152,7 @@ func (ctrler *RigoApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 	return abcitypes.ResponseInfo{
 		Data:             "",
 		Version:          tmver.ABCIVersion,
-		AppVersion:       version.Uint64(),
+		AppVersion:       version.Uint64(version.MASK_MAJOR_VER, version.MASK_MINOR_VER),
 		LastBlockHeight:  lastHeight,
 		LastBlockAppHash: appHash,
 	}

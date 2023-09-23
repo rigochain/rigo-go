@@ -19,6 +19,11 @@ var (
 	// it is changed using ldflags.
 	//  ex) -ldflags "... -X 'github.com/rigochain/rigo-go/cmd/version.GitCommit=$(LVER)'"
 	GitCommit string
+
+	MASK_MAJOR_VER  = uint64(0xFF00000000000000)
+	MASK_MINOR_VER  = uint64(0x00FF000000000000)
+	MASK_PATCH_VER  = uint64(0x0000FFFF00000000)
+	MASK_COMMIT_VER = uint64(0x00000000FFFFFFFF)
 )
 
 func init() {
@@ -31,8 +36,16 @@ func String() string {
 	return fmt.Sprintf(FMT_VERSTR, majorVer, minorVer, patchVer, commitVer, version.TMCoreSemVer)
 }
 
-func Uint64() uint64 {
-	return (majorVer << 56) + (minorVer << 48) + (patchVer << 32) + commitVer
+func Uint64(masks ...uint64) uint64 {
+	mask := uint64(0)
+	if len(masks) == 0 {
+		mask = MASK_MAJOR_VER | MASK_MINOR_VER | MASK_PATCH_VER | MASK_COMMIT_VER
+	} else {
+		for _, m := range masks {
+			mask |= m
+		}
+	}
+	return ((majorVer << 56) + (minorVer << 48) + (patchVer << 32) + commitVer) & (mask)
 }
 
 func Parse(c uint64) string {
