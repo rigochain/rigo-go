@@ -6,6 +6,7 @@ import (
 	"github.com/rigochain/rigo-go/libs/web3/vm"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	"github.com/stretchr/testify/require"
+	"math/big"
 	"testing"
 )
 
@@ -37,8 +38,9 @@ func TestBalanceBug(t *testing.T) {
 	require.NoError(t, err)
 
 	fmt.Println("userBalance returns", retCall)
-
-	//fmt.Println("return value", new(uint256.Int).SetBytes(retCall).Dec())
+	rbal, ok := retCall[0].(*big.Int)
+	require.True(t, ok)
+	require.Equal(t, "0", rbal.String())
 
 	// transfer to contract
 	require.NoError(t, deployer.SyncAccount(rweb3))
@@ -54,7 +56,9 @@ func TestBalanceBug(t *testing.T) {
 	require.NoError(t, deployer.SyncAccount(rweb3))
 	retCall, err = contract.Call("userBalance", []interface{}{contAddr.Array20()}, contAddr, 0, rweb3)
 	require.NoError(t, err)
-	fmt.Println("userBalance returns", retCall)
-	//fmt.Println("return value", new(uint256.Int).SetBytes(ret.DeliverTx.Data).Dec())
 
+	fmt.Println("userBalance returns", retCall)
+	rbal, ok = retCall[0].(*big.Int)
+	require.True(t, ok)
+	require.Equal(t, _amt.Dec(), rbal.String())
 }
