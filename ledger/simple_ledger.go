@@ -142,16 +142,18 @@ func (ledger *SimpleLedger[T]) IterateReadAllItems(cb func(T) xerrors.XError) xe
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
+	var xerrStop xerrors.XError
+
 	stopped, err := ledger.tree.Iterate(func(key []byte, value []byte) bool {
 		item := ledger.getNewItem()
 		if xerr := item.Decode(value); xerr != nil {
-			panic(fmt.Errorf("unable to load stake - txhash:%X, error:%v", key, xerr))
+			xerrStop = xerrors.NewOrdinary(fmt.Sprintf("item decode error - Key:%X vs. err:%v", key, xerr))
 			return true
 		} else if item.Key() != ToLedgerKey(key) {
-			panic(fmt.Errorf("wrong key - Key:%X vs. stake's txhash:%X", key, item.Key()))
+			xerrStop = xerrors.NewOrdinary(fmt.Sprintf("wrong key - Key:%X vs. stake's txhash:%X", key, item.Key()))
 			return true
 		} else if xerr := cb(item); xerr != nil {
-			panic(xerr)
+			xerrStop = xerr
 			return true
 		}
 		return false // continue iteration
@@ -160,7 +162,7 @@ func (ledger *SimpleLedger[T]) IterateReadAllItems(cb func(T) xerrors.XError) xe
 	if err != nil {
 		return xerrors.From(err)
 	} else if stopped {
-		return xerrors.NewOrdinary("stop to iterate ledger tree")
+		return xerrStop
 	}
 	return nil
 }
