@@ -387,10 +387,12 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]abytes.HexBytes, xerror
 				case proposal.PROPOSAL_GOVPARAMS:
 					newGovParams := &ctrlertypes.GovParams{}
 					if err := json.Unmarshal(prop.MajorOption.Option(), newGovParams); err != nil {
+						ctrler.logger.Error("Apply proposal", "error", err, "option", string(prop.MajorOption.Option()))
 						return xerrors.From(err)
 					}
 					ctrlertypes.MergeGovParams(&ctrler.GovParams, newGovParams)
 					if xerr := ctrler.paramsLedger.SetFinality(newGovParams); xerr != nil {
+						ctrler.logger.Error("Apply proposal", "error", xerr, "newGovParams", newGovParams)
 						return xerr
 					}
 					ctrler.newGovParams = newGovParams
