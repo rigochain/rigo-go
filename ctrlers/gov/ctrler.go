@@ -303,20 +303,52 @@ func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Ev
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if xerr := ctrler.freezeProposals(ctx.Height()); xerr != nil {
-		return nil, xerr
-	}
-	if xerr := ctrler.applyProposals(ctx.Height()); xerr != nil {
+	var evts []abcitypes.Event
+
+	frozen, removed, xerr := ctrler.freezeProposals(ctx.Height())
+	if xerr != nil {
 		return nil, xerr
 	}
 
-	return nil, nil
+	applied, xerr := ctrler.applyProposals(ctx.Height())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	for _, h := range frozen {
+		evts = append(evts, abcitypes.Event{
+			Type: "proposal",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte("frozen"), Value: []byte(h.String()), Index: true},
+			},
+		})
+	}
+	for _, h := range removed {
+		evts = append(evts, abcitypes.Event{
+			Type: "proposal",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte("removed"), Value: []byte(h.String()), Index: true},
+			},
+		})
+	}
+	for _, h := range applied {
+		evts = append(evts, abcitypes.Event{
+			Type: "proposal",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte("applied"), Value: []byte(h.String()), Index: true},
+			},
+		})
+	}
+
+	return evts, nil
 }
 
 // The following function is called by the Block Executor
 //
 
-func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
+func (ctrler *GovCtrler) freezeProposals(height int64) ([]abytes.HexBytes, []abytes.HexBytes, xerrors.XError) {
+	var frozen []abytes.HexBytes
+	var removed []abytes.HexBytes
 	xerr := ctrler.proposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		if prop.EndVotingHeight < height {
 
@@ -327,20 +359,24 @@ func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
 
 			majorOpt := prop.UpdateMajorOption()
 			if majorOpt != nil {
+				// freeze the proposal
 				if xerr := ctrler.frozenLedger.SetFinality(prop); xerr != nil {
 					return xerr
 				}
+				frozen = append(frozen, prop.TxHash)
 			} else {
 				// do nothing. the proposal will be just removed.
 				ctrler.logger.Debug("Freeze proposal", "warning", "not found major option")
+				removed = append(removed, prop.TxHash)
 			}
 		}
 		return nil
 	})
-	return xerr
+	return frozen, removed, xerr
 }
 
-func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
+func (ctrler *GovCtrler) applyProposals(height int64) ([]abytes.HexBytes, xerrors.XError) {
+	var applied []abytes.HexBytes
 	xerr := ctrler.frozenLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		if prop.ApplyingHeight <= height {
 			if _, xerr := ctrler.frozenLedger.DelFinality(prop.Key()); xerr != nil {
@@ -362,6 +398,8 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 					key := prop.Key()
 					ctrler.logger.Debug("Apply proposal", "key(txHash)", abytes.HexBytes(key[:]), "type", prop.OptType)
 				}
+
+				applied = append(applied, prop.TxHash)
 			} else {
 				ctrler.logger.Error("Apply proposal", "error", "major option is nil")
 			}
@@ -369,7 +407,7 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 		return nil
 	})
 
-	return xerr
+	return applied, xerr
 }
 
 func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
