@@ -16,6 +16,7 @@ import (
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -390,9 +391,9 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]abytes.HexBytes, xerror
 					//
 					// hotfix
 					strOpt := string(prop.MajorOption.Option())
-					//if strings.HasSuffix(strOpt, `""}`) {
-					//	strOpt = strings.ReplaceAll(strOpt, `""}`, `"}`)
-					//}
+					if strings.HasSuffix(strOpt, `""}`) {
+						strOpt = strings.ReplaceAll(strOpt, `""}`, `"}`)
+					}
 					//
 					//
 
