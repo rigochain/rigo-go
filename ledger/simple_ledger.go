@@ -151,6 +151,7 @@ func (ledger *SimpleLedger[T]) IterateReadAllItems(cb func(T) xerrors.XError) xe
 			panic(fmt.Errorf("wrong key - Key:%X vs. stake's txhash:%X", key, item.Key()))
 			return true
 		} else if xerr := cb(item); xerr != nil {
+			panic(xerr)
 			return true
 		}
 		return false // continue iteration
