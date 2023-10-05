@@ -16,6 +16,7 @@ import (
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -386,7 +387,17 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]abytes.HexBytes, xerror
 				switch prop.OptType {
 				case proposal.PROPOSAL_GOVPARAMS:
 					newGovParams := &ctrlertypes.GovParams{}
-					if err := json.Unmarshal(prop.MajorOption.Option(), newGovParams); err != nil {
+
+					//
+					// hotfix
+					strOpt := string(prop.MajorOption.Option())
+					if strings.HasSuffix(strOpt, `""}`) {
+						strOpt = strings.ReplaceAll(strOpt, `""}`, `"}`)
+					}
+					//
+					//
+
+					if err := json.Unmarshal([]byte(strOpt), newGovParams); err != nil {
 						ctrler.logger.Error("Apply proposal", "error", err, "option", string(prop.MajorOption.Option()))
 						return xerrors.From(err)
 					}
