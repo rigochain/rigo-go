@@ -199,7 +199,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 			checkGovParams := &ctrlertypes.GovParams{}
 			for _, option := range txpayload.Options {
 				if err := json.Unmarshal(option, checkGovParams); err != nil {
-					return xerrors.ErrInvalidProposalGovParams
+					return xerrors.ErrInvalidTrxPayloadParams.Wrap(err)
 				}
 			}
 		}
