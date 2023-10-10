@@ -12,6 +12,7 @@ type TrxPayloadProposal struct {
 	Message            string
 	StartVotingHeight  int64
 	VotingPeriodBlocks int64
+	ApplyingBlocks     int64
 	OptType            int32
 	Options            [][]byte
 }
@@ -40,6 +41,9 @@ func (tx *TrxPayloadProposal) Equal(_tx ITrxPayload) bool {
 	if tx.VotingPeriodBlocks != _tx0.VotingPeriodBlocks {
 		return false
 	}
+	if tx.ApplyingBlocks != _tx0.ApplyingBlocks {
+		return false
+	}
 	if tx.OptType != _tx0.OptType {
 		return false
 	}
@@ -63,6 +67,7 @@ func (tx *TrxPayloadProposal) Decode(bz []byte) xerrors.XError {
 	tx.Message = pm.Message
 	tx.StartVotingHeight = pm.StartVotingHeight
 	tx.VotingPeriodBlocks = pm.VotingBlocks
+	tx.ApplyingBlocks = pm.ApplyingBlocks
 	tx.OptType = pm.OptType
 	tx.Options = pm.Options
 	return nil
@@ -73,6 +78,7 @@ func (tx *TrxPayloadProposal) Encode() ([]byte, xerrors.XError) {
 		Message:           tx.Message,
 		StartVotingHeight: tx.StartVotingHeight,
 		VotingBlocks:      tx.VotingPeriodBlocks,
+		ApplyingBlocks:    tx.ApplyingBlocks,
 		OptType:           tx.OptType,
 		Options:           tx.Options,
 	}
@@ -87,12 +93,14 @@ func (tx *TrxPayloadProposal) EncodeRLP(w io.Writer) error {
 		Message            string
 		StartVotingHeight  uint64
 		VotingPeriodBlocks uint64
+		ApplyingBlocks     uint64
 		OptType            uint32
 		Options            [][]byte
 	}{
 		Message:            tx.Message,
 		StartVotingHeight:  uint64(tx.StartVotingHeight),
 		VotingPeriodBlocks: uint64(tx.VotingPeriodBlocks),
+		ApplyingBlocks:     uint64(tx.ApplyingBlocks),
 		OptType:            uint32(tx.OptType),
 		Options:            tx.Options,
 	}
@@ -104,6 +112,7 @@ func (tx *TrxPayloadProposal) DecodeRLP(s *rlp.Stream) error {
 		Message            string
 		StartVotingHeight  uint64
 		VotingPeriodBlocks uint64
+		ApplyingBlocks     uint64
 		OptType            uint32
 		Options            [][]byte
 	}{}
@@ -115,6 +124,7 @@ func (tx *TrxPayloadProposal) DecodeRLP(s *rlp.Stream) error {
 	tx.Message = rlpPayload.Message
 	tx.StartVotingHeight = int64(rlpPayload.StartVotingHeight)
 	tx.VotingPeriodBlocks = int64(rlpPayload.VotingPeriodBlocks)
+	tx.ApplyingBlocks = int64(rlpPayload.ApplyingBlocks)
 	tx.OptType = int32(rlpPayload.OptType)
 	tx.Options = rlpPayload.Options
 	return nil
