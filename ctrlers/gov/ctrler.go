@@ -193,6 +193,17 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 			txpayload.VotingPeriodBlocks < ctrler.MinVotingPeriodBlocks() {
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
+		// check governance proposal consistency
+		if txpayload.OptType == proposal.PROPOSAL_GOVPARAMS {
+			//check options
+			checkGovParams := &ctrlertypes.GovParams{}
+			for _, option := range txpayload.Options {
+				if err := json.Unmarshal(option, checkGovParams); err != nil {
+					return xerrors.ErrInvalidTrxPayloadParams
+				}
+			}
+		}
+
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrap(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
