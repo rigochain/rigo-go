@@ -19,14 +19,19 @@ type GovProposal struct {
 	mtx sync.RWMutex
 }
 
-func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
+func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower, applyingBlocks int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
 
 	endVotingHeight := startHeight + votingBlocks
-	applyingHeight := startHeight + votingBlocks + lazyApplyingBlocks
+	applyingHeight := applyingBlocks
 	// check overflow: issue #51
 	if startHeight > endVotingHeight || startHeight > applyingHeight {
 		return nil, xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v, applyingHeight:%v",
 			startHeight, endVotingHeight, applyingHeight)
+	}
+
+	// TODO: check applying blocks, add error msg
+	if applyingBlocks <= endVotingHeight+lazyApplyingBlocks {
+		return nil, xerrors.ErrInvalidTrxPayloadParams
 	}
 
 	return &GovProposal{

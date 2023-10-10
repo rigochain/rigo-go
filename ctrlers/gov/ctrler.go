@@ -193,6 +193,11 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 			txpayload.VotingPeriodBlocks < ctrler.MinVotingPeriodBlocks() {
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
+
+		// TODO: check applying blocks, add error msg
+		if txpayload.ApplyingBlocks <= txpayload.VotingPeriodBlocks+txpayload.VotingPeriodBlocks+ctrler.LazyApplyingBlocks() {
+			return xerrors.ErrInvalidTrxPayloadParams
+		}
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrap(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
@@ -264,7 +269,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	prop, xerr := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
 		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks, ctrler.LazyApplyingBlocks(),
-		totalVotingPower, voters, txpayload.Options...)
+		totalVotingPower, txpayload.ApplyingBlocks, voters, txpayload.Options...)
 	if xerr != nil {
 		return xerr
 	}
