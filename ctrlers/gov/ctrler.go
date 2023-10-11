@@ -193,7 +193,16 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 			txpayload.VotingPeriodBlocks < ctrler.MinVotingPeriodBlocks() {
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
-
+		// check governance proposal consistency
+		if txpayload.OptType == proposal.PROPOSAL_GOVPARAMS {
+			//check options
+			checkGovParams := &ctrlertypes.GovParams{}
+			for _, option := range txpayload.Options {
+				if err := json.Unmarshal(option, checkGovParams); err != nil {
+					return xerrors.ErrInvalidTrxPayloadParams.Wrap(err)
+				}
+			}
+		}
 		// TODO: check applying blocks, add error msg
 		if txpayload.ApplyingBlocks <= txpayload.VotingPeriodBlocks+txpayload.VotingPeriodBlocks+ctrler.LazyApplyingBlocks() {
 			return xerrors.ErrInvalidTrxPayloadParams
@@ -269,7 +278,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	prop, xerr := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
 		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks, ctrler.LazyApplyingBlocks(),
-		totalVotingPower, txpayload.ApplyingBlocks, voters, txpayload.Options...)
+		totalVotingPower, voters, txpayload.Options...)
 	if xerr != nil {
 		return xerr
 	}
