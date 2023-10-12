@@ -143,6 +143,7 @@ var jsonBlobDevnetGenesis = []byte(`{
       "maxVotingPeriodBlocks": "2592000",
       "minSelfStakeRatio": "50",
       "maxUpdatableStakeRatio": "30",
+	  "maxIndividualStakeRatio": "33",
       "slashRatio": "50"
 	}
   }

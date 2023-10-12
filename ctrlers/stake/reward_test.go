@@ -1,1 +1,1 @@
-package stake_test
+package stake

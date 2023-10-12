@@ -47,6 +47,24 @@ func QueryStakes(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64
 	}
 }
 
+func QueryStakes1(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes/total_power", nil, height, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
+func QueryStakes2(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes/voting_power", nil, height, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
 func QueryReward(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
 	height := adjustHeight(ctx, heightPtr)
 	if resp, err := tmrpccore.ABCIQuery(ctx, "reward", tmbytes.HexBytes(addr), height, false); err != nil {

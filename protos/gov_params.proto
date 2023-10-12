@@ -16,8 +16,9 @@ message GovParamsProto {
   int64   max_voting_period_blocks = 11;
   int64   min_self_stake_ratio = 12;
   int64   max_updatable_stake_ratio = 13;
-  int64   slash_ratio = 14;
-  bytes   _min_validator_stake = 15;
-  int64   signed_blocks_window = 16;
-  int64   min_signed_blocks = 17;
+  int64   max_individual_stake_ratio = 14;
+  int64   slash_ratio = 15;
+  bytes   _min_validator_stake = 16;
+  int64   signed_blocks_window = 17;
+  int64   min_signed_blocks = 18;
 }

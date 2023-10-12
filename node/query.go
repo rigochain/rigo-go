@@ -39,7 +39,7 @@ func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 			}
 		}
 
-	case "stakes", "delegatee", "reward":
+	case "stakes", "stakes/total_power", "stakes/voting_power", "delegatee", "reward":
 		response.Value, xerr = ctrler.stakeCtrler.Query(req)
 	case "proposal", "gov_params":
 		response.Value, xerr = ctrler.govCtrler.Query(req)
