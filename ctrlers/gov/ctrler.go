@@ -203,9 +203,21 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 				}
 			}
 		}
-		// TODO: check applying blocks, add error msg
-		if txpayload.ApplyingBlocks <= txpayload.VotingPeriodBlocks+txpayload.VotingPeriodBlocks+ctrler.LazyApplyingBlocks() {
-			return xerrors.ErrInvalidTrxPayloadParams
+
+		endVotingHeight := txpayload.StartVotingHeight + txpayload.VotingPeriodBlocks
+		minApplyHeight := endVotingHeight + ctrler.LazyApplyingBlocks()
+		applyHeight := txpayload.ApplyHeight
+		if applyHeight == 0 {
+			applyHeight = minApplyHeight
+		}
+		// check overflow: issue #51
+		if txpayload.StartVotingHeight > endVotingHeight {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v",
+				txpayload.StartVotingHeight, endVotingHeight)
+		}
+		// check applying blocks
+		if applyHeight < minApplyHeight || endVotingHeight > applyHeight {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyHeight: must be set equal to or higher than minApplyHeight. ApplyHeight:%v, minApplyHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyHeight, minApplyHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
 		}
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
@@ -278,7 +290,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	prop, xerr := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
 		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks, ctrler.LazyApplyingBlocks(),
-		totalVotingPower, voters, txpayload.Options...)
+		totalVotingPower, txpayload.ApplyHeight, voters, txpayload.Options...)
 	if xerr != nil {
 		return xerr
 	}

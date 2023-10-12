@@ -19,19 +19,12 @@ type GovProposal struct {
 	mtx sync.RWMutex
 }
 
-func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower, applyingBlocks int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
-
+func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower, applyHeight int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
 	endVotingHeight := startHeight + votingBlocks
-	applyingHeight := applyingBlocks
-	// check overflow: issue #51
-	if startHeight > endVotingHeight || startHeight > applyingHeight {
-		return nil, xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v, applyingHeight:%v",
-			startHeight, endVotingHeight, applyingHeight)
-	}
 
-	// TODO: check applying blocks, add error msg
-	if applyingBlocks <= endVotingHeight+lazyApplyingBlocks {
-		return nil, xerrors.ErrInvalidTrxPayloadParams
+	// set to default minimum value when applyHeight is 0
+	if applyHeight == 0 {
+		applyHeight = endVotingHeight + lazyApplyingBlocks
 	}
 
 	return &GovProposal{
@@ -39,7 +32,7 @@ func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlo
 			TxHash:            txhash,
 			StartVotingHeight: startHeight,
 			EndVotingHeight:   endVotingHeight,
-			ApplyingHeight:    applyingHeight,
+			ApplyingHeight:    applyHeight,
 			TotalVotingPower:  totalVotingPower,
 			MajorityPower:     (totalVotingPower * 2) / 3,
 			Voters:            voters,

@@ -29,7 +29,7 @@ func init() {
 	}
 	txProposal := web3.NewTrxProposal(
 		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt)
+		"test govparams proposal", 10, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
 	if xerr := runTrx(trxCtxProposal); xerr != nil {
 		panic(xerr)
