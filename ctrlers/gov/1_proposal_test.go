@@ -35,19 +35,19 @@ func init() {
 
 	tx1 := web3.NewTrxProposal( // no right
 		stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt)
+		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 
 	tx3 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 159200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt) // wrong period
+		"test govparams proposal", 10, 159200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt) // wrong period
 
 	tx4 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt) // it will be used to test wrong start height
+		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt) // it will be used to test wrong start height
 
 	tx5 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt) // all right
+		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt) // all right
 
 	cases1 = []*Case{
 		//{txctx: makeTrxCtx(tx0, 1, true), err: xerrors.ErrInvalidGas}, // wrong min fee
@@ -60,7 +60,7 @@ func init() {
 
 	tx6 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal2", 11, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt)
+		"test govparams proposal2", 11, 259200, 518400+11, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	cases2 = []*Case{
 		// the tx6 will be submitted two times.
 		// the first must success but the second must fail.
@@ -107,7 +107,7 @@ func TestOverflowBlockHeight(t *testing.T) {
 
 	tx := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", math.MaxInt64, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt)
+		"test govparams proposal", math.MaxInt64, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	xerr := runTrx(makeTrxCtx(tx, 1, true))
 	require.Error(t, xerr)
 	require.Contains(t, xerr.Error(), "overflow occurs")
@@ -117,9 +117,9 @@ func TestApplyingHeight(t *testing.T) {
 	bzOpt, err := json.Marshal(govParams0)
 	require.NoError(t, err)
 
-	tx0 := web3.NewTrxProposal( // applyingHeight : 0
+	tx0 := web3.NewTrxProposal( // applyingHeight : 518410
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt)
+		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	xerr := runTrx(makeTrxCtx(tx0, 1, true))
 	require.NoError(t, xerr)
 

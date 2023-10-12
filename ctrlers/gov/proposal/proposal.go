@@ -21,12 +21,6 @@ type GovProposal struct {
 
 func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower, applyingHeight int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
 	endVotingHeight := startHeight + votingBlocks
-
-	// set to default minimum value when applyingHeight is 0
-	if applyingHeight == 0 {
-		applyingHeight = endVotingHeight + lazyApplyingBlocks
-	}
-
 	return &GovProposal{
 		GovProposalHeader: GovProposalHeader{
 			TxHash:            txhash,

@@ -203,20 +203,15 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 				}
 			}
 		}
-
 		endVotingHeight := txpayload.StartVotingHeight + txpayload.VotingPeriodBlocks
 		minApplyingHeight := endVotingHeight + ctrler.LazyApplyingBlocks()
-		applyingHeight := txpayload.ApplyingHeight
-		if applyingHeight == 0 {
-			applyingHeight = minApplyingHeight
-		}
 		// check overflow: issue #51
 		if txpayload.StartVotingHeight > endVotingHeight {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v",
 				txpayload.StartVotingHeight, endVotingHeight)
 		}
 		// check applying blocks
-		if applyingHeight < minApplyingHeight || endVotingHeight > applyingHeight {
+		if txpayload.ApplyingHeight < minApplyingHeight || endVotingHeight > txpayload.ApplyingHeight {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyingHeight: must be set equal to or higher than minApplyingHeight. ApplyingHeight:%v, minApplyingHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyingHeight, minApplyingHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
 		}
 	case ctrlertypes.TRX_VOTING:
