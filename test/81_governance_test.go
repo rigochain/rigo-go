@@ -61,7 +61,7 @@ func TestProposalAndVoting(t *testing.T) {
 		currentBlockHeight := event.Data.(types.EventDataNewBlock).Block.Height
 		if currentBlockHeight > 10 {
 			targetBlockHeight = currentBlockHeight + 5
-			proposalResult, err2 := validatorWallet.ProposalCommit(defGas, defGasPrice, "proposal test", targetBlockHeight, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt, rweb3)
+			proposalResult, err2 := validatorWallet.ProposalCommit(defGas, defGasPrice, "proposal test", targetBlockHeight, 259200, 518410+targetBlockHeight, proposal.PROPOSAL_GOVPARAMS, bzOpt, rweb3)
 			require.NoError(t, err2)
 			require.Equal(t, xerrors.ErrCodeSuccess, proposalResult.CheckTx.Code)
 			proposalHash = bytes.HexBytes(proposalResult.Hash)
@@ -135,7 +135,7 @@ func TestIncorrectProposal(t *testing.T) {
 		currentBlockHeight := event.Data.(types.EventDataNewBlock).Block.Height
 		if currentBlockHeight > 10 {
 			targetBlockHeight = currentBlockHeight + 5
-			proposalResult, err2 := validatorWallet.ProposalCommit(defGas, defGasPrice, "proposal test", targetBlockHeight, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt, rweb3)
+			proposalResult, err2 := validatorWallet.ProposalCommit(defGas, defGasPrice, "proposal test", targetBlockHeight, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt, rweb3)
 			require.Equal(t, xerrors.ErrCheckTx.Code(), proposalResult.CheckTx.Code)
 			require.NoError(t, err2)
 			sub.Stop()
