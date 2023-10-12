@@ -19,12 +19,12 @@ type GovProposal struct {
 	mtx sync.RWMutex
 }
 
-func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower, applyHeight int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
+func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, lazyApplyingBlocks, totalVotingPower, applyingHeight int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
 	endVotingHeight := startHeight + votingBlocks
 
-	// set to default minimum value when applyHeight is 0
-	if applyHeight == 0 {
-		applyHeight = endVotingHeight + lazyApplyingBlocks
+	// set to default minimum value when applyingHeight is 0
+	if applyingHeight == 0 {
+		applyingHeight = endVotingHeight + lazyApplyingBlocks
 	}
 
 	return &GovProposal{
@@ -32,7 +32,7 @@ func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlo
 			TxHash:            txhash,
 			StartVotingHeight: startHeight,
 			EndVotingHeight:   endVotingHeight,
-			ApplyingHeight:    applyHeight,
+			ApplyingHeight:    applyingHeight,
 			TotalVotingPower:  totalVotingPower,
 			MajorityPower:     (totalVotingPower * 2) / 3,
 			Voters:            voters,

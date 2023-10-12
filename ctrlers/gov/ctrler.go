@@ -205,10 +205,10 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 
 		endVotingHeight := txpayload.StartVotingHeight + txpayload.VotingPeriodBlocks
-		minApplyHeight := endVotingHeight + ctrler.LazyApplyingBlocks()
-		applyHeight := txpayload.ApplyHeight
-		if applyHeight == 0 {
-			applyHeight = minApplyHeight
+		minApplyingHeight := endVotingHeight + ctrler.LazyApplyingBlocks()
+		applyingHeight := txpayload.ApplyingHeight
+		if applyingHeight == 0 {
+			applyingHeight = minApplyingHeight
 		}
 		// check overflow: issue #51
 		if txpayload.StartVotingHeight > endVotingHeight {
@@ -216,8 +216,8 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 				txpayload.StartVotingHeight, endVotingHeight)
 		}
 		// check applying blocks
-		if applyHeight < minApplyHeight || endVotingHeight > applyHeight {
-			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyHeight: must be set equal to or higher than minApplyHeight. ApplyHeight:%v, minApplyHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyHeight, minApplyHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
+		if applyingHeight < minApplyingHeight || endVotingHeight > applyingHeight {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyingHeight: must be set equal to or higher than minApplyingHeight. ApplyingHeight:%v, minApplyingHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyingHeight, minApplyingHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
 		}
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
@@ -290,7 +290,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	prop, xerr := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
 		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks, ctrler.LazyApplyingBlocks(),
-		totalVotingPower, txpayload.ApplyHeight, voters, txpayload.Options...)
+		totalVotingPower, txpayload.ApplyingHeight, voters, txpayload.Options...)
 	if xerr != nil {
 		return xerr
 	}

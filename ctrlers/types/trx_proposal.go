@@ -12,7 +12,7 @@ type TrxPayloadProposal struct {
 	Message            string
 	StartVotingHeight  int64
 	VotingPeriodBlocks int64
-	ApplyHeight        int64
+	ApplyingHeight     int64
 	OptType            int32
 	Options            [][]byte
 }
@@ -41,7 +41,7 @@ func (tx *TrxPayloadProposal) Equal(_tx ITrxPayload) bool {
 	if tx.VotingPeriodBlocks != _tx0.VotingPeriodBlocks {
 		return false
 	}
-	if tx.ApplyHeight != _tx0.ApplyHeight {
+	if tx.ApplyingHeight != _tx0.ApplyingHeight {
 		return false
 	}
 	if tx.OptType != _tx0.OptType {
@@ -67,7 +67,7 @@ func (tx *TrxPayloadProposal) Decode(bz []byte) xerrors.XError {
 	tx.Message = pm.Message
 	tx.StartVotingHeight = pm.StartVotingHeight
 	tx.VotingPeriodBlocks = pm.VotingBlocks
-	tx.ApplyHeight = pm.ApplyHeight
+	tx.ApplyingHeight = pm.ApplyingHeight
 	tx.OptType = pm.OptType
 	tx.Options = pm.Options
 	return nil
@@ -78,7 +78,7 @@ func (tx *TrxPayloadProposal) Encode() ([]byte, xerrors.XError) {
 		Message:           tx.Message,
 		StartVotingHeight: tx.StartVotingHeight,
 		VotingBlocks:      tx.VotingPeriodBlocks,
-		ApplyHeight:       tx.ApplyHeight,
+		ApplyingHeight:    tx.ApplyingHeight,
 		OptType:           tx.OptType,
 		Options:           tx.Options,
 	}
@@ -93,14 +93,14 @@ func (tx *TrxPayloadProposal) EncodeRLP(w io.Writer) error {
 		Message            string
 		StartVotingHeight  uint64
 		VotingPeriodBlocks uint64
-		ApplyHeight        uint64
+		ApplyingHeight     uint64
 		OptType            uint32
 		Options            [][]byte
 	}{
 		Message:            tx.Message,
 		StartVotingHeight:  uint64(tx.StartVotingHeight),
 		VotingPeriodBlocks: uint64(tx.VotingPeriodBlocks),
-		ApplyHeight:        uint64(tx.ApplyHeight),
+		ApplyingHeight:     uint64(tx.ApplyingHeight),
 		OptType:            uint32(tx.OptType),
 		Options:            tx.Options,
 	}
@@ -112,7 +112,7 @@ func (tx *TrxPayloadProposal) DecodeRLP(s *rlp.Stream) error {
 		Message            string
 		StartVotingHeight  uint64
 		VotingPeriodBlocks uint64
-		ApplyHeight        uint64
+		ApplyingHeight     uint64
 		OptType            uint32
 		Options            [][]byte
 	}{}
@@ -124,7 +124,7 @@ func (tx *TrxPayloadProposal) DecodeRLP(s *rlp.Stream) error {
 	tx.Message = rlpPayload.Message
 	tx.StartVotingHeight = int64(rlpPayload.StartVotingHeight)
 	tx.VotingPeriodBlocks = int64(rlpPayload.VotingPeriodBlocks)
-	tx.ApplyHeight = int64(rlpPayload.ApplyHeight)
+	tx.ApplyingHeight = int64(rlpPayload.ApplyingHeight)
 	tx.OptType = int32(rlpPayload.OptType)
 	tx.Options = rlpPayload.Options
 	return nil

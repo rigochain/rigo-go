@@ -281,12 +281,12 @@ func (w *Wallet) WithdrawCommit(gas uint64, gasPrice, req *uint256.Int, rweb3 *R
 	return w.SendTxCommit(tx, rweb3)
 }
 
-func (w *Wallet) ProposalSync(gas uint64, gasPrice *uint256.Int, msg string, start, period, applyHeight int64, optType int32, options []byte, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) ProposalSync(gas uint64, gasPrice *uint256.Int, msg string, start, period, applyingHeight int64, optType int32, options []byte, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTx, error) {
 	tx := NewTrxProposal(
 		w.Address(),
 		types.ZeroAddress(),
 		w.acct.GetNonce(),
-		gas, gasPrice, msg, start, period, applyHeight, optType, options,
+		gas, gasPrice, msg, start, period, applyingHeight, optType, options,
 	)
 	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err
@@ -295,12 +295,12 @@ func (w *Wallet) ProposalSync(gas uint64, gasPrice *uint256.Int, msg string, sta
 	}
 }
 
-func (w *Wallet) ProposalCommit(gas uint64, gasPrice *uint256.Int, msg string, start, period, applyHeight int64, optType int32, options []byte, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+func (w *Wallet) ProposalCommit(gas uint64, gasPrice *uint256.Int, msg string, start, period, applyingHeight int64, optType int32, options []byte, rweb3 *RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
 	tx := NewTrxProposal(
 		w.Address(),
 		types.ZeroAddress(),
 		w.acct.GetNonce(),
-		gas, gasPrice, msg, start, period, applyHeight, optType, options,
+		gas, gasPrice, msg, start, period, applyingHeight, optType, options,
 	)
 	if _, _, err := w.SignTrxRLP(tx, rweb3.ChainID()); err != nil {
 		return nil, err

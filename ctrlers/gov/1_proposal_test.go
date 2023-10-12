@@ -113,42 +113,42 @@ func TestOverflowBlockHeight(t *testing.T) {
 	require.Contains(t, xerr.Error(), "overflow occurs")
 }
 
-func TestApplyHeight(t *testing.T) {
+func TestApplyingHeight(t *testing.T) {
 	bzOpt, err := json.Marshal(govParams0)
 	require.NoError(t, err)
 
-	tx0 := web3.NewTrxProposal( // applyHeight : 0
+	tx0 := web3.NewTrxProposal( // applyingHeight : 0
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	xerr := runTrx(makeTrxCtx(tx0, 1, true))
 	require.NoError(t, xerr)
 
-	tx1 := web3.NewTrxProposal( // applyHeight : start + period + lazyApplyingBlocks
+	tx1 := web3.NewTrxProposal( // applyingHeight : start + period + lazyApplyingBlocks
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, ctrlertypes.DefaultGovParams().LazyApplyingBlocks()+259200+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	xerr = runTrx(makeTrxCtx(tx1, 1, true))
 	require.NoError(t, xerr)
 
-	tx2 := web3.NewTrxProposal( // wrong applyHeight
+	tx2 := web3.NewTrxProposal( // wrong applyingHeight
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, 1, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 
 	xerr = runTrx(makeTrxCtx(tx2, 1, true))
 	require.Error(t, xerr)
-	require.Contains(t, xerr.Error(), "wrong applyHeight")
+	require.Contains(t, xerr.Error(), "wrong applyingHeight")
 
-	tx3 := web3.NewTrxProposal( // applyHeight : start + period + lazyApplyingBlocks - 1
+	tx3 := web3.NewTrxProposal( // applyingHeight : start + period + lazyApplyingBlocks - 1
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, ctrlertypes.DefaultGovParams().LazyApplyingBlocks()+259200+10-1, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	xerr = runTrx(makeTrxCtx(tx3, 1, true))
 	require.Error(t, xerr)
-	require.Contains(t, xerr.Error(), "wrong applyHeight")
+	require.Contains(t, xerr.Error(), "wrong applyingHeight")
 
-	tx4 := web3.NewTrxProposal( // applyHeight : -518410
+	tx4 := web3.NewTrxProposal( // applyingHeight : -518410
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, -518410, proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	xerr = runTrx(makeTrxCtx(tx4, 1, true))
 	require.Error(t, xerr)
-	require.Contains(t, xerr.Error(), "wrong applyHeight")
+	require.Contains(t, xerr.Error(), "wrong applyingHeight")
 
 }
