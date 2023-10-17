@@ -203,7 +203,17 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 				}
 			}
 		}
-
+		endVotingHeight := txpayload.StartVotingHeight + txpayload.VotingPeriodBlocks
+		minApplyingHeight := endVotingHeight + ctrler.LazyApplyingBlocks()
+		// check overflow: issue #51
+		if txpayload.StartVotingHeight > endVotingHeight {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v",
+				txpayload.StartVotingHeight, endVotingHeight)
+		}
+		// check applying blocks
+		if txpayload.ApplyingHeight < minApplyingHeight || endVotingHeight > txpayload.ApplyingHeight {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyingHeight: must be set equal to or higher than minApplyingHeight. ApplyingHeight:%v, minApplyingHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyingHeight, minApplyingHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
+		}
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrap(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
@@ -274,8 +284,8 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	}
 
 	prop, xerr := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
-		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks, ctrler.LazyApplyingBlocks(),
-		totalVotingPower, voters, txpayload.Options...)
+		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks,
+		totalVotingPower, txpayload.ApplyingHeight, voters, txpayload.Options...)
 	if xerr != nil {
 		return xerr
 	}
