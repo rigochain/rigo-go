@@ -23,7 +23,7 @@ type Account struct {
 	Name    string        `json:"name,omitempty"`
 	Nonce   uint64        `json:"nonce,string"`
 	Balance *uint256.Int  `json:"balance"`
-	Code    []byte        `json:"code,omitempty"`
+	Code    string        `json:"code,omitempty"`
 	DocURL  string        `json:"docURL,omitempty"`
 	mtx     sync.RWMutex
 }
@@ -46,17 +46,12 @@ func (acct *Account) Clone() *Account {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
-	var code []byte
-	if acct.Code != nil {
-		code = make([]byte, len(acct.Code))
-		copy(code, acct.Code)
-	}
 	return &Account{
 		Address: acct.Address,
 		Name:    acct.Name,
 		Nonce:   acct.Nonce,
 		Balance: acct.Balance.Clone(),
-		Code:    code,
+		Code:    acct.Code,
 	}
 }
 
@@ -175,14 +170,14 @@ func (acct *Account) CheckBalance(amt *uint256.Int) xerrors.XError {
 	return nil
 }
 
-func (acct *Account) SetCode(c []byte) {
+func (acct *Account) SetCode(c string) {
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()
 
 	acct.Code = c
 }
 
-func (acct *Account) GetCode() []byte {
+func (acct *Account) GetCode() string {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
@@ -206,7 +201,7 @@ func (acct *Account) Encode() ([]byte, xerrors.XError) {
 		Name:     acct.Name,
 		Nonce:    acct.Nonce,
 		XBalance: acct.Balance.Bytes(),
-		XCode:    acct.Code,
+		Code:     acct.Code,
 		DocUrl:   acct.DocURL,
 	}); err != nil {
 		return nil, xerrors.From(err)
@@ -225,7 +220,7 @@ func (acct *Account) Decode(d []byte) xerrors.XError {
 	acct.Name = pm.Name
 	acct.Nonce = pm.Nonce
 	acct.Balance = new(uint256.Int).SetBytes(pm.XBalance)
-	acct.Code = pm.XCode
+	acct.Code = pm.Code
 	acct.DocURL = pm.DocUrl
 	return nil
 }
