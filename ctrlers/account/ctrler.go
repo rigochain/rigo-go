@@ -256,7 +256,7 @@ func (ctrler *AcctCtrler) transfer(from, to *atypes.Account, amt *uint256.Int) x
 	return nil
 }
 
-func (ctrler *AcctCtrler) SetCode(addr types.Address, code []byte, exec bool) xerrors.XError {
+func (ctrler *AcctCtrler) SetCode(addr types.Address, code string, exec bool) xerrors.XError {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 

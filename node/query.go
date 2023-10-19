@@ -35,15 +35,6 @@ func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 			}{}
 			if err := tmjson.Unmarshal(response.Value, &_acct); err != nil {
 				xerr = xerrors.ErrQuery.Wrap(err)
-			} else if len(_acct.Code) > 0 {
-				response.Value = nil
-				_acct.Code, xerr = ctrler.vmCtrler.QueryCode(req.Data, req.Height)
-				if xerr == nil {
-					response.Value, err = tmjson.Marshal(&_acct)
-					if err != nil {
-						xerr = xerrors.ErrQuery.Wrap(err)
-					}
-				}
 			}
 		}
 

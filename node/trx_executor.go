@@ -259,8 +259,8 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			return xerrors.ErrNotFoundAccount.Wrapf("contract address: %v", contractAddr)
 		}
 
-		// mark the new account as contract account
-		acct.SetCode([]byte("contract"))
+		// setting deploy txhash in contract account
+		acct.SetCode(ctx.TxHash.String())
 
 		if xerr := ctx.AcctHandler.SetAccountCommittable(acct, ctx.Exec); xerr != nil {
 			return xerr
