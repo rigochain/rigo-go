@@ -69,7 +69,6 @@ func testDeploy(t *testing.T) {
 	require.NotNil(t, contract.GetAddress())
 
 	fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
-
 	contAcct, err := rweb3.GetAccount(contract.GetAddress())
 	require.NoError(t, err)
 	require.Equal(t, []byte(ret.Hash), contAcct.Code)
