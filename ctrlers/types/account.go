@@ -46,17 +46,12 @@ func (acct *Account) Clone() *Account {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
-	var code []byte
-	if acct.Code != nil {
-		code = make([]byte, len(acct.Code))
-		copy(code, acct.Code)
-	}
 	return &Account{
 		Address: acct.Address,
 		Name:    acct.Name,
 		Nonce:   acct.Nonce,
 		Balance: acct.Balance.Clone(),
-		Code:    code,
+		Code:    acct.Code,
 	}
 }
 

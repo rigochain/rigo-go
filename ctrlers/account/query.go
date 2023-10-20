@@ -3,6 +3,7 @@ package account
 import (
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -23,12 +24,12 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 	// `Account::Balance`, which type is *uint256.Int, is marshaled to hex-string.
 	// To marshal this value to decimal format...
 	_acct := &struct {
-		Address types.Address `json:"address"`
-		Name    string        `json:"name,omitempty"`
-		Nonce   uint64        `json:"nonce,string"`
-		Balance string        `json:"balance"`
-		Code    []byte        `json:"code,omitempty"`
-		DocURL  string        `json:"docURL,omitempty"`
+		Address types.Address  `json:"address"`
+		Name    string         `json:"name,omitempty"`
+		Nonce   uint64         `json:"nonce,string"`
+		Balance string         `json:"balance"`
+		Code    bytes.HexBytes `json:"code,omitempty"`
+		DocURL  string         `json:"docURL,omitempty"`
 	}{
 		Address: acct.Address,
 		Name:    acct.Name,
