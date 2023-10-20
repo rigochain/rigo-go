@@ -24,7 +24,7 @@ func ToProto(acct *types2.Account) *types2.AcctProto {
 		Name:     acct.GetName(),
 		Nonce:    acct.GetNonce(),
 		XBalance: acct.GetBalance().Bytes(),
-		Code:     acct.GetCode(),
+		XCode:    acct.GetCode(),
 	}
 }
 
@@ -34,6 +34,6 @@ func FromProto(pm *types2.AcctProto) *types2.Account {
 		Name:    pm.Name,
 		Nonce:   pm.Nonce,
 		Balance: new(uint256.Int).SetBytes(pm.XBalance),
-		Code:    pm.Code,
+		Code:    pm.XCode,
 	}
 }
