@@ -23,7 +23,7 @@ type Account struct {
 	Name    string        `json:"name,omitempty"`
 	Nonce   uint64        `json:"nonce,string"`
 	Balance *uint256.Int  `json:"balance"`
-	Code    string        `json:"code,omitempty"`
+	Code    []byte        `json:"code,omitempty"`
 	DocURL  string        `json:"docURL,omitempty"`
 	mtx     sync.RWMutex
 }
@@ -170,14 +170,14 @@ func (acct *Account) CheckBalance(amt *uint256.Int) xerrors.XError {
 	return nil
 }
 
-func (acct *Account) SetCode(c string) {
+func (acct *Account) SetCode(c []byte) {
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()
 
 	acct.Code = c
 }
 
-func (acct *Account) GetCode() string {
+func (acct *Account) GetCode() []byte {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
@@ -201,7 +201,7 @@ func (acct *Account) Encode() ([]byte, xerrors.XError) {
 		Name:     acct.Name,
 		Nonce:    acct.Nonce,
 		XBalance: acct.Balance.Bytes(),
-		Code:     acct.Code,
+		XCode:    acct.Code,
 		DocUrl:   acct.DocURL,
 	}); err != nil {
 		return nil, xerrors.From(err)
@@ -220,7 +220,7 @@ func (acct *Account) Decode(d []byte) xerrors.XError {
 	acct.Name = pm.Name
 	acct.Nonce = pm.Nonce
 	acct.Balance = new(uint256.Int).SetBytes(pm.XBalance)
-	acct.Code = pm.Code
+	acct.Code = pm.XCode
 	acct.DocURL = pm.DocUrl
 	return nil
 }

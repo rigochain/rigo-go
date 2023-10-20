@@ -1,6 +1,7 @@
 package account
 
 import (
+	"encoding/hex"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/xerrors"
@@ -34,7 +35,7 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 		Name:    acct.Name,
 		Nonce:   acct.Nonce,
 		Balance: acct.Balance.Dec(),
-		Code:    acct.Code,
+		Code:    hex.EncodeToString(acct.Code),
 		DocURL:  acct.DocURL,
 	}
 	if raw, err := tmjson.Marshal(_acct); err != nil {

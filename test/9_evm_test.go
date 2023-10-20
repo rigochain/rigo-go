@@ -72,7 +72,7 @@ func testDeploy(t *testing.T) {
 
 	contAcct, err := rweb3.GetAccount(contract.GetAddress())
 	require.NoError(t, err)
-	require.Equal(t, ret.Hash.String(), contAcct.Code)
+	require.Equal(t, []byte(ret.Hash), contAcct.Code)
 
 	txRet, err := waitTrxResult(ret.Hash, 30, rweb3)
 	require.NoError(t, err, err)

@@ -84,7 +84,7 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 		Name    string        `json:"name,omitempty"`
 		Nonce   uint64        `json:"nonce,string"`
 		Balance string        `json:"balance"`
-		Code    string        `json:"code,omitempty"`
+		Code    []byte        `json:"code,omitempty"`
 		DocURL  string        `json:"docURL,omitempty"`
 	}{}
 

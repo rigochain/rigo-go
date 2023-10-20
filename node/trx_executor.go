@@ -260,7 +260,7 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		}
 
 		// setting deploy txhash in contract account
-		acct.SetCode(ctx.TxHash.String())
+		acct.SetCode(ctx.TxHash)
 
 		if xerr := ctx.AcctHandler.SetAccountCommittable(acct, ctx.Exec); xerr != nil {
 			return xerr
