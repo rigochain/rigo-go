@@ -8,6 +8,7 @@ import (
 	rweb3types "github.com/rigochain/rigo-go/libs/web3/types"
 	"github.com/rigochain/rigo-go/rpc"
 	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"strconv"
@@ -80,12 +81,12 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 	}
 
 	_acct := &struct {
-		Address types.Address `json:"address"`
-		Name    string        `json:"name,omitempty"`
-		Nonce   uint64        `json:"nonce,string"`
-		Balance string        `json:"balance"`
-		Code    []byte        `json:"code,omitempty"`
-		DocURL  string        `json:"docURL,omitempty"`
+		Address types.Address  `json:"address"`
+		Name    string         `json:"name,omitempty"`
+		Nonce   uint64         `json:"nonce,string"`
+		Balance string         `json:"balance"`
+		Code    bytes.HexBytes `json:"code,omitempty"`
+		DocURL  string         `json:"docURL,omitempty"`
 	}{}
 
 	if err := tmjson.Unmarshal(queryResp.Value, _acct); err != nil {

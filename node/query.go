@@ -2,6 +2,7 @@ package node
 
 import (
 	rtypes "github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -30,7 +31,7 @@ func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 				Name    string         `json:"name,omitempty"`
 				Nonce   uint64         `json:"nonce,string"`
 				Balance string         `json:"balance"`
-				Code    []byte         `json:"code,omitempty"`
+				Code    bytes.HexBytes `json:"code,omitempty"`
 				DocURL  string         `json:"docURL,omitempty"`
 			}{}
 			if err := tmjson.Unmarshal(response.Value, &_acct); err != nil {
