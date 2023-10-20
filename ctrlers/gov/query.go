@@ -13,14 +13,26 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 	txhash := req.Data
 	switch req.Path {
 	case "proposal":
-		atledger, xerr := ctrler.proposalLedger.ImmutableLedgerAt(req.Height, 0)
+		atProposalLedger, xerr := ctrler.proposalLedger.ImmutableLedgerAt(req.Height, 0)
+		if xerr != nil {
+			return nil, xerrors.ErrQuery.Wrap(xerr)
+		}
+
+		atFrozenLedger, xerr := ctrler.frozenLedger.ImmutableLedgerAt(req.Height, 0)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
 		if txhash == nil || len(txhash) == 0 {
 			var proposals []*proposal.GovProposal
-			if xerr := atledger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+			if xerr := atProposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+				proposals = append(proposals, prop)
+				return nil
+			}); xerr != nil {
+				return nil, xerrors.ErrQuery.Wrap(xerr)
+			}
+
+			if xerr = atFrozenLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 				proposals = append(proposals, prop)
 				return nil
 			}); xerr != nil {
@@ -33,10 +45,22 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			}
 			return v, nil
 		} else {
-			prop, xerr := atledger.Read(ledger.ToLedgerKey(txhash))
-			if xerr != nil {
+			prop, xerr := atProposalLedger.Read(ledger.ToLedgerKey(txhash))
+			if xerr != nil && xerr.Code() == xerrors.ErrCodeNotFoundResult {
+				prop, xerr = atFrozenLedger.Read(ledger.ToLedgerKey(txhash))
+				if xerr != nil {
+					return nil, xerrors.ErrQuery.Wrap(xerr)
+				}
+			} else if xerr != nil {
 				return nil, xerrors.ErrQuery.Wrap(xerr)
 			}
+
+			/*_prop := &struct {
+				GovProposalHeader `json:"header"`
+				Options           []*voteOption `json:"options"`
+				MajorOption       *voteOption   `json:"majorOption"`
+				status
+			}*/
 
 			v, err := tmjson.Marshal(prop)
 			if err != nil {
