@@ -23,17 +23,28 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
+		type _prop struct {
+			Status   string                `json:"status"`
+			Proposal *proposal.GovProposal `json:"proposal"`
+		}
+
 		if txhash == nil || len(txhash) == 0 {
-			var proposals []*proposal.GovProposal
+			var proposals []*_prop
 			if xerr := atProposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
-				proposals = append(proposals, prop)
+				proposals = append(proposals, &_prop{
+					Status:   "voting",
+					Proposal: prop,
+				})
 				return nil
 			}); xerr != nil {
 				return nil, xerrors.ErrQuery.Wrap(xerr)
 			}
 
 			if xerr = atFrozenLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
-				proposals = append(proposals, prop)
+				proposals = append(proposals, &_prop{
+					Status:   "frozen",
+					Proposal: prop,
+				})
 				return nil
 			}); xerr != nil {
 				return nil, xerrors.ErrQuery.Wrap(xerr)
@@ -46,26 +57,27 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			return v, nil
 		} else {
 			prop, xerr := atProposalLedger.Read(ledger.ToLedgerKey(txhash))
-			if xerr != nil && xerr.Code() == xerrors.ErrCodeNotFoundResult {
-				prop, xerr = atFrozenLedger.Read(ledger.ToLedgerKey(txhash))
-				if xerr != nil {
+			queryResult := &_prop{}
+			if xerr != nil {
+				if xerr.Code() == xerrors.ErrCodeNotFoundResult {
+					prop, xerr = atFrozenLedger.Read(ledger.ToLedgerKey(txhash))
+					if xerr != nil {
+						return nil, xerrors.ErrQuery.Wrap(xerr)
+					}
+					queryResult.Status = "frozen"
+				} else {
 					return nil, xerrors.ErrQuery.Wrap(xerr)
 				}
-			} else if xerr != nil {
-				return nil, xerrors.ErrQuery.Wrap(xerr)
+			} else {
+				queryResult.Status = "voting"
 			}
+			queryResult.Proposal = prop
 
-			/*_prop := &struct {
-				GovProposalHeader `json:"header"`
-				Options           []*voteOption `json:"options"`
-				MajorOption       *voteOption   `json:"majorOption"`
-				status
-			}*/
-
-			v, err := tmjson.Marshal(prop)
+			v, err := tmjson.Marshal(queryResult)
 			if err != nil {
 				return nil, xerrors.ErrQuery.Wrap(err)
 			}
+
 			return v, nil
 		}
 	case "gov_params":
