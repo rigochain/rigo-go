@@ -24,6 +24,7 @@ const (
 	ErrCodeNotFoundProposal
 	ErrCodeNotFoundVoter
 	ErrCodeNotFoundReward
+	ErrCodeUpdatableStakeRatio
 )
 
 const (
@@ -65,6 +66,7 @@ var (
 	ErrNotFoundProposal        = New(ErrCodeNotFoundProposal, "not found proposal", nil)
 	ErrNotFoundVoter           = New(ErrCodeNotFoundVoter, "not found voter", nil)
 	ErrNotFoundReward          = New(ErrCodeNotFoundReward, "not found reward", nil)
+	ErrUpdatableStakeRatio     = New(ErrCodeUpdatableStakeRatio, "exceeded updatable stake ratio", nil)
 
 	ErrInvalidQueryPath   = New(ErrCodeInvalidQueryPath, "invalid query path", nil)
 	ErrInvalidQueryParams = New(ErrCodeInvalidQueryParams, "invalid query parameters", nil)

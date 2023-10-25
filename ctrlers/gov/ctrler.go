@@ -88,24 +88,20 @@ func (ctrler *GovCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcit
 
 	byzantines := blockCtx.BlockInfo().ByzantineValidators
 	if byzantines != nil && len(byzantines) > 0 {
-		ctrler.logger.Debug("Byzantine validators is found", "count", len(byzantines))
+		ctrler.logger.Info("GovCtrler: Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
 			if slashed, xerr := ctrler.doPunish(&evi); xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
 			} else {
-				_addr := types.Address(evi.Validator.Address).String()
-				_type := abcitypes.EvidenceType_name[int32(evi.Type)]
-				_height0 := strconv.FormatInt(evi.Height, 10)
-				_slashed := strconv.FormatInt(slashed, 10)
 				evts = append(evts, abcitypes.Event{
-					Type: "punishment",
+					Type: "punishment.gov",
 					Attributes: []abcitypes.EventAttribute{
-						{Key: []byte("byzantine"), Value: []byte(_addr), Index: true},
-						{Key: []byte("height"), Value: []byte(_height0), Index: false},
-						{Key: []byte("type"), Value: []byte(_type), Index: false},
-						{Key: []byte("slashed"), Value: []byte(_slashed), Index: false},
+						{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
+						{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
+						{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
+						{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
 					},
 				})
 			}

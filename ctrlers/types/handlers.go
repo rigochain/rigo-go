@@ -31,6 +31,7 @@ type IGovHandler interface {
 	MaxVotingPeriodBlocks() int64
 	MinSelfStakeRatio() int64
 	MaxUpdatableStakeRatio() int64
+	MaxIndividualStakeRatio() int64
 	SlashRatio() int64
 	SignedBlocksWindow() int64
 	MinSignedBlocks() int64
