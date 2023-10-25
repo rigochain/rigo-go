@@ -29,9 +29,9 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 		}
 
 		if txhash == nil || len(txhash) == 0 {
-			var proposals []*_prop
+			var readProposals []*_prop
 			if xerr := atProposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
-				proposals = append(proposals, &_prop{
+				readProposals = append(readProposals, &_prop{
 					Status:   "voting",
 					Proposal: prop,
 				})
@@ -41,7 +41,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			}
 
 			if xerr = atFrozenLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
-				proposals = append(proposals, &_prop{
+				readProposals = append(readProposals, &_prop{
 					Status:   "frozen",
 					Proposal: prop,
 				})
@@ -50,30 +50,30 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 				return nil, xerrors.ErrQuery.Wrap(xerr)
 			}
 
-			v, err := tmjson.Marshal(proposals)
+			v, err := tmjson.Marshal(readProposals)
 			if err != nil {
 				return nil, xerrors.ErrQuery.Wrap(err)
 			}
 			return v, nil
 		} else {
 			prop, xerr := atProposalLedger.Read(ledger.ToLedgerKey(txhash))
-			queryResult := &_prop{}
+			readProposal := &_prop{}
 			if xerr != nil {
 				if xerr.Code() == xerrors.ErrCodeNotFoundResult {
 					prop, xerr = atFrozenLedger.Read(ledger.ToLedgerKey(txhash))
 					if xerr != nil {
 						return nil, xerrors.ErrQuery.Wrap(xerr)
 					}
-					queryResult.Status = "frozen"
+					readProposal.Status = "frozen"
 				} else {
 					return nil, xerrors.ErrQuery.Wrap(xerr)
 				}
 			} else {
-				queryResult.Status = "voting"
+				readProposal.Status = "voting"
 			}
-			queryResult.Proposal = prop
+			readProposal.Proposal = prop
 
-			v, err := tmjson.Marshal(queryResult)
+			v, err := tmjson.Marshal(readProposal)
 			if err != nil {
 				return nil, xerrors.ErrQuery.Wrap(err)
 			}
