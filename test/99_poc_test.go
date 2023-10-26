@@ -242,6 +242,17 @@ func TestPoC2(t *testing.T) {
 	require.Equal(t, "10000000000000001", victimAcData.Balance)
 }
 
+/*
+	contract Attack {
+	    constructor () payable {}
+
+	    function empty() public {
+	        address someone = 0x000000000000000000000000000000000000FEfe;
+	        // someone.call{value: address(this).balance}(""); // send all balance to someone
+	        selfdestruct(payable(address(someone)));
+	    }
+	}
+*/
 func TestPoc3(t *testing.T) {
 	wallet := randWallet()
 	require.NoError(t, wallet.Unlock(defaultRpcNode.Pass))
@@ -259,8 +270,9 @@ func TestPoc3(t *testing.T) {
 	//gasEncode, _ := uint256.FromBig(gas)
 	_amt := uint256.MustFromDecimal("10000000000000000")
 
-	selfdestructContract, _ := hex.DecodeString("6080604052608b8060116000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063f2a75fe414602d575b600080fd5b60336035565b005b600061fefe90508073ffffffffffffffffffffffffffffffffffffffff16fffea264697066735822122006ac63568a8a89b4d90fe512fe76fb87c6f6f951443e0302939b87e795198d7264736f6c63430008100033")
-	trxObj := web3.NewTrxContract(fromAddr, types.ZeroAddress(), nonce, contractGas, defGasPrice, uint256.NewInt(0), selfdestructContract)
+	selfdestructContract, _ := hex.DecodeString("6080604052608b8060116000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063f2a75fe414602d575b600080fd5b60336035565b005b600061fefe90508073ffffffffffffffffffffffffffffffffffffffff16fffea26469706673582212201e32548a0b90b02cfc3f8f25d922823a580c1c4839c2663b0b714fdebdd1014164736f6c63430008100033")
+	//selfdestructContract, _ := hex.DecodeString("6080604052608b8060116000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063f2a75fe414602d575b600080fd5b60336035565b005b600061fefe90508073ffffffffffffffffffffffffffffffffffffffff16fffea264697066735822122006ac63568a8a89b4d90fe512fe76fb87c6f6f951443e0302939b87e795198d7264736f6c63430008100033")
+	trxObj := web3.NewTrxContract(fromAddr, types.ZeroAddress(), nonce, contractGas, defGasPrice, _amt, selfdestructContract)
 	retbz := submitTrx(wallet, trxObj)
 
 	resp := &struct {
@@ -290,18 +302,29 @@ func TestPoc3(t *testing.T) {
 	}
 
 	fmt.Println("contract address", contractAddr)
+	contAcct := getAccountData(contractAddr)
+	fmt.Println("contract balance", contAcct.Balance)
+	require.Equal(t, _amt.Dec(), contAcct.Balance)
 
+	//
+	// If the contract has no fallback payable function,
+	// the transferring tx is reverted.
+	// is it right???? ==> yes
+	//
 	nonce++
-	transferTrx := web3.NewTrxTransfer(fromAddr, contractAddr, nonce, defGas, defGasPrice, _amt)
+	transferTrx := web3.NewTrxTransfer(fromAddr, contractAddr, nonce, bigGas, defGasPrice, _amt)
 	retbz = submitTrx(wallet, transferTrx)
 	err = tmjson.Unmarshal(retbz, resp)
 	require.NoError(t, err)
 	resp2 = &coretypes.ResultBroadcastTxCommit{}
 	err = tmjson.Unmarshal(resp.Result, resp2)
 	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, resp2.CheckTx.Code, resp2.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeDeliverTx, resp2.DeliverTx.Code)
+	nonce--
 
-	contAcct := getAccountData(contractAddr)
-	fmt.Println("contract balance", contAcct.Balance)
+	contAcct = getAccountData(contractAddr)
+	require.Equal(t, _amt.Dec(), contAcct.Balance)
 
 	someoneAddr, _ := types.HexToAddress("0x000000000000000000000000000000000000FEfe")
 	someoneAcct := getAccountData(someoneAddr)
@@ -382,7 +405,7 @@ func TestPoC4(t *testing.T) {
 
 	// set accessedObjAddrs - walletMain
 	bytedata, _ := hex.DecodeString("1234")
-	trx1 := web3.NewTrxContract(walletB.Address(), walletMain.Address(), walletB.GetNonce(), contGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
+	trx1 := web3.NewTrxContract(walletB.Address(), walletMain.Address(), walletB.GetNonce(), bigGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
 	_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
 
 	// transfer all money to walletMoneCopy with NewTrxTransfer
@@ -394,7 +417,7 @@ func TestPoC4(t *testing.T) {
 
 	// use evm stated(accessedObjAddrs[walletMain] is true)
 	// overwrite walletMain's state(balance)
-	trx3 := web3.NewTrxContract(walletA.Address(), walletMain.Address(), walletA.GetNonce(), contGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
+	trx3 := web3.NewTrxContract(walletA.Address(), walletMain.Address(), walletA.GetNonce(), bigGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
 	_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
 
 	wg := sync.WaitGroup{}
@@ -505,7 +528,7 @@ func TestPoC5(t *testing.T) {
 
 	gasSum := uint64(0)
 
-	contract, err := vm.NewEVMContract("./PoC5.json")
+	contract, err := vm.NewEVMContract("./abi_poc5.json")
 	require.NoError(t, err)
 
 	ret, err := contract.ExecCommit("", nil, w0, w0.GetNonce(), contractGas, defGasPrice, uint256.NewInt(1_000_000), rweb3)
@@ -526,7 +549,7 @@ func TestPoC5(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		w0.AddNonce()
-		txhash, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), contGas, defGasPrice, uint256.NewInt(123), rweb3)
+		txhash, err := contract.ExecAsync("transferAsset", []interface{}{targetWallet.Address().Array20()}, w0, w0.GetNonce(), bigGas, defGasPrice, uint256.NewInt(123), rweb3)
 		require.NoError(t, err)
 
 		retTx, err := waitTrxResult(txhash, 30, rweb3)
@@ -562,7 +585,7 @@ func TestPoC5(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		time.Sleep(20 * time.Millisecond) // tx order 2
-		txhash, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), contGas, defGasPrice, uint256.NewInt(0), rweb3)
+		txhash, err := contract.ExecAsync("callRevert", nil, w2, w2.GetNonce(), bigGas, defGasPrice, uint256.NewInt(0), rweb3)
 		require.NoError(t, err)
 
 		retTx, err := waitTrxResult(txhash, 30, rweb3)

@@ -18,7 +18,7 @@ func TestBalanceBug(t *testing.T) {
 	require.NoError(t, deployer.SyncAccount(rweb3))
 	fmt.Println("deployer address", deployer.Address(), "balance", deployer.GetBalance().Dec(), "nonce", deployer.GetNonce())
 
-	contract, err := vm.NewEVMContract("./vesting_test.json")
+	contract, err := vm.NewEVMContract("./abi_vesting_contract.json")
 	require.NoError(t, err)
 
 	// deploy
@@ -42,13 +42,13 @@ func TestBalanceBug(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "0", rbal.String())
 
-	// transfer to contract
+	// transfer to contract - expect error
 	require.NoError(t, deployer.SyncAccount(rweb3))
 	_amt := new(uint256.Int).Div(deployer.GetBalance(), uint256.NewInt(2))
-	ret, err = deployer.TransferCommit(contAddr, defGas, defGasPrice, _amt, rweb3)
+	ret, err = deployer.TransferCommit(contAddr, bigGas, defGasPrice, _amt, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	require.Equal(t, xerrors.ErrCodeDeliverTx, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
 	fmt.Println("transfer amount", _amt.Dec())
 
@@ -60,5 +60,5 @@ func TestBalanceBug(t *testing.T) {
 	fmt.Println("userBalance returns", retCall)
 	rbal, ok = retCall[0].(*big.Int)
 	require.True(t, ok)
-	require.Equal(t, _amt.Dec(), rbal.String())
+	require.Equal(t, "0" /*_amt.Dec()*/, rbal.String())
 }

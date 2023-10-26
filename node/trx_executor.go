@@ -206,13 +206,15 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			return xerr
 		}
 	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
-		if xerr := ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil {
-			// todo: rollback changes in TrxGovHandler.ExecuteTrx
+		if ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil {
+			if xerr := ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+				return xerr
+			}
+		} else if xerr := ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
 		if xerr := ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil {
-			// todo: rollback changes in TrxGovHandler.ExecuteTrx and TrxAcctHandler.ExecuteTrx
 			return xerr
 		}
 	default:
@@ -231,43 +233,44 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	if ctx.Exec &&
 		ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT &&
 		ctx.Tx.To.Compare(rtypes.ZeroAddress()) == 0 {
-		// this tx is to deploy contract
-		var contractAddr rtypes.Address
-		for _, evt := range ctx.Events {
-			if evt.GetType() == "evm" {
-				for _, attr := range evt.Attributes {
-					if string(attr.Key) == "contractAddress" {
-						if caddr, err := rtypes.HexToAddress(string(attr.Value)); err != nil {
-							return xerrors.From(err)
-						} else {
-							contractAddr = caddr
-							break
-						}
-					}
-				}
-				if contractAddr != nil {
-					break
-				}
-			}
-		}
-		if contractAddr == nil {
-			return xerrors.NewOrdinary("there is no contract address")
-		}
-
-		acct := ctx.AcctHandler.FindAccount(contractAddr, ctx.Exec)
-		if acct == nil {
-			return xerrors.ErrNotFoundAccount.Wrapf("contract address: %v", contractAddr)
-		}
-
-		// setting deploy txhash in contract account
-		acct.SetCode(ctx.TxHash)
-
-		if xerr := ctx.AcctHandler.SetAccountCommittable(acct, ctx.Exec); xerr != nil {
-			return xerr
-		}
+		//// this tx is to deploy contract
+		//var contractAddr rtypes.Address
+		//for _, evt := range ctx.Events {
+		//	if evt.GetType() == "evm" {
+		//		for _, attr := range evt.Attributes {
+		//			if string(attr.Key) == "contractAddress" {
+		//				if caddr, err := rtypes.HexToAddress(string(attr.Value)); err != nil {
+		//					return xerrors.From(err)
+		//				} else {
+		//					contractAddr = caddr
+		//					break
+		//				}
+		//			}
+		//		}
+		//		if contractAddr != nil {
+		//			break
+		//		}
+		//	}
+		//}
+		//if contractAddr == nil {
+		//	return xerrors.NewOrdinary("there is no contract address")
+		//}
+		//
+		//acct := ctx.AcctHandler.FindAccount(contractAddr, ctx.Exec)
+		//if acct == nil {
+		//	return xerrors.ErrNotFoundAccount.Wrapf("contract address: %v", contractAddr)
+		//}
+		//
+		//// setting deploy txhash in contract account
+		//acct.SetCode(ctx.TxHash)
+		//
+		//if xerr := ctx.AcctHandler.SetAccountCommittable(acct, ctx.Exec); xerr != nil {
+		//	return xerr
+		//}
 	}
 
-	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
+	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT &&
+		!(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
 		//
 		// The gas & nonce is already processed in `EVMCtrler` if the tx type is `TRX_CONTRACT`.
 
