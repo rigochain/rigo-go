@@ -11,8 +11,8 @@ const (
 )
 
 var (
-	majorVer  uint64 = 1
-	minorVer  uint64 = 2
+	majorVer  uint64 = 0
+	minorVer  uint64 = 3
 	patchVer  uint64 = 0
 	commitVer uint64 = 0
 
