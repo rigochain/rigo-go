@@ -24,20 +24,28 @@ type InitStake struct {
 }
 
 type StakeCtrler struct {
-	allDelegatees   DelegateeArray
-	lastValidators  DelegateeArray
-	delegateeLedger ledger.IFinalityLedger[*Delegatee]
-	frozenLedger    ledger.IFinalityLedger[*Stake]
-	rewardLedger    ledger.IFinalityLedger[*Reward]
+	rwdHashDB *ctrlertypes.MetaDB
 
-	stakeLimiter *StakeLimiter
-	govParams    ctrlertypes.IGovHandler
+	allDelegatees     DelegateeArray
+	lastValidators    DelegateeArray
+	delegateeLedger   ledger.IFinalityLedger[*Delegatee]
+	frozenLedger      ledger.IFinalityLedger[*Stake]
+	rewardLedger      ledger.IFinalityLedger[*Reward]
+	rwdLedgUpInterval int64
+	lastRwdHash       []byte
+	stakeLimiter      *StakeLimiter
+	govParams         ctrlertypes.IGovHandler
 
 	logger tmlog.Logger
 	mtx    sync.RWMutex
 }
 
 func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovHandler, logger tmlog.Logger) (*StakeCtrler, xerrors.XError) {
+	rwdHashDB, err := ctrlertypes.OpenMetaDB("rigo_app_rwd_hash", config.DBDir())
+	if err != nil {
+		panic(err)
+	}
+
 	newDelegateeProvider := func() *Delegatee { return &Delegatee{} }
 	newStakeProvider := func() *Stake { return &Stake{} }
 	newRewardProvider := func() *Reward { return &Reward{} }
@@ -59,12 +67,15 @@ func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovHandler, logg
 	}
 
 	ret := &StakeCtrler{
-		delegateeLedger: delegateeLedger,
-		frozenLedger:    frozenLedger,
-		rewardLedger:    rewardLedger,
-		stakeLimiter:    NewStakeLimiter(nil, govHandler.MaxValidatorCnt(), govHandler.MaxIndividualStakeRatio(), govHandler.MaxUpdatableStakeRatio()),
-		govParams:       govHandler,
-		logger:          logger.With("module", "rigo_StakeCtrler"),
+		rwdHashDB:         rwdHashDB,
+		delegateeLedger:   delegateeLedger,
+		frozenLedger:      frozenLedger,
+		rewardLedger:      rewardLedger,
+		rwdLedgUpInterval: int64(10),
+		lastRwdHash:       rwdHashDB.LastRewardHash(),
+		stakeLimiter:      NewStakeLimiter(nil, govHandler.MaxValidatorCnt(), govHandler.MaxIndividualStakeRatio(), govHandler.MaxUpdatableStakeRatio()),
+		govParams:         govHandler,
+		logger:            logger.With("module", "rigo_StakeCtrler"),
 	}
 
 	// set `lastValidators` of StakeCtrler
@@ -770,17 +781,28 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if h0, v0, xerr := ctrler.delegateeLedger.Commit(); xerr != nil {
+	h0, v0, xerr := ctrler.delegateeLedger.Commit()
+	if xerr != nil {
 		return nil, -1, xerr
-	} else if h1, v1, xerr := ctrler.frozenLedger.Commit(); xerr != nil {
-		return nil, -1, xerr
-	} else if h2, v2, xerr := ctrler.rewardLedger.Commit(); xerr != nil {
-		return nil, -1, xerr
-	} else if v0 != v1 || v1 != v2 {
-		return nil, -1, xerrors.ErrCommit.Wrapf("error: StakeCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2)
-	} else {
-		return crypto.DefaultHash(h0, h1, h2), v0, nil
 	}
+	h1, v1, xerr := ctrler.frozenLedger.Commit()
+	if xerr != nil {
+		return nil, -1, xerr
+	}
+	h2, v2, xerr := ctrler.rewardLedger.Commit()
+	if xerr != nil {
+		return nil, -1, xerr
+	}
+	if v0 != v1 || v1 != v2 {
+		return nil, -1, xerrors.ErrCommit.Wrapf("error: StakeCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2)
+	}
+
+	if v0%ctrler.rwdLedgUpInterval == 0 {
+		_ = ctrler.rwdHashDB.PutLastRewardHash(h2)
+		ctrler.lastRwdHash = h2
+	}
+
+	return crypto.DefaultHash(h0, h1, ctrler.lastRwdHash), v0, nil
 }
 
 func (ctrler *StakeCtrler) Close() xerrors.XError {

@@ -1,8 +1,7 @@
-package node
+package types
 
 import (
 	"encoding/binary"
-	"github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/tendermint/tendermint/libs/json"
 	tmdb "github.com/tendermint/tm-db"
 	"sync"
@@ -13,6 +12,7 @@ const (
 	keyBlockHeight  = "bh"
 	keyBlockContext = "bc"
 	keyBlockAppHash = "ah"
+	keyRewardHash   = "rh"
 )
 
 type MetaDB struct {
@@ -22,7 +22,7 @@ type MetaDB struct {
 	cache map[string][]byte
 }
 
-func openMetaDB(name, dir string) (*MetaDB, error) {
+func OpenMetaDB(name, dir string) (*MetaDB, error) {
 	// The returned 'db' instance is safe in concurrent use.
 	db, err := tmdb.NewDB(name, "goleveldb", dir)
 	if err != nil {
@@ -77,19 +77,27 @@ func (stdb *MetaDB) PutLastBlockAppHash(v []byte) error {
 	return stdb.put(keyBlockAppHash, v)
 }
 
-func (stdb *MetaDB) LastBlockContext() *types.BlockContext {
+func (stdb *MetaDB) LastRewardHash() []byte {
+	return stdb.get(keyRewardHash)
+}
+
+func (stdb *MetaDB) PutLastRewardHash(v []byte) error {
+	return stdb.put(keyRewardHash, v)
+}
+
+func (stdb *MetaDB) LastBlockContext() *BlockContext {
 	bz := stdb.get(keyBlockContext)
 	if bz == nil {
 		return nil
 	}
-	ret := &types.BlockContext{}
+	ret := &BlockContext{}
 	if err := json.Unmarshal(bz, ret); err != nil {
 		return nil
 	}
 	return ret
 }
 
-func (stdb *MetaDB) PutLastBlockContext(ctx *types.BlockContext) error {
+func (stdb *MetaDB) PutLastBlockContext(ctx *BlockContext) error {
 	bz, err := json.Marshal(ctx)
 	if err != nil {
 		return err
