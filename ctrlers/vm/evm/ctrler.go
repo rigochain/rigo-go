@@ -7,7 +7,7 @@ import (
 	ethcore "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/vm"
+	ethvm "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -36,6 +36,7 @@ func blockKey(h int64) []byte {
 }
 
 type EVMCtrler struct {
+	vmevm          *ethvm.EVM
 	ethChainConfig *params.ChainConfig
 	ethDB          ethdb.Database
 	stateDBWrapper *StateDBWrapper
@@ -109,6 +110,11 @@ func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 
 	ctrler.stateDBWrapper = stdb
 	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
+
+	beneficiary := bytes.HexBytes(ctx.BlockInfo().Header.ProposerAddress).Array20()
+	blockContext := evmBlockContext(beneficiary, ctx.Height(), ctx.TimeSeconds())
+	ctrler.vmevm = ethvm.NewEVM(blockContext, ethvm.TxContext{}, ctrler.stateDBWrapper, ctrler.ethChainConfig, ethvm.Config{NoBaseFee: true})
+
 	return nil, nil
 }
 
@@ -177,8 +183,6 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctx.GovHandler.GasPrice(),
 		ctx.Tx.Amount,
 		inputData,
-		ctx.Height,
-		ctx.BlockTime,
 		ctx.Exec,
 	)
 	if xerr != nil {
@@ -289,23 +293,18 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data []byte, height, blockTime int64, exec bool) (*ethcore.ExecutionResult, xerrors.XError) {
-	var sender common.Address
+func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data []byte, exec bool) (*ethcore.ExecutionResult, xerrors.XError) {
 	var toAddr *common.Address
-	copy(sender[:], from)
 	if to != nil && !types.IsZeroAddress(to) {
 		toAddr = new(common.Address)
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, nonce, gas, gasPrice, amt, data, false)
-	blockContext := evmBlockContext(sender, height, blockTime)
-
+	vmmsg := evmMessage(from.Array20(), toAddr, nonce, gas, gasPrice, amt, data, false)
 	txContext := ethcore.NewEVMTxContext(vmmsg)
+	ctrler.vmevm.Reset(txContext, ctrler.stateDBWrapper)
 
-	vmevm := vm.NewEVM(blockContext, txContext, ctrler.stateDBWrapper, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
-
-	result, err := ethcore.ApplyMessage(vmevm, vmmsg, ctrler.blockGasPool)
+	result, err := ethcore.ApplyMessage(ctrler.vmevm, vmmsg, ctrler.blockGasPool)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
@@ -314,7 +313,6 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPr
 }
 
 func (ctrler *EVMCtrler) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
 	return nil, nil
 }
 

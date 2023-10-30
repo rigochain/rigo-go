@@ -33,7 +33,7 @@ type RigoApp struct {
 	lastBlockCtx *rctypes.BlockContext
 	nextBlockCtx *rctypes.BlockContext
 
-	metaDB      *MetaDB
+	metaDB      *rctypes.MetaDB
 	acctCtrler  *account.AcctCtrler
 	stakeCtrler *stake.StakeCtrler
 	govCtrler   *gov.GovCtrler
@@ -49,7 +49,7 @@ type RigoApp struct {
 }
 
 func NewRigoApp(config *cfg.Config, logger log.Logger) *RigoApp {
-	stateDB, err := openMetaDB("rigo_app", config.DBDir())
+	stateDB, err := rctypes.OpenMetaDB("rigo_app", config.DBDir())
 	if err != nil {
 		panic(err)
 	}
