@@ -113,20 +113,27 @@ func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 }
 
 func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
+	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT && ctx.Receiver.Code == nil {
 		return xerrors.ErrUnknownTrxType
 	}
+
+	inputData := []byte(nil)
 	payload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract)
-	if !ok {
-		return xerrors.ErrInvalidTrxPayloadType
+	if ok {
+		inputData = payload.Data
 	}
-	if payload.Data == nil || len(payload.Data) == 0 {
-		return xerrors.ErrInvalidTrxPayloadParams
-	}
+
+	//payload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract)
+	//if !ok {
+	//	return xerrors.ErrInvalidTrxPayloadType
+	//}
+	//if payload.Data == nil || len(payload.Data) == 0 {
+	//	return xerrors.ErrInvalidTrxPayloadParams
+	//}
 
 	// Check intrinsic gas if everything is correct
 	bn := big.NewInt(ctx.Height)
-	gas, err := ethcore.IntrinsicGas(payload.Data, nil, types.IsZeroAddress(ctx.Tx.To), ctrler.ethChainConfig.IsHomestead(bn), ctrler.ethChainConfig.IsIstanbul(bn))
+	gas, err := ethcore.IntrinsicGas(inputData, nil, types.IsZeroAddress(ctx.Tx.To), ctrler.ethChainConfig.IsHomestead(bn), ctrler.ethChainConfig.IsIstanbul(bn))
 	if err != nil {
 		return xerrors.From(err)
 	}
@@ -144,7 +151,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		// Execute a contract transaction only on `deliveryTx`
 		return nil
 	}
-	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT {
+	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT && ctx.Receiver.Code == nil {
 		return xerrors.ErrUnknownTrxType
 	}
 
@@ -156,6 +163,12 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	// issue #48 - prepare hash and index of tx
 	ctrler.stateDBWrapper.Prepare(ctx.TxHash, ctx.TxIdx, ctx.Tx.From, ctx.Tx.To, snap, ctx.Exec)
 
+	inputData := []byte(nil)
+	payload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract)
+	if ok {
+		inputData = payload.Data
+	}
+
 	evmResult, xerr := ctrler.execVM(
 		ctx.Tx.From,
 		ctx.Tx.To,
@@ -163,7 +176,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctx.Tx.Gas,
 		ctx.GovHandler.GasPrice(),
 		ctx.Tx.Amount,
-		ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data,
+		inputData,
 		ctx.Height,
 		ctx.BlockTime,
 		ctx.Exec,
@@ -204,6 +217,13 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		createdAddr := crypto.CreateAddress(ctx.Tx.From.Array20(), ctx.Tx.Nonce)
 		ctrler.logger.Debug("Create contract", "address", createdAddr)
 
+		// Account.Code 에 현재 Tx(Contract 생성) 의 Hash 를 기록.
+		contAcct := ctx.AcctHandler.FindAccount(createdAddr[:], ctx.Exec)
+		contAcct.SetCode(ctx.TxHash)
+		if xerr := ctx.AcctHandler.SetAccountCommittable(contAcct, ctx.Exec); xerr != nil {
+			return xerr
+		}
+
 		// EVM은 ReturnData 에 deployed code 를 리턴한다.
 		// contract 생성 주소를 계산하여 리턴.
 		ctx.RetData = createdAddr[:]
@@ -231,7 +251,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 			// Topics (indexed)
 			for i, t := range l.Topics {
-				strVal := hex.EncodeToString(t.Bytes())
+				strVal = hex.EncodeToString(t.Bytes())
 				attrs = append(attrs, abcitypes.EventAttribute{
 					Key:   []byte(fmt.Sprintf("topic.%d", i)),
 					Value: []byte(strings.ToUpper(strVal)),
@@ -241,7 +261,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 			// Data (not indexed)
 			if l.Data != nil && len(l.Data) > 0 {
-				strVal := hex.EncodeToString(l.Data)
+				strVal = hex.EncodeToString(l.Data)
 				attrs = append(attrs, abcitypes.EventAttribute{
 					Key:   []byte("data"),
 					Value: []byte(strVal),

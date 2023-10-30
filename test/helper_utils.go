@@ -29,7 +29,7 @@ var (
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
 	defGovParams     = rtypes1.DefaultGovParams()
 	defGas           = defGovParams.MinTrxGas()
-	contGas          = defGas * 10
+	bigGas           = defGas * 10
 	smallGas         = defGas - 1
 	contractGas      = uint64(3_000_000)
 	defGasPrice      = defGovParams.GasPrice()

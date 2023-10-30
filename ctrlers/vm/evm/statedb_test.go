@@ -1,7 +1,7 @@
 package evm
 
 //func TestStateDBWrapper_Prepare(t *testing.T) {
-//	deployInput, err := abiContract.Pack("", "TokenOnRigo", "TOR")
+//	deployInput, err := abiERC20Contract.Pack("", "TokenOnRigo", "TOR")
 //	require.NoError(t, err)
 //
 //	// deploy code = contract byte code + input parameters
