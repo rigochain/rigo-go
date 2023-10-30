@@ -69,11 +69,11 @@ func DefaultGovParams() *GovParams {
 
 		// hotfix: because reward ledger and appHash is continually updated, block time is not controlled to 3s.
 		// so, reward = original reward / 3 = 4756468797
-		rewardPerPower:          uint256.NewInt(1_585_489_599),   //uint256.NewInt(4_756_468_797),   // amount
+		rewardPerPower:          uint256.NewInt(4_756_468_797),   // fons
 		lazyRewardBlocks:        2592000,                         // = 60 * 60 * 24 * 30 => 30 days
 		lazyApplyingBlocks:      259200,                          // = 60 * 60 * 24 * 3 => 3 days
-		gasPrice:                uint256.NewInt(250_000_000_000), // 250Gwei
-		minTrxGas:               uint64(4000),                    // 0.001 RIGO = 10^15 wei
+		gasPrice:                uint256.NewInt(250_000_000_000), // 250e9 = 250 Gfons
+		minTrxGas:               uint64(4000),                    // 4e3 * 25e10 = 1e15 = 0.001 RIGO
 		maxTrxGas:               25_000_000,
 		maxBlockGas:             math.MaxUint64,
 		minVotingPeriodBlocks:   259200,  // = 60 * 60 * 24 * 3 => 3 days
