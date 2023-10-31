@@ -257,7 +257,7 @@ func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*rwe
 func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, error) {
 	txRet := &rweb3types.TrxResult{
 		ResultTx: &coretypes.ResultTx{},
-		TxDetail: &ctrlertypes.Trx{},
+		TrxObj:   &ctrlertypes.Trx{},
 	}
 
 	if req, err := rweb3.NewRequest("tx", txhash, false); err != nil {
@@ -268,7 +268,7 @@ func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, err
 		return nil, errors.New("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, txRet.ResultTx); err != nil {
 		return nil, err
-	} else if err := txRet.TxDetail.Decode(txRet.ResultTx.Tx); err != nil {
+	} else if err := txRet.TrxObj.Decode(txRet.ResultTx.Tx); err != nil {
 		return nil, err
 	} else {
 		return txRet, nil

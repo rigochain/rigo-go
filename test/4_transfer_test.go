@@ -38,7 +38,7 @@ func TestTransfer_GasUsed(t *testing.T) {
 
 	txRet, xerr := waitTrxResult(ret.Hash, 30, rweb3)
 	require.NoError(t, xerr)
-	require.Equal(t, defGas, txRet.TxDetail.Gas)
+	require.Equal(t, defGas, txRet.TrxObj.Gas)
 
 	expectedBalance := new(uint256.Int).Sub(oriBalance, new(uint256.Int).Add(trAmt, baseFee))
 	require.NoError(t, w.SyncAccount(rweb3))
