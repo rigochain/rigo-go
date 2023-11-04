@@ -59,7 +59,7 @@ func TestLock(t *testing.T) {
 
 	pass := []byte("abcdef")
 
-	w := crypto.CreateWalletKey(pass)
+	w := crypto.NewWalletKey(pass)
 	require.Nil(t, w.PrvKey())
 	require.NotNil(t, w.PubKey())
 
@@ -100,7 +100,7 @@ func TestOpenSave(t *testing.T) {
 	pass := []byte("abcdef")
 	path := filepath.Join(TESTDIR, "test_key.json")
 
-	w1 := crypto.CreateWalletKey(pass)
+	w1 := crypto.NewWalletKey(pass)
 	_, err := w1.Save(libs.NewFileWriter(path))
 	require.NoError(t, err)
 
@@ -145,7 +145,7 @@ func TestSig2Addr(t *testing.T) {
 
 	pass := []byte("abcdef")
 
-	w := crypto.CreateWalletKey(pass)
+	w := crypto.NewWalletKey(pass)
 	err := w.Unlock(pass)
 	require.NoError(t, err)
 	require.NotNil(t, w.PrvKey())

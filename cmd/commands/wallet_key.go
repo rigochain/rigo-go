@@ -13,33 +13,42 @@ import (
 )
 
 var (
-	wkSecret string
+	wkPass     string
+	changePass bool
 )
 
-func AddShowWalletKeyCmdFlag(cmd *cobra.Command) {
-	cmd.Flags().StringVar(
-		&wkSecret,
-		"secret",
+func AddWalletKeyCmdFlag(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(
+		&wkPass,
+		"passphrase",
+		"p",
 		"",
 		"passphrase to encrypt and decrypt a private key in a wallet key files",
 	)
+	cmd.Flags().BoolVarP(
+		&changePass,
+		"change-passphrase",
+		"c",
+		false,
+		"Change passphrase of a wallet key file")
+
 }
 
-func NewShowWalletKeyCmd() *cobra.Command {
+func NewWalletKeyCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "show-wallet-key",
-		Aliases: []string{"show_wallet_key"},
-		Short:   "Show wallet key file",
-		RunE:    showWalletKey,
+		Use:     "wallet-key",
+		Aliases: []string{"wallet_key"},
+		Short:   "Wallet key file management",
+		RunE:    handleWalletKey,
 		PreRun:  deprecateSnakeCase,
 	}
 
-	AddShowWalletKeyCmdFlag(cmd)
+	AddWalletKeyCmdFlag(cmd)
 
 	return cmd
 }
 
-func showWalletKey(cmd *cobra.Command, args []string) error {
+func handleWalletKey(cmd *cobra.Command, args []string) error {
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "~") {
 			if home, err := os.UserHomeDir(); err != nil {
@@ -54,7 +63,11 @@ func showWalletKey(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		if fileInfo.IsDir() {
+		if changePass {
+			if err := resetPassphrase(arg); err != nil {
+				return err
+			}
+		} else if fileInfo.IsDir() {
 			if err := showWalletKeyDir(arg); err != nil {
 				return err
 			}
@@ -90,8 +103,8 @@ func showWalletKeyFile(path string) error {
 		return err
 	} else {
 		var s []byte
-		if wkSecret != "" {
-			s = []byte(wkSecret)
+		if wkPass != "" {
+			s = []byte(wkPass)
 		} else {
 			s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(path)))
 		}
@@ -118,4 +131,28 @@ func showWalletKeyFile(path string) error {
 	}
 	return nil
 
+}
+
+func resetPassphrase(path string) error {
+	wk, err := crypto.OpenWalletKey(libs.NewFileReader(path))
+	if err != nil {
+		return err
+	}
+
+	pass0 := libs.ReadCredential(fmt.Sprintf("Current Passphrase for %v: ", filepath.Base(path)))
+	defer bytes.ClearBytes(pass0)
+	if err := wk.Unlock(pass0); err != nil {
+		return err
+	}
+	defer wk.Lock()
+
+	pass1 := libs.ReadCredential(fmt.Sprintf("New Passphrase for %v: ", filepath.Base(path)))
+	defer bytes.ClearBytes(pass1)
+	wk.LockWith(pass1)
+
+	if _, err := wk.Save(libs.NewFileWriter(path)); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -21,7 +21,7 @@ type Wallet struct {
 
 func NewWallet(s []byte) *Wallet {
 	prvKey := tmsecp256k1.GenPrivKey()
-	wkey := crypto.NewWalletKey(prvKey, s)
+	wkey := crypto.NewWalletKeyWith(prvKey, s)
 	return &Wallet{
 		wkey: wkey,
 		acct: types2.NewAccount(wkey.Address),
@@ -29,7 +29,7 @@ func NewWallet(s []byte) *Wallet {
 }
 
 func ImportKey(prvKey, s []byte) *Wallet {
-	wkey := crypto.NewWalletKey(prvKey, s)
+	wkey := crypto.NewWalletKeyWith(prvKey, s)
 	return &Wallet{
 		wkey: wkey,
 		acct: types2.NewAccount(wkey.Address),
