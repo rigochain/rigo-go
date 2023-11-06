@@ -2,17 +2,23 @@ version: 0.0
 os: linux
 files:
   - source:  /
-    destination: /tmp/rigo-deploy
+    destination: /home/ubuntu/rigo-deploy
 
 file_exists_behavior: OVERWRITE
 
 permissions:
-
+  - object: /
+    pattern: "**"
+    owner: ubuntu
+    group: ubuntu
 
 hooks:
   ApplicationStop:
-    - location: scripts/codedeploy/appstop.sh
-      runas: rigo_svc
+    - location: stop.sh
+      timeout: 60
+      runas: ubuntu
+
   ApplicationStart:
-    - location: scripts/codedeploy/appstart.sh
-      runas: rigo_svc
+    - location: start.sh
+      timeout: 60
+      runas: ubuntu
