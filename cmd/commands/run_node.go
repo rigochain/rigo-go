@@ -5,10 +5,12 @@ import (
 	"fmt"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/libs"
+	"github.com/rigochain/rigo-go/libs/sfeeder/client"
 	"github.com/rigochain/rigo-go/node"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/libs/log"
+	tmp2p "github.com/tendermint/tendermint/p2p"
 	"io"
 	"os"
 	"os/signal"
@@ -30,6 +32,19 @@ func AddNodeFlags(cmd *cobra.Command) {
 	cmd.Flags().String(
 		"priv_validator_laddr",
 		rootConfig.PrivValidatorListenAddr,
+		"socket address to listen on for connections from external priv_validator process")
+
+	cmd.Flags().StringVar(
+		&privValSecret,
+		"priv_validator_secret",
+		"",
+		"passphrase to encrypt and decrypt a private key in priv_validator_key.json",
+	)
+
+	cmd.Flags().StringVar(
+		&privValSecretFeederAddr,
+		"priv_validator_secret_feeder",
+		"",
 		"socket address to listen on for connections from external priv_validator process")
 
 	// node flags
@@ -96,12 +111,6 @@ func AddNodeFlags(cmd *cobra.Command) {
 		"db_dir",
 		rootConfig.DBPath,
 		"database directory")
-	cmd.Flags().StringVar(
-		&privValSecret,
-		"priv_validator_secret",
-		"",
-		"passphrase to encrypt and decrypt a private key in priv_validator_key.json",
-	)
 }
 
 // NewRunNodeCmd returns the command that allows the CLI to start a node.
@@ -117,7 +126,21 @@ func NewRunNodeCmd(nodeProvider node.Provider) *cobra.Command {
 			}
 
 			var s []byte
-			if privValSecret != "" {
+			if privValSecretFeederAddr != "" {
+				wkf, err := crypto.OpenWalletKey(libs.NewFileReader(rootConfig.PrivValidatorKeyFile()))
+				if err != nil {
+					return err
+				}
+				nodeKey, err := tmp2p.LoadNodeKey(rootConfig.NodeKeyFile())
+
+				if err != nil {
+					return err
+				}
+				s, err = client.ReadRemoteCredential(string(nodeKey.ID()), privValSecretFeederAddr, wkf.Address)
+				if err != nil {
+					return err
+				}
+			} else if privValSecret != "" {
 				s = []byte(privValSecret)
 				privValSecret = ""
 			} else {
