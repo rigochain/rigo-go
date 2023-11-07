@@ -15,7 +15,7 @@ func main() {
 		commands.ResetAllCmd,
 		commands.NewRunNodeCmd(node.NewRigoNode),
 		commands.ShowNodeIDCmd,
-		commands.NewShowWalletKeyCmd(),
+		commands.NewWalletKeyCmd(),
 		commands.VersionCmd,
 	)
 

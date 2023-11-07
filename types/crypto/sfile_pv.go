@@ -79,7 +79,7 @@ func (pvKey SFilePVKey) SaveWith(s []byte) {
 	}
 
 	// build WalletKey contains jsonBytes
-	walKey := NewWalletKey(pvKey.PrivKey.Bytes(), s)
+	walKey := NewWalletKeyWith(pvKey.PrivKey.Bytes(), s)
 	_, err := walKey.Save(libs.NewFileWriter(outFile))
 	if err != nil {
 		panic(err)
