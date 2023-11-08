@@ -1,6 +1,7 @@
 package genesis
 
 import (
+	"github.com/rigochain/rigo-go/cmd/version"
 	types2 "github.com/rigochain/rigo-go/ctrlers/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -32,7 +33,7 @@ func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetH
 				PubKeyTypes: []string{tmtypes.ABCIPubKeyTypeSecp256k1},
 			},
 			Version: tmproto.VersionParams{
-				AppVersion: 1,
+				AppVersion: version.Major(),
 			},
 		},
 		Validators: validators,
