@@ -14,7 +14,7 @@ func TestnetGenesisDoc(chainId string) (*tmtypes.GenesisDoc, error) {
 }
 
 var jsonBlobTestnetGenesis = []byte(`{
-  "genesis_time": "2023-11-08T03:24:02.686739Z",
+  "genesis_time": "2023-11-09T08:21:21.503994Z",
   "chain_id": "testnet",
   "initial_height": "0",
   "consensus_params": {
@@ -33,14 +33,16 @@ var jsonBlobTestnetGenesis = []byte(`{
         "secp256k1"
       ]
     },
-    "version": {}
+    "version": {
+      "app_version": "1"
+    }
   },
   "validators": [
     {
       "address": "1594B3A79F75A81F0181DD6D113A95DCA419E7EC",
       "pub_key": {
         "type": "tendermint/PubKeySecp256k1",
-        "value": null
+        "value": "A7ek3mK550SOIpE3QPx+HkTx3C+4C6P2P8LLYn49/xry"
       },
       "power": "10000000",
       "name": "Validator#1"
@@ -49,7 +51,7 @@ var jsonBlobTestnetGenesis = []byte(`{
       "address": "3799CE8CE603BBE3F8D34FDF5C75A1E83AB23F76",
       "pub_key": {
         "type": "tendermint/PubKeySecp256k1",
-        "value": null
+        "value": "AsMXO+qyTobs7+3XzF4OxDXupRd9IYcfLkCSyICtp9uH"
       },
       "power": "10000000",
       "name": "Validator#2"
@@ -58,7 +60,7 @@ var jsonBlobTestnetGenesis = []byte(`{
       "address": "70723973BC6E29031386EFF74BDD2D845DDB3CBD",
       "pub_key": {
         "type": "tendermint/PubKeySecp256k1",
-        "value": null
+        "value": "Awe3jmsdM35SiBq7BocTVf0k3MJ5+3MiATKFgRx5xaDB"
       },
       "power": "10000000",
       "name": "Validator#3"
