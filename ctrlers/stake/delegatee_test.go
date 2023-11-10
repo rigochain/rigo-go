@@ -1,19 +1,22 @@
-package stake_test
+package stake
 
 import (
-	"github.com/rigochain/rigo-go/ctrlers/stake"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/bytes"
+	"github.com/rigochain/rigo-go/types/crypto"
 	"github.com/stretchr/testify/require"
+	"github.com/tendermint/tendermint/crypto/secp256k1"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
 	"math/rand"
 	"testing"
 )
 
 func TestSlash(t *testing.T) {
-	for _, w := range Wallets[:21] {
-		delegatee := stake.NewDelegatee(w.Address(), w.GetPubKey())
+	for i := 0; i < 21; i++ {
+		govParams := ctrlertypes.Test1GovParams()
+
+		delegatee := newDelegatee()
 
 		selfPower0 := int64(0)
 		totalPower0 := int64(0)
@@ -31,7 +34,7 @@ func TestSlash(t *testing.T) {
 			}
 
 			delegatee.AddStake(
-				stake.NewStakeWithPower(
+				NewStakeWithPower(
 					fromAddr,
 					delegatee.Addr,
 					stakePower,
@@ -43,7 +46,7 @@ func TestSlash(t *testing.T) {
 		require.Equal(t, selfPower0, delegatee.SelfPower)
 		require.Equal(t, totalPower0, delegatee.TotalPower)
 
-		oriStakes := make([]*stake.Stake, delegatee.StakesLen())
+		oriStakes := make([]*Stake, delegatee.StakesLen())
 		for i, s0 := range delegatee.GetAllStakes() {
 			oriStakes[i] = s0.Clone()
 		}
@@ -81,11 +84,11 @@ func TestSlash(t *testing.T) {
 }
 
 func TestAddStake(t *testing.T) {
-	delegatee := stake.NewDelegatee(Wallets[0].Address(), Wallets[0].GetPubKey())
+	delegatee := newDelegatee()
 
 	power0 := bytes.RandInt64N(ctrlertypes.MaxTotalPower())
 	delegatee.AddStake(
-		stake.NewStakeWithPower(
+		NewStakeWithPower(
 			delegatee.Addr,
 			delegatee.Addr,
 			power0,
@@ -100,7 +103,7 @@ func TestAddStake(t *testing.T) {
 	from1 := types.RandAddress()
 	power1 := bytes.RandInt64N(ctrlertypes.MaxTotalPower())
 	delegatee.AddStake(
-		stake.NewStakeWithPower(
+		NewStakeWithPower(
 			from1,
 			delegatee.Addr,
 			power1,
@@ -169,3 +172,9 @@ func TestAddStake(t *testing.T) {
 //		require.True(b, rewarded > 0)
 //	}
 //}
+
+func newDelegatee() *Delegatee {
+	pubBytes := secp256k1.GenPrivKey().PubKey().Bytes()
+	addr, _ := crypto.PubBytes2Addr(pubBytes)
+	return NewDelegatee(addr, pubBytes)
+}

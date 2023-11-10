@@ -316,12 +316,21 @@ func (delegatee *Delegatee) sumPowerOf(addr types.Address) int64 {
 
 type DelegateeArray []*Delegatee
 
-func (vs DelegateeArray) SumTotalPower() int64 {
+func (delgs DelegateeArray) SumTotalPower() int64 {
 	power := int64(0)
-	for _, val := range vs {
-		power += val.TotalPower
+	for _, d := range delgs {
+		power += d.TotalPower
 	}
 	return power
+}
+
+func (delgs DelegateeArray) Find(addr types.Address) (int, *Delegatee) {
+	for i, d := range delgs {
+		if bytes.Compare(addr, d.Addr) == 0 {
+			return i, d
+		}
+	}
+	return -1, nil
 }
 
 type PowerOrderDelegatees []*Delegatee

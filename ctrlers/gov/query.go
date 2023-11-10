@@ -13,35 +13,71 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 	txhash := req.Data
 	switch req.Path {
 	case "proposal":
-		atledger, xerr := ctrler.proposalLedger.ImmutableLedgerAt(req.Height, 0)
+		atProposalLedger, xerr := ctrler.proposalLedger.ImmutableLedgerAt(req.Height, 0)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
+		atFrozenLedger, xerr := ctrler.frozenLedger.ImmutableLedgerAt(req.Height, 0)
+		if xerr != nil {
+			return nil, xerrors.ErrQuery.Wrap(xerr)
+		}
+
+		type _prop struct {
+			Status   string                `json:"status"`
+			Proposal *proposal.GovProposal `json:"proposal"`
+		}
+
 		if txhash == nil || len(txhash) == 0 {
-			var proposals []*proposal.GovProposal
-			if xerr := atledger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
-				proposals = append(proposals, prop)
+			var readProposals []*_prop
+			if xerr := atProposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+				readProposals = append(readProposals, &_prop{
+					Status:   "voting",
+					Proposal: prop,
+				})
 				return nil
 			}); xerr != nil {
 				return nil, xerrors.ErrQuery.Wrap(xerr)
 			}
 
-			v, err := tmjson.Marshal(proposals)
+			if xerr = atFrozenLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+				readProposals = append(readProposals, &_prop{
+					Status:   "frozen",
+					Proposal: prop,
+				})
+				return nil
+			}); xerr != nil {
+				return nil, xerrors.ErrQuery.Wrap(xerr)
+			}
+
+			v, err := tmjson.Marshal(readProposals)
 			if err != nil {
 				return nil, xerrors.ErrQuery.Wrap(err)
 			}
 			return v, nil
 		} else {
-			prop, xerr := atledger.Read(ledger.ToLedgerKey(txhash))
+			prop, xerr := atProposalLedger.Read(ledger.ToLedgerKey(txhash))
+			readProposal := &_prop{}
 			if xerr != nil {
-				return nil, xerrors.ErrQuery.Wrap(xerr)
+				if xerr.Code() == xerrors.ErrCodeNotFoundResult {
+					prop, xerr = atFrozenLedger.Read(ledger.ToLedgerKey(txhash))
+					if xerr != nil {
+						return nil, xerrors.ErrQuery.Wrap(xerr)
+					}
+					readProposal.Status = "frozen"
+				} else {
+					return nil, xerrors.ErrQuery.Wrap(xerr)
+				}
+			} else {
+				readProposal.Status = "voting"
 			}
+			readProposal.Proposal = prop
 
-			v, err := tmjson.Marshal(prop)
+			v, err := tmjson.Marshal(readProposal)
 			if err != nil {
 				return nil, xerrors.ErrQuery.Wrap(err)
 			}
+
 			return v, nil
 		}
 	case "gov_params":

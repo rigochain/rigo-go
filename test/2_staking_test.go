@@ -51,7 +51,7 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	sender.AddNonce()
 
 	// not allowed delegating, because `maxAllowedAmt` is already delegated.
-	ret, err = sender.StakingSync(valWal.Address(), defGas, defGasPrice, uint256.NewInt(1_000_000_000_000_000_000), rweb3)
+	ret, err = sender.StakingSync(valWal.Address(), defGas, defGasPrice, rtypes0.ToFons(1), rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
@@ -60,11 +60,12 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	// already stake + new stake >= govParams.MinValidatorStake
 	allowedMinStake := new(uint256.Int).Sub(govParams.MinValidatorStake(), ctrlertypes.PowerToAmount(valStakes.SelfPower))
 	if allowedMinStake.Sign() <= 0 {
-		allowedMinStake = uint256.NewInt(10_000_000_000_000_000_000)
+		allowedMinStake = rtypes0.ToFons(10)
 	}
 
 	require.NoError(t, valWal.SyncAccount(rweb3))
 	require.NoError(t, valWal.Unlock(defaultRpcNode.Pass))
+
 	ret, err = valWal.StakingSync(valWal.Address(), defGas, defGasPrice, allowedMinStake, rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, allowedMinStake.Dec())
@@ -116,7 +117,7 @@ func TestDelegating(t *testing.T) {
 	valStakes0, err := rweb3.GetDelegatee(valAddr)
 	require.NoError(t, err)
 
-	stakeAmt := uint256.NewInt(1_000_000_000_000_000_000) // 10^18
+	stakeAmt := rtypes0.ToFons(1) // 10^18
 	stakePower := int64(1)
 
 	require.NoError(t, delegatorWallet.Unlock(defaultRpcNode.Pass))
@@ -175,7 +176,7 @@ func TestMinValidatorStake(t *testing.T) {
 	require.NoError(t, sender.SyncAccount(rweb3))
 
 	minValidatorStake := govParams.MinValidatorStake()
-	_amt := new(uint256.Int).Sub(minValidatorStake, ctrlertypes.AmountPerPower())
+	_amt := new(uint256.Int).Sub(minValidatorStake, ctrlertypes.PowerToAmount(1))
 	ret, err := sender.StakingSync(sender.Address(), defGas, defGasPrice, _amt, rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)

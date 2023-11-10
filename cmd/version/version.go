@@ -12,9 +12,9 @@ const (
 
 var (
 	majorVer  uint64 = 1
-	minorVer  uint64 = 2
-	patchVer  uint64 = 0
-	commitVer uint64 = 0
+	minorVer  uint64 = 3
+	patchVer  uint64 = 11
+	commitVer uint64 = 1
 
 	// it is changed using ldflags.
 	//  ex) -ldflags "... -X 'github.com/rigochain/rigo-go/cmd/version.GitCommit=$(LVER)'"
@@ -46,6 +46,29 @@ func Uint64(masks ...uint64) uint64 {
 		}
 	}
 	return ((majorVer << 56) + (minorVer << 48) + (patchVer << 32) + commitVer) & (mask)
+}
+
+func Uint64Formated(masks ...uint64) uint64 {
+	mask := uint64(0)
+	if len(masks) == 0 {
+		mask = MASK_MAJOR_VER | MASK_MINOR_VER | MASK_PATCH_VER | MASK_COMMIT_VER
+	} else {
+		for _, m := range masks {
+			mask |= m
+		}
+	}
+
+	retVer := uint64(0)
+	if mask&MASK_MAJOR_VER != 0 {
+		retVer += majorVer * 1_000_000
+	}
+	if mask&MASK_MINOR_VER != 0 {
+		retVer += minorVer * 1_000
+	}
+	if mask&MASK_PATCH_VER != 0 {
+		retVer += patchVer
+	}
+	return retVer
 }
 
 func Parse(c uint64) string {

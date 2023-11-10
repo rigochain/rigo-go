@@ -2,6 +2,7 @@ package node
 
 import (
 	rtypes "github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -30,24 +31,15 @@ func (ctrler *RigoApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 				Name    string         `json:"name,omitempty"`
 				Nonce   uint64         `json:"nonce,string"`
 				Balance string         `json:"balance"`
-				Code    []byte         `json:"code,omitempty"`
+				Code    bytes.HexBytes `json:"code,omitempty"`
 				DocURL  string         `json:"docURL,omitempty"`
 			}{}
 			if err := tmjson.Unmarshal(response.Value, &_acct); err != nil {
 				xerr = xerrors.ErrQuery.Wrap(err)
-			} else if len(_acct.Code) > 0 {
-				response.Value = nil
-				_acct.Code, xerr = ctrler.vmCtrler.QueryCode(req.Data, req.Height)
-				if xerr == nil {
-					response.Value, err = tmjson.Marshal(&_acct)
-					if err != nil {
-						xerr = xerrors.ErrQuery.Wrap(err)
-					}
-				}
 			}
 		}
 
-	case "stakes", "delegatee", "reward":
+	case "stakes", "stakes/total_power", "stakes/voting_power", "delegatee", "reward":
 		response.Value, xerr = ctrler.stakeCtrler.Query(req)
 	case "proposal", "gov_params":
 		response.Value, xerr = ctrler.govCtrler.Query(req)

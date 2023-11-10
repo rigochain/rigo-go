@@ -9,6 +9,8 @@ func AddRoutes() {
 	tmrpccore.Routes["account"] = tmrpccore_server.NewRPCFunc(QueryAccount, "addr,height")
 	tmrpccore.Routes["delegatee"] = tmrpccore_server.NewRPCFunc(QueryDelegatee, "addr,height")
 	tmrpccore.Routes["stakes"] = tmrpccore_server.NewRPCFunc(QueryStakes, "addr,height")
+	tmrpccore.Routes["stakes/total_power"] = tmrpccore_server.NewRPCFunc(QueryStakes1, "height")
+	tmrpccore.Routes["stakes/voting_power"] = tmrpccore_server.NewRPCFunc(QueryStakes2, "height")
 	tmrpccore.Routes["reward"] = tmrpccore_server.NewRPCFunc(QueryReward, "addr,height")
 	tmrpccore.Routes["proposals"] = tmrpccore_server.NewRPCFunc(QueryProposal, "txhash,height") // todo: will be deprecated
 	tmrpccore.Routes["proposal"] = tmrpccore_server.NewRPCFunc(QueryProposal, "txhash,height")

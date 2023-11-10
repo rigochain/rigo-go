@@ -16,6 +16,7 @@ import (
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -87,24 +88,20 @@ func (ctrler *GovCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcit
 
 	byzantines := blockCtx.BlockInfo().ByzantineValidators
 	if byzantines != nil && len(byzantines) > 0 {
-		ctrler.logger.Debug("Byzantine validators is found", "count", len(byzantines))
+		ctrler.logger.Info("GovCtrler: Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
 			if slashed, xerr := ctrler.doPunish(&evi); xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
 			} else {
-				_addr := types.Address(evi.Validator.Address).String()
-				_type := abcitypes.EvidenceType_name[int32(evi.Type)]
-				_height0 := strconv.FormatInt(evi.Height, 10)
-				_slashed := strconv.FormatInt(slashed, 10)
 				evts = append(evts, abcitypes.Event{
-					Type: "punishment",
+					Type: "punishment.gov",
 					Attributes: []abcitypes.EventAttribute{
-						{Key: []byte("byzantine"), Value: []byte(_addr), Index: true},
-						{Key: []byte("height"), Value: []byte(_height0), Index: false},
-						{Key: []byte("type"), Value: []byte(_type), Index: false},
-						{Key: []byte("slashed"), Value: []byte(_slashed), Index: false},
+						{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
+						{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
+						{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
+						{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
 					},
 				})
 			}
@@ -192,6 +189,27 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 			txpayload.VotingPeriodBlocks < ctrler.MinVotingPeriodBlocks() {
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
+		// check governance proposal consistency
+		if txpayload.OptType == proposal.PROPOSAL_GOVPARAMS {
+			//check options
+			checkGovParams := &ctrlertypes.GovParams{}
+			for _, option := range txpayload.Options {
+				if err := json.Unmarshal(option, checkGovParams); err != nil {
+					return xerrors.ErrInvalidTrxPayloadParams.Wrap(err)
+				}
+			}
+		}
+		endVotingHeight := txpayload.StartVotingHeight + txpayload.VotingPeriodBlocks
+		minApplyingHeight := endVotingHeight + ctrler.LazyApplyingBlocks()
+		// check overflow: issue #51
+		if txpayload.StartVotingHeight > endVotingHeight {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v",
+				txpayload.StartVotingHeight, endVotingHeight)
+		}
+		// check applying blocks
+		if txpayload.ApplyingHeight < minApplyingHeight || endVotingHeight > txpayload.ApplyingHeight {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyingHeight: must be set equal to or higher than minApplyingHeight. ApplyingHeight:%v, minApplyingHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyingHeight, minApplyingHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
+		}
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrap(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
@@ -262,8 +280,8 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	}
 
 	prop, xerr := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
-		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks, ctrler.LazyApplyingBlocks(),
-		totalVotingPower, voters, txpayload.Options...)
+		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks,
+		totalVotingPower, txpayload.ApplyingHeight, voters, txpayload.Options...)
 	if xerr != nil {
 		return xerr
 	}
@@ -303,20 +321,52 @@ func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Ev
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if xerr := ctrler.freezeProposals(ctx.Height()); xerr != nil {
-		return nil, xerr
-	}
-	if xerr := ctrler.applyProposals(ctx.Height()); xerr != nil {
+	var evts []abcitypes.Event
+
+	frozen, removed, xerr := ctrler.freezeProposals(ctx.Height())
+	if xerr != nil {
 		return nil, xerr
 	}
 
-	return nil, nil
+	applied, xerr := ctrler.applyProposals(ctx.Height())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	for _, h := range frozen {
+		evts = append(evts, abcitypes.Event{
+			Type: "proposal",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte("frozen"), Value: []byte(h.String()), Index: true},
+			},
+		})
+	}
+	for _, h := range removed {
+		evts = append(evts, abcitypes.Event{
+			Type: "proposal",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte("removed"), Value: []byte(h.String()), Index: true},
+			},
+		})
+	}
+	for _, h := range applied {
+		evts = append(evts, abcitypes.Event{
+			Type: "proposal",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte("applied"), Value: []byte(h.String()), Index: true},
+			},
+		})
+	}
+
+	return evts, nil
 }
 
 // The following function is called by the Block Executor
 //
 
-func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
+func (ctrler *GovCtrler) freezeProposals(height int64) ([]abytes.HexBytes, []abytes.HexBytes, xerrors.XError) {
+	var frozen []abytes.HexBytes
+	var removed []abytes.HexBytes
 	xerr := ctrler.proposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		if prop.EndVotingHeight < height {
 
@@ -327,20 +377,24 @@ func (ctrler *GovCtrler) freezeProposals(height int64) xerrors.XError {
 
 			majorOpt := prop.UpdateMajorOption()
 			if majorOpt != nil {
+				// freeze the proposal
 				if xerr := ctrler.frozenLedger.SetFinality(prop); xerr != nil {
 					return xerr
 				}
+				frozen = append(frozen, prop.TxHash)
 			} else {
 				// do nothing. the proposal will be just removed.
 				ctrler.logger.Debug("Freeze proposal", "warning", "not found major option")
+				removed = append(removed, prop.TxHash)
 			}
 		}
 		return nil
 	})
-	return xerr
+	return frozen, removed, xerr
 }
 
-func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
+func (ctrler *GovCtrler) applyProposals(height int64) ([]abytes.HexBytes, xerrors.XError) {
+	var applied []abytes.HexBytes
 	xerr := ctrler.frozenLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
 		if prop.ApplyingHeight <= height {
 			if _, xerr := ctrler.frozenLedger.DelFinality(prop.Key()); xerr != nil {
@@ -350,11 +404,23 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 				switch prop.OptType {
 				case proposal.PROPOSAL_GOVPARAMS:
 					newGovParams := &ctrlertypes.GovParams{}
-					if err := json.Unmarshal(prop.MajorOption.Option(), newGovParams); err != nil {
+
+					//
+					// hotfix
+					strOpt := string(prop.MajorOption.Option())
+					if strings.HasSuffix(strOpt, `""}`) {
+						strOpt = strings.ReplaceAll(strOpt, `""}`, `"}`)
+					}
+					//
+					//
+
+					if err := json.Unmarshal([]byte(strOpt), newGovParams); err != nil {
+						ctrler.logger.Error("Apply proposal", "error", err, "option", string(prop.MajorOption.Option()))
 						return xerrors.From(err)
 					}
 					ctrlertypes.MergeGovParams(&ctrler.GovParams, newGovParams)
 					if xerr := ctrler.paramsLedger.SetFinality(newGovParams); xerr != nil {
+						ctrler.logger.Error("Apply proposal", "error", xerr, "newGovParams", newGovParams)
 						return xerr
 					}
 					ctrler.newGovParams = newGovParams
@@ -362,6 +428,8 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 					key := prop.Key()
 					ctrler.logger.Debug("Apply proposal", "key(txHash)", abytes.HexBytes(key[:]), "type", prop.OptType)
 				}
+
+				applied = append(applied, prop.TxHash)
 			} else {
 				ctrler.logger.Error("Apply proposal", "error", "major option is nil")
 			}
@@ -369,7 +437,7 @@ func (ctrler *GovCtrler) applyProposals(height int64) xerrors.XError {
 		return nil
 	})
 
-	return xerr
+	return applied, xerr
 }
 
 func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {

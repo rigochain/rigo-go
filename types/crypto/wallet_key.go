@@ -57,7 +57,7 @@ type WalletKey struct {
 	pubKey []byte
 }
 
-func NewWalletKey(keyBytes, pass []byte) *WalletKey {
+func NewWalletKeyWith(keyBytes, pass []byte) *WalletKey {
 	var _pubKey, _prvKey []byte
 	var _cipherTextParams *cipherTextParams
 	var _dkParams *dkParams
@@ -126,9 +126,9 @@ func NewWalletKey(keyBytes, pass []byte) *WalletKey {
 	}
 }
 
-func CreateWalletKey(s []byte) *WalletKey {
+func NewWalletKey(s []byte) *WalletKey {
 	privKey := tmsecp256k1.GenPrivKey()
-	return NewWalletKey(privKey, s)
+	return NewWalletKeyWith(privKey, s)
 }
 
 func OpenWalletKey(r io.Reader) (*WalletKey, error) {
@@ -159,6 +159,55 @@ func (wk *WalletKey) IsLock() bool {
 func (wk *WalletKey) Lock() {
 	libs.ClearCredential(wk.prvKey[:])
 	wk.prvKey = nil
+}
+
+func (wk *WalletKey) LockWith(pass []byte) {
+	if wk.prvKey == nil {
+		return
+	}
+	defer func() {
+		libs.ClearCredential(wk.prvKey[:])
+		wk.prvKey = nil
+	}()
+
+	salt := make([]byte, DKLEN)
+	rand.Read(salt)
+	iter := 600000 + int(binary.BigEndian.Uint16(append([]byte{0x00}, salt[:1]...)))
+
+	sk := pbkdf2.Key(pass, salt, iter, DKLEN, DefaultHasher)
+
+	_dkParams := &dkParams{
+		Algo:  "pbkdf2",
+		Prf:   DefaultHasherName(),
+		Iter:  iter,
+		Salt:  salt,
+		DkLen: DKLEN,
+	}
+
+	block, err := aes.NewCipher(sk)
+	if err != nil {
+		panic(err)
+	}
+
+	iv := make([]byte, block.BlockSize())
+	rand.Read(iv)
+
+	plaintext, err := PKCS7Padding(wk.prvKey, block.BlockSize())
+	if err != nil {
+		panic(err)
+	}
+
+	ciphertext := make([]byte, len(plaintext))
+	cbc := cipher.NewCBCEncrypter(block, iv)
+	cbc.CryptBlocks(ciphertext, plaintext)
+	libs.ClearCredential(plaintext)
+
+	wk.CipherTextParams = &cipherTextParams{
+		Algo: SymmAlgo,
+		Text: ciphertext,
+		Iv:   iv,
+	}
+	wk.DKParams = _dkParams
 }
 
 func (wk *WalletKey) Unlock(s []byte) error {
@@ -233,7 +282,7 @@ const DefaultWalletKeyDirPerm = 0700
 const DefaultWalletKeyDir = "walkeys"
 
 func createWalletKeyFile(s []byte, dir string) (*WalletKey, error) {
-	wk := CreateWalletKey(s)
+	wk := NewWalletKey(s)
 	filePath := filepath.Join(dir, fmt.Sprintf("wk%X.json", wk.Address))
 	if _, err := wk.Save(libs.NewFileWriter(filePath)); err != nil {
 		return nil, err

@@ -7,5 +7,5 @@ import (
 
 type TrxResult struct {
 	*coretypes.ResultTx
-	TxDetail *ctrlertypes.Trx `json:"tx_detail"`
+	TrxObj *ctrlertypes.Trx `json:"trx_obj"`
 }

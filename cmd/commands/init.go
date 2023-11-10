@@ -23,9 +23,10 @@ import (
 //}
 
 var (
-	rigoChainID   = "mainnet"
-	walkeyCnt     = 9
-	privValSecret string
+	rigoChainID             = "mainnet"
+	walkeyCnt               = 9
+	privValSecret           string
+	privValSecretFeederAddr string
 )
 
 // NewRunNodeCmd returns the command that allows the CLI to start a node.

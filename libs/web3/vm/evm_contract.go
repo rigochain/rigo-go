@@ -173,6 +173,23 @@ func (ec *EVMContract) ExecCommit(name string, args []interface{}, from *web3.Wa
 	return ret, nil
 }
 
+func (ec *EVMContract) ExecCommitWith(data []byte, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, rweb3 *web3.RigoWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+	to := ec.addr
+
+	tx := web3.NewTrxContract(from.Address(), to, nonce, gas, gasPrice, amt, data)
+	_, _, err := from.SignTrxRLP(tx, rweb3.ChainID())
+	if err != nil {
+		return nil, err
+	}
+
+	ret, err := rweb3.SendTransactionCommit(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
 func (ec *EVMContract) pack(name string, args ...interface{}) ([]byte, error) {
 	data, err := ec.abi.Pack(name, args...)
 	if err != nil {

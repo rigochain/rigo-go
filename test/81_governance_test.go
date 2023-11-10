@@ -3,6 +3,7 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/rigochain/rigo-go/ctrlers/types"
 	"github.com/rigochain/rigo-go/libs/web3"
@@ -24,12 +25,28 @@ var (
 func TestProposalAndVoting(t *testing.T) {
 	//get validator wallet
 	rweb3 := randRigoWeb3()
-	validatorWallets := validatorWallets[0]
-	require.NoError(t, validatorWallets.SyncAccount(rweb3))
-	require.NoError(t, validatorWallets.Unlock(defaultRpcNode.Pass))
+	validatorWallet := validatorWallets[0]
+	require.NoError(t, validatorWallet.SyncAccount(rweb3))
+	require.NoError(t, validatorWallet.Unlock(defaultRpcNode.Pass))
 
 	bzOpt, err := json.Marshal(ctrlertypes.Test3GovParams())
 	require.NoError(t, err)
+
+	//asset transfer for unit test
+	if validatorWallet.GetBalance().IsZero() {
+		sender := randCommonWallet()
+		require.NoError(t, sender.Unlock([]byte("1111")))
+		require.NoError(t, sender.SyncAccount(rweb3))
+
+		_amt := new(uint256.Int).Div(sender.GetBalance(), uint256.NewInt(2))
+		fmt.Println("wallet amount", sender.GetBalance().Dec())
+		fmt.Println("transfer amount", _amt.Dec())
+
+		txRet, err := sender.TransferCommit(validatorWallet.Address(), defGas, defGasPrice, _amt, rweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, txRet.CheckTx.Code, txRet.CheckTx.Log)
+		require.Equal(t, xerrors.ErrCodeSuccess, txRet.DeliverTx.Code, txRet.DeliverTx.Log)
+	}
 
 	//subscriber
 	subWg := sync.WaitGroup{}
@@ -44,7 +61,7 @@ func TestProposalAndVoting(t *testing.T) {
 		currentBlockHeight := event.Data.(types.EventDataNewBlock).Block.Height
 		if currentBlockHeight > 10 {
 			targetBlockHeight = currentBlockHeight + 5
-			proposalResult, err2 := validatorWallets.ProposalCommit(defGas, defGasPrice, "proposal test", targetBlockHeight, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt, rweb3)
+			proposalResult, err2 := validatorWallet.ProposalCommit(defGas, defGasPrice, "proposal test", targetBlockHeight, 259200, 518410+targetBlockHeight, proposal.PROPOSAL_GOVPARAMS, bzOpt, rweb3)
 			require.NoError(t, err2)
 			require.Equal(t, xerrors.ErrCodeSuccess, proposalResult.CheckTx.Code)
 			proposalHash = bytes.HexBytes(proposalResult.Hash)
@@ -64,8 +81,8 @@ func TestProposalAndVoting(t *testing.T) {
 
 		votingBlockHeight := event.Data.(types.EventDataNewBlock).Block.Height
 		if votingBlockHeight > targetBlockHeight && proposalHash != nil {
-			require.NoError(t, validatorWallets.SyncAccount(rweb3))
-			votingResult, err := validatorWallets.VotingCommit(defGas, defGasPrice, proposalHash, 0, rweb3)
+			require.NoError(t, validatorWallet.SyncAccount(rweb3))
+			votingResult, err := validatorWallet.VotingCommit(defGas, defGasPrice, proposalHash, 0, rweb3)
 			require.NoError(t, err)
 			require.Equal(t, xerrors.ErrCodeSuccess, votingResult.CheckTx.Code)
 			sub2.Stop()
@@ -77,5 +94,54 @@ func TestProposalAndVoting(t *testing.T) {
 		}
 	})
 	require.NoError(t, votingSubErr)
+	subWg.Wait()
+}
+
+func TestIncorrectProposal(t *testing.T) {
+	//get validator wallet
+	rweb3 := randRigoWeb3()
+	validatorWallet := validatorWallets[0]
+	require.NoError(t, validatorWallet.SyncAccount(rweb3))
+	require.NoError(t, validatorWallet.Unlock(defaultRpcNode.Pass))
+
+	//asset transfer for unit test
+	if validatorWallet.GetBalance().IsZero() {
+		sender := randCommonWallet()
+		require.NoError(t, sender.Unlock([]byte("1111")))
+		require.NoError(t, sender.SyncAccount(rweb3))
+
+		_amt := new(uint256.Int).Div(sender.GetBalance(), uint256.NewInt(2))
+		fmt.Println("wallet amount", sender.GetBalance().Dec())
+		fmt.Println("transfer amount", _amt.Dec())
+
+		txRet, err := sender.TransferCommit(validatorWallet.Address(), defGas, defGasPrice, _amt, rweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, txRet.CheckTx.Code, txRet.CheckTx.Log)
+		require.Equal(t, xerrors.ErrCodeSuccess, txRet.DeliverTx.Code, txRet.DeliverTx.Log)
+	}
+
+	bzOpt := []byte(`{"slashRatio": "60""}`)
+
+	//subscriber
+	subWg := sync.WaitGroup{}
+	sub, err := web3.NewSubscriber(defaultRpcNode.WSEnd)
+	require.NoError(t, err)
+
+	subWg.Add(1)
+	propSubErr := sub.Start("tm.event='NewBlock'", func(sub *web3.Subscriber, result []byte) {
+		event := &coretypes.ResultEvent{}
+		err := tmjson.Unmarshal(result, event)
+		require.NoError(t, err)
+		currentBlockHeight := event.Data.(types.EventDataNewBlock).Block.Height
+		if currentBlockHeight > 10 {
+			targetBlockHeight = currentBlockHeight + 5
+			proposalResult, err2 := validatorWallet.ProposalCommit(defGas, defGasPrice, "proposal test", targetBlockHeight, 259200, 0, proposal.PROPOSAL_GOVPARAMS, bzOpt, rweb3)
+			require.Equal(t, xerrors.ErrCheckTx.Code(), proposalResult.CheckTx.Code)
+			require.NoError(t, err2)
+			sub.Stop()
+			subWg.Done()
+		}
+	})
+	require.NoError(t, propSubErr)
 	subWg.Wait()
 }

@@ -1,6 +1,7 @@
 package test
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/holiman/uint256"
 	"github.com/rigochain/rigo-go/libs/web3"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -22,21 +24,27 @@ var (
 
 func TestERC20_Deploy(t *testing.T) {
 	// deploy
-	testDeploy(t)
+	testDeploy(t, "./abi_erc20.json", []interface{}{"RigoToken", "RGT"})
 	testQuery(t)
 }
 
 func TestERC20_Payable(t *testing.T) {
-	testDeploy(t)
+	testDeploy(t, "./abi_erc20.json", []interface{}{"RigoToken", "RGT"})
 	testPayable(t)
 }
 
 func TestERC20_Event(t *testing.T) {
-	testDeploy(t)
+	testDeploy(t, "./abi_erc20.json", []interface{}{"RigoToken", "RGT"})
 	testEvents(t)
 }
 
-func testDeploy(t *testing.T) {
+func TestERC20_Fallback(t *testing.T) {
+	testDeploy(t, "./abi_fallback_contract.json", nil)
+	testReceive(t)
+	testFallback(t)
+}
+
+func testDeploy(t *testing.T, abiFile string, args []interface{}) {
 	rweb3 := randRigoWeb3()
 
 	creator = randCommonWallet()
@@ -45,11 +53,11 @@ func testDeploy(t *testing.T) {
 	require.NoError(t, creator.SyncAccount(rweb3))
 	beforeBalance0 := creator.GetBalance().Clone()
 
-	contract, err := vm.NewEVMContract("./erc20_test_contract.json")
+	contract, err := vm.NewEVMContract(abiFile)
 	require.NoError(t, err)
 
 	// insufficient gas
-	ret, err := contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
+	ret, err := contract.ExecCommit("", args,
 		creator, creator.GetNonce(), defGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
@@ -61,7 +69,7 @@ func testDeploy(t *testing.T) {
 	require.Equal(t, beforeBalance0.Dec(), beforeBalance1.Dec())
 
 	// sufficient gas - deploy contract
-	ret, err = contract.ExecCommit("", []interface{}{"RigoToken", "RGT"},
+	ret, err = contract.ExecCommit("", args,
 		creator, creator.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
@@ -69,10 +77,9 @@ func testDeploy(t *testing.T) {
 	require.NotNil(t, contract.GetAddress())
 
 	fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
-
 	contAcct, err := rweb3.GetAccount(contract.GetAddress())
 	require.NoError(t, err)
-	require.Equal(t, []byte(contract.GetDeployedBytecode()), contAcct.Code)
+	require.Equal(t, []byte(ret.Hash), contAcct.Code)
 
 	txRet, err := waitTrxResult(ret.Hash, 30, rweb3)
 	require.NoError(t, err, err)
@@ -126,15 +133,12 @@ func testPayable(t *testing.T) {
 	randAmt := bytes.RandU256IntN(sender.GetBalance())
 	_ = randAmt.Sub(randAmt, baseFee)
 
-	ret, err := sender.TransferSync(evmContract.GetAddress(), defGas, defGasPrice, randAmt, rweb3)
+	ret, err := sender.TransferCommit(evmContract.GetAddress(), bigGas, defGasPrice, randAmt, rweb3)
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
-	txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
-	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
-
-	expectedAmt := new(uint256.Int).Sub(sender.GetBalance(), gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice))
+	expectedAmt := new(uint256.Int).Sub(sender.GetBalance(), gasToFee(uint64(ret.DeliverTx.GasUsed), defGasPrice))
 	_ = expectedAmt.Sub(expectedAmt, randAmt)
 	require.NotEqual(t, sender.GetBalance(), expectedAmt)
 	require.NoError(t, sender.SyncAccount(rweb3))
@@ -152,18 +156,19 @@ func testPayable(t *testing.T) {
 	//
 
 	refundAmt := bytes.RandU256IntN(randAmt)
-	ret, err = evmContract.ExecSync("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
+	ret, err = evmContract.ExecCommit("giveMeAsset", []interface{}{refundAmt.ToBig()}, sender, sender.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), rweb3)
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
-	txRet, err = waitTrxResult(ret.Hash, 15, rweb3)
-	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
+	//txRet, err := waitTrxResult(ret.Hash, 15, rweb3)
+	//require.NoError(t, err)
+	//require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 
-	fmt.Println("giveMeAsset", "usedGas", txRet.TxResult.GasUsed)
+	fmt.Println("giveMeAsset", "usedGas", ret.DeliverTx.GasUsed)
 
 	expectedAmt = new(uint256.Int).Add(sender.GetBalance(), refundAmt)
-	_ = expectedAmt.Sub(expectedAmt, gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice))
+	_ = expectedAmt.Sub(expectedAmt, gasToFee(uint64(ret.DeliverTx.GasUsed), defGasPrice))
 	require.NoError(t, sender.SyncAccount(rweb3))
 	require.Equal(t, expectedAmt, sender.GetBalance())
 
@@ -215,5 +220,95 @@ func testEvents(t *testing.T) {
 	fmt.Println("transfer(contract)", "usedGas", txRet.TxResult.GasUsed)
 
 	subWg.Wait()
+
+}
+
+func testFallback(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
+	sender := randCommonWallet()
+	require.NoError(t, sender.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
+	require.NoError(t, sender.SyncAccount(rweb3))
+
+	ret, err := evmContract.ExecCommitWith(bytes.RandBytes(4), sender, sender.GetNonce(), bigGas, defGasPrice, uint256.NewInt(0), rweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+
+	found := false
+	for _, evt := range ret.DeliverTx.Events {
+		if evt.Type != "evm" {
+			continue
+		}
+		for _, attr := range evt.Attributes {
+			//fmt.Println(attr.String())
+			if string(attr.Key) == "data" {
+				val, err := hex.DecodeString(string(attr.Value))
+				require.NoError(t, err)
+				found = strings.HasPrefix(string(val[64:]), "fallback")
+				break
+			}
+		}
+	}
+
+	require.True(t, found)
+}
+
+func testReceive(t *testing.T) {
+	rweb3 := randRigoWeb3()
+
+	sender := randCommonWallet()
+	require.NoError(t, sender.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
+	require.NoError(t, sender.SyncAccount(rweb3))
+
+	contAcct, err := rweb3.GetAccount(evmContract.GetAddress())
+	require.NoError(t, err)
+	require.Equal(t, "0", contAcct.Balance.Dec())
+
+	originSenderBalance := sender.GetBalance()
+	originContractBalance := contAcct.GetBalance()
+
+	//
+	// Transfer
+	//
+	randAmt := bytes.RandU256IntN(sender.GetBalance())
+	_ = randAmt.Sub(randAmt, baseFee)
+
+	ret, err := sender.TransferCommit(evmContract.GetAddress(), bigGas, defGasPrice, randAmt, rweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+
+	fmt.Println("sender", sender.Address(), "balance", sender.GetBalance())
+	fmt.Println("contAcct", contAcct.Address, "balance", contAcct.GetBalance())
+
+	gasAmt := new(uint256.Int).Mul(uint256.NewInt(uint64(ret.DeliverTx.GasUsed)), defGasPrice)
+	expectedSenderBalance := new(uint256.Int).Sub(originSenderBalance, new(uint256.Int).Add(gasAmt, randAmt))
+	expectedContractBalance := new(uint256.Int).Add(originContractBalance, randAmt)
+
+	require.NoError(t, sender.SyncAccount(rweb3))
+	contAcct, err = rweb3.GetAccount(evmContract.GetAddress())
+	require.NoError(t, err)
+
+	require.Equal(t, expectedSenderBalance.Dec(), sender.GetBalance().Dec())
+	require.Equal(t, expectedContractBalance.Dec(), contAcct.GetBalance().Dec())
+
+	found := false
+	for _, evt := range ret.DeliverTx.Events {
+		if evt.Type != "evm" {
+			continue
+		}
+		for _, attr := range evt.Attributes {
+			//fmt.Println(attr.String())
+			if string(attr.Key) == "data" {
+				val, err := hex.DecodeString(string(attr.Value))
+				require.NoError(t, err)
+				found = strings.HasPrefix(string(val[64:]), "receive")
+				break
+			}
+		}
+	}
+
+	require.True(t, found)
 
 }

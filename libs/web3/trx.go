@@ -51,7 +51,7 @@ func NewTrxWithdraw(from, to types.Address, nonce, gas uint64, gasPrice, req *ui
 		&types2.TrxPayloadWithdraw{ReqAmt: req})
 }
 
-func NewTrxProposal(from, to types.Address, nonce, gas uint64, gasPrice *uint256.Int, msg string, start, period int64, optType int32, options ...[]byte) *types2.Trx {
+func NewTrxProposal(from, to types.Address, nonce, gas uint64, gasPrice *uint256.Int, msg string, start, period, applyingHeight int64, optType int32, options ...[]byte) *types2.Trx {
 	return types2.NewTrx(
 		uint32(1),
 		from, to,
@@ -63,6 +63,7 @@ func NewTrxProposal(from, to types.Address, nonce, gas uint64, gasPrice *uint256
 			Message:            msg,
 			StartVotingHeight:  start,
 			VotingPeriodBlocks: period,
+			ApplyingHeight:     applyingHeight,
 			OptType:            optType,
 			Options:            options,
 		})

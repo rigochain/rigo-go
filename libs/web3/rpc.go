@@ -8,6 +8,7 @@ import (
 	rweb3types "github.com/rigochain/rigo-go/libs/web3/types"
 	"github.com/rigochain/rigo-go/rpc"
 	"github.com/rigochain/rigo-go/types"
+	"github.com/rigochain/rigo-go/types/bytes"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"strconv"
@@ -80,12 +81,12 @@ func (rweb3 *RigoWeb3) GetAccount(addr types.Address) (*ctrlertypes.Account, err
 	}
 
 	_acct := &struct {
-		Address types.Address `json:"address"`
-		Name    string        `json:"name,omitempty"`
-		Nonce   uint64        `json:"nonce,string"`
-		Balance string        `json:"balance"`
-		Code    []byte        `json:"code,omitempty"`
-		DocURL  string        `json:"docURL,omitempty"`
+		Address types.Address  `json:"address"`
+		Name    string         `json:"name,omitempty"`
+		Nonce   uint64         `json:"nonce,string"`
+		Balance string         `json:"balance"`
+		Code    bytes.HexBytes `json:"code,omitempty"`
+		DocURL  string         `json:"docURL,omitempty"`
 	}{}
 
 	if err := tmjson.Unmarshal(queryResp.Value, _acct); err != nil {
@@ -164,6 +165,43 @@ func (rweb3 *RigoWeb3) QueryReward(addr types.Address, height int64) (*stake.Rew
 	}
 }
 
+func (rweb3 *RigoWeb3) QueryTotalPower(height int64) (int64, error) {
+	queryResp := &rpc.QueryResult{}
+	if req, err := rweb3.NewRequest("stakes/total_power", strconv.FormatInt(height, 10)); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return -1, err
+	} else if resp.Error != nil {
+		return -1, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return -1, err
+	} else if ret, err := strconv.ParseInt(string(queryResp.Value), 10, 64); err != nil {
+		return -1, err
+	} else {
+		return ret, nil
+	}
+}
+
+func (rweb3 *RigoWeb3) QueryValidatorPower(height int64) (int64, error) {
+	return rweb3.QueryVotingPower(height)
+}
+func (rweb3 *RigoWeb3) QueryVotingPower(height int64) (int64, error) {
+	queryResp := &rpc.QueryResult{}
+	if req, err := rweb3.NewRequest("stakes/voting_power", strconv.FormatInt(height, 10)); err != nil {
+		panic(err)
+	} else if resp, err := rweb3.provider.Call(req); err != nil {
+		return -1, err
+	} else if resp.Error != nil {
+		return -1, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return -1, err
+	} else if ret, err := strconv.ParseInt(string(queryResp.Value), 10, 64); err != nil {
+		return -1, err
+	} else {
+		return ret, nil
+	}
+}
+
 func (rweb3 *RigoWeb3) SendTransactionAsync(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
 	resp, err := rweb3.sendTransaction(tx, "broadcast_tx_async")
 	if err != nil {
@@ -219,7 +257,7 @@ func (rweb3 *RigoWeb3) sendTransaction(tx *ctrlertypes.Trx, method string) (*rwe
 func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, error) {
 	txRet := &rweb3types.TrxResult{
 		ResultTx: &coretypes.ResultTx{},
-		TxDetail: &ctrlertypes.Trx{},
+		TrxObj:   &ctrlertypes.Trx{},
 	}
 
 	if req, err := rweb3.NewRequest("tx", txhash, false); err != nil {
@@ -230,7 +268,7 @@ func (rweb3 *RigoWeb3) GetTransaction(txhash []byte) (*rweb3types.TrxResult, err
 		return nil, errors.New("provider error: " + string(resp.Error))
 	} else if err := tmjson.Unmarshal(resp.Result, txRet.ResultTx); err != nil {
 		return nil, err
-	} else if err := txRet.TxDetail.Decode(txRet.ResultTx.Tx); err != nil {
+	} else if err := txRet.TrxObj.Decode(txRet.ResultTx.Tx); err != nil {
 		return nil, err
 	} else {
 		return txRet, nil
