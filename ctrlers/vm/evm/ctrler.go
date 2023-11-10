@@ -194,6 +194,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	if evmResult.Failed() {
 		ctrler.stateDBWrapper.RevertToSnapshot(snap)
 		ctrler.stateDBWrapper.Finish()
+		ctx.RetData = evmResult.ReturnData
 		return xerrors.From(evmResult.Err)
 	}
 

@@ -264,6 +264,7 @@ func (ctrler *RigoApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 			return abcitypes.ResponseCheckTx{
 				Code: xerr.Code(),
 				Log:  xerr.Error(),
+				Data: txctx.RetData, // in case of evm, there may be return data when tx is failed.
 			}
 		}
 
@@ -349,6 +350,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 		return abcitypes.ResponseDeliverTx{
 			Code: xerr.Code(),
 			Log:  xerr.Error(),
+			Data: txctx.RetData, // in case of evm, there may be return data when tx is failed.
 		}
 	} else {
 
