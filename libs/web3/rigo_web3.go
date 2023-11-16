@@ -33,6 +33,13 @@ func (rweb3 *RigoWeb3) ChainID() string {
 	return rweb3.chainId
 }
 
+func (rweb3 *RigoWeb3) SetChainID(cid string) {
+	rweb3.mtx.RLock()
+	defer rweb3.mtx.RUnlock()
+
+	rweb3.chainId = cid
+}
+
 func (rweb3 *RigoWeb3) NewRequest(method string, args ...interface{}) (*types.JSONRpcReq, error) {
 	rweb3.mtx.Lock()
 	defer rweb3.mtx.Unlock()

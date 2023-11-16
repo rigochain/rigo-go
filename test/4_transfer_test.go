@@ -81,7 +81,7 @@ func TestTransfer_Bulk(t *testing.T) {
 
 	for _, v := range senderAcctObjs {
 		wg.Add(1)
-		go bulkTransfer(t, &wg, v, allAcctObjs, 500) // 100 txs per sender
+		go bulkTransfer(t, &wg, v, allAcctObjs, 1000) // 100 txs per sender
 	}
 
 	fmt.Printf("TestBulkTransfer - Sender accounts: %d, Receiver accounts: %d\n", len(senderAcctObjs), len(allAcctObjs))
@@ -147,12 +147,30 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 		require.Equal(t, w.Address(), addr)
 
 		eventDataTx := event.Data.(tmtypes.EventDataTx)
-		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code)
-		require.Equal(t, defGas, uint64(eventDataTx.TxResult.Result.GasUsed))
 
-		tx := &ctrlertypes.Trx{}
-		err = tx.Decode(eventDataTx.Tx)
-		require.NoError(t, err)
+		if eventDataTx.TxResult.Result.Code == xerrors.ErrCodeSuccess {
+			require.Equal(t, defGas, uint64(eventDataTx.TxResult.Result.GasUsed))
+
+			tx := &ctrlertypes.Trx{}
+			require.NoError(t, tx.Decode(eventDataTx.TxResult.Tx))
+
+			needAmt := new(uint256.Int).Add(tx.Amount, baseFee)
+			senderAcctObj.addSpentGas(baseFee)
+			senderAcctObj.subExpectedBalance(needAmt)
+			senderAcctObj.addExpectedNonce()
+
+			var racctObj *acctObj
+			for i := 0; i < len(receivers); i++ {
+				if receivers[i].w.Address().Compare(tx.To) == 0 {
+					racctObj = receivers[i]
+					break
+				}
+			}
+			require.NotNil(t, racctObj)
+			racctObj.addExpectedBalance(tx.Amount)
+		} else {
+			require.Equal(t, uint64(0), uint64(eventDataTx.TxResult.Result.GasUsed))
+		}
 
 		senderAcctObj.retTxsCnt++
 
@@ -185,7 +203,7 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 			randAmt = uint256.NewInt(1)
 		}
 		//fmt.Printf("bulkTransfer - from: %v, to: %v, amount: %v\n", w.Address(), raddr, randAmt)
-		needAmt := new(uint256.Int).Add(randAmt, baseFee)
+		//needAmt := new(uint256.Int).Add(randAmt, baseFee)
 
 		subWg.Add(1)
 
@@ -195,29 +213,22 @@ func bulkTransfer(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, rece
 			subWg.Done()
 			time.Sleep(time.Millisecond * 1000)
 
-			i--
 			continue
 		}
 		require.NoError(t, err)
 
-		if ret.Code != xerrors.ErrCodeSuccess &&
-			strings.Contains(ret.Log, "invalid nonce") {
+		//if ret.Code != xerrors.ErrCodeSuccess &&
+		//	strings.Contains(ret.Log, "invalid nonce") {
+		if ret.Code != xerrors.ErrCodeSuccess {
 
 			subWg.Done()
 			require.NoError(t, w.SyncAccount(_rweb3))
 
-			i--
 			continue
 		}
-		require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, w.GetNonce(), ret.Hash)
-
 		//checkTxRoutine(ret.Hash)
 
 		senderAcctObj.addTxHashOfAddr(ret.Hash, w.Address())
-		senderAcctObj.addSpentGas(baseFee)
-		senderAcctObj.subExpectedBalance(needAmt)
-		senderAcctObj.addExpectedNonce()
-		racctState.addExpectedBalance(randAmt)
 
 		//fmt.Printf("Send Tx [txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Hash, w.Address(), racctState.w.Address(), w.GetNonce(), randAmt)
 

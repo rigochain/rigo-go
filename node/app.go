@@ -338,19 +338,49 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("deliverTxSync", "error", xerr)
+
+		if txctx.Tx != nil {
+			// add event
+			txctx.Events = append(txctx.Events, abcitypes.Event{
+				Type: "tx",
+				Attributes: []abcitypes.EventAttribute{
+					{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+					{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+					{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
+					{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
+					{Key: []byte(rctypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+				},
+			})
+		}
+
 		return abcitypes.ResponseDeliverTx{
-			Code: xerr.Code(),
-			Log:  xerr.Error(),
+			Code:   xerr.Code(),
+			Log:    xerr.Error(),
+			Events: txctx.Events,
 		}
 	}
 	xerr = ctrler.txExecutor.ExecuteSync(txctx)
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("deliverTxSync", "error", xerr)
+
+		// add event
+		txctx.Events = append(txctx.Events, abcitypes.Event{
+			Type: "tx",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+				{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+				{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
+				{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
+				{Key: []byte(rctypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+			},
+		})
+
 		return abcitypes.ResponseDeliverTx{
-			Code: xerr.Code(),
-			Log:  xerr.Error(),
-			Data: txctx.RetData, // in case of evm, there may be return data when tx is failed.
+			Code:   xerr.Code(),
+			Log:    xerr.Error(),
+			Data:   txctx.RetData, // in case of evm, there may be return data when tx is failed.
+			Events: txctx.Events,
 		}
 	} else {
 
