@@ -11,7 +11,7 @@ permissions:
 
 hooks:
   ApplicationStop:
-    - location: scripts/codedeploy/appsstop.sh
+    - location: scripts/codedeploy/appstop.sh
       runas: rigo-validator
   ApplicationStart:
     - location: scripts/codedeploy/appstart.sh
