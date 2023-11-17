@@ -20,6 +20,7 @@ func NewRigoWeb3(provider types.Provider) *RigoWeb3 {
 	}
 	gen, err := rweb3.Genesis()
 	if err != nil {
+		panic(err)
 		return nil
 	}
 	rweb3.chainId = gen.Genesis.ChainID

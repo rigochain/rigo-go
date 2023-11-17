@@ -290,7 +290,8 @@ func (ctrler *RigoApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 		"hash", req.Hash,
 		"prev.hash", req.Header.LastBlockId.Hash)
 
-	ctrler.mtx.Lock() // this lock will be unlocked at EndBlock
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
 
 	ctrler.nextBlockCtx = rctypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
 
@@ -346,9 +347,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 				Attributes: []abcitypes.EventAttribute{
 					{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
 					{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-					{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
-					{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
-					{Key: []byte(rctypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+					{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte{byte(xerr.Code())}, Index: false},
 				},
 			})
 		}
@@ -370,9 +369,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 			Attributes: []abcitypes.EventAttribute{
 				{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
 				{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+				{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte{byte(xerr.Code())}, Index: false},
 			},
 		})
 
@@ -395,6 +392,7 @@ func (ctrler *RigoApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.R
 				{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
 				{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
 				{Key: []byte(rctypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+				{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte{0x0}, Index: false},
 			},
 		})
 
@@ -486,6 +484,9 @@ func (ctrler *RigoApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.
 }
 
 func (ctrler *RigoApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	return ctrler.deliverTxSync(req)
 }
 
@@ -493,6 +494,7 @@ func (ctrler *RigoApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respons
 	ctrler.logger.Debug("Begin RigoApp::EndBlock",
 		"height", req.Height)
 
+	ctrler.mtx.Lock()
 	defer func() {
 		ctrler.mtx.Unlock() // this was locked at BeginBlock
 		ctrler.logger.Debug("Finish RigoApp::EndBlock",

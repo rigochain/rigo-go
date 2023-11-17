@@ -77,7 +77,7 @@ func AddNodeFlags(cmd *cobra.Command) {
 		"GRPC listen address (BroadcastTx only). Port required")
 	cmd.Flags().Bool("rpc.unsafe", rootConfig.RPC.Unsafe, "enabled unsafe provider methods")
 	cmd.Flags().String("rpc.pprof_laddr", rootConfig.RPC.PprofListenAddress, "pprof listen address (https://golang.org/pkg/net/http/pprof)")
-
+	cmd.Flags().Int("rpc.max_subscription_clients", rootConfig.RPC.MaxSubscriptionClients, "Maximum number of unique clientIDs that can /subscribe")
 	// p2p flags
 	cmd.Flags().String(
 		"p2p.laddr",

@@ -75,10 +75,10 @@ func initFiles(cmd *cobra.Command, args []string) error {
 	}
 	defer libs.ClearCredential(s)
 
-	return InitFilesWith(rigoChainID, rootConfig, s)
+	return InitFilesWith(rigoChainID, rootConfig, walkeyCnt, s)
 }
 
-func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
+func InitFilesWith(chainID string, config *cfg.Config, wkcnt int, secret []byte) error {
 	// private validator
 	privValKeyFile := config.PrivValidatorKeyFile()
 	privValStateFile := config.PrivValidatorStateFile()
@@ -131,7 +131,7 @@ func InitFilesWith(chainID string, config *cfg.Config, secret []byte) error {
 				return err
 			}
 
-			walkeys, err := acrypto.CreateWalletKeyFiles(secret, walkeyCnt, defaultWalkeyDirPath)
+			walkeys, err := acrypto.CreateWalletKeyFiles(secret, wkcnt, defaultWalkeyDirPath)
 			if err != nil {
 				return err
 			}

@@ -25,6 +25,7 @@ const (
 )
 
 const (
+	EVENT_ATTR_TXSTATUS = "status"
 	EVENT_ATTR_TXTYPE   = "type"
 	EVENT_ATTR_TXSENDER = "sender"
 	EVENT_ATTR_TXRECVER = "receiver"

@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// https://github.com/orgs/rigochain/projects/3?pane=issue&itemId=26408019
 func TestIssue32(t *testing.T) {
 	wg := sync.WaitGroup{}
 
@@ -47,7 +48,7 @@ func TestIssue32(t *testing.T) {
 
 	for _, v := range senderAcctObjs {
 		wg.Add(1)
-		go bulkTransfer(t, &wg, v, []*acctObj{receiverHelper, receiverHelper1}, 50) // 50 txs
+		go bulkTransferSync(t, &wg, v, []*acctObj{receiverHelper, receiverHelper1}, 50) // 50 txs
 	}
 
 	wg.Wait()
