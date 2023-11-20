@@ -12,6 +12,11 @@ hooks:
       timeout: 120
       runas: rigo_svc
 
+  BeforeInstall:
+    - location: scripts/codedeploy/replace.sh
+      timeout: 60
+      runas: rigo_svc
+
   ApplicationStart:
     - location: scripts/codedeploy/appstart.sh
       timeout: 120
