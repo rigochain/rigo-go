@@ -12,19 +12,17 @@ import (
 	"os"
 )
 
-func Start(lisAddr, storePath string) {
-	logrusEntry := getLogrusEntry()
+var grpcServer *grpc.Server
 
-	if err := os.MkdirAll(storePath, 0700); err != nil {
-		panic(err)
-	}
+func Start(lisAddr, storePath string, cb func() []byte) {
+	logrusEntry := getLogrusEntry()
 
 	lis, err := net.Listen("tcp", lisAddr)
 	if err != nil {
 		log.Fatalf("failed to listen %v", err)
 	}
 
-	grpcServer := grpc.NewServer(
+	grpcServer = grpc.NewServer(
 		grpc_middleware.WithUnaryServerChain(
 			grpc_tags.UnaryServerInterceptor(
 				grpc_tags.WithFieldExtractor(
@@ -36,13 +34,20 @@ func Start(lisAddr, storePath string) {
 		),
 	)
 
-	RegisterSecretFeederSvcServer(grpcServer, NewSecretFeederHandler(storePath, logrusEntry))
+	RegisterSecretFeederSvcServer(grpcServer, NewSecretFeederHandler(storePath, cb, logrusEntry))
 
 	logrusEntry.Infoln("Listen address", lis.Addr().String(), "Store", storePath)
 
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
+}
+
+func Stop() {
+	if grpcServer != nil {
+		grpcServer.GracefulStop()
+	}
+	grpcServer = nil
 }
 
 func getLogrusEntry() *logrus.Entry {
