@@ -34,20 +34,22 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 	if xerr != nil {
 		return nil, xerr
 	}
-	if execRet.Err != nil {
-		return execRet.Revert(), xerrors.From(execRet.Err)
-	}
-	//fmt.Printf("return: %x", execRet.Return())
+
 	returnData := &ctrlertypes.VMCallResult{
-		execRet.UsedGas,
-		execRet.Err,
-		execRet.ReturnData,
+		UsedGas:    execRet.UsedGas,
+		ReturnData: execRet.ReturnData,
+	}
+	if execRet.Err != nil {
+		returnData.Err = execRet.Err.Error()
+	} else {
+		returnData.Err = ""
 	}
 
 	retbz, err := tmjson.Marshal(returnData)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
+
 	return retbz, nil
 }
 
