@@ -3,8 +3,8 @@ package client
 import (
 	"context"
 	"github.com/rigochain/rigo-go/libs"
-	"github.com/rigochain/rigo-go/libs/sfeeder/common"
-	"github.com/rigochain/rigo-go/libs/sfeeder/server"
+	"github.com/rigochain/rigo-go/sfeeder/common"
+	server2 "github.com/rigochain/rigo-go/sfeeder/server"
 	"github.com/rigochain/rigo-go/types"
 	"github.com/rigochain/rigo-go/types/crypto"
 	"google.golang.org/grpc"
@@ -19,11 +19,11 @@ func ReadRemoteCredential(nodeid string, serverAddr string, target types.Address
 	}
 	defer CloseConnect(conn, cancelFunc)
 
-	grpcClient := server.NewSecretFeederSvcClient(conn)
+	grpcClient := server2.NewSecretFeederSvcClient(conn)
 	sk, err := Handshake(ctx, grpcClient, nodeid)
 	defer libs.ClearCredential(sk)
 
-	req := &server.ReqGetSecret{
+	req := &server2.ReqGetSecret{
 		Id:      nodeid,
 		Address: target,
 	}
@@ -55,11 +55,11 @@ func CloseConnect(conn *grpc.ClientConn, cancelFunc context.CancelFunc) {
 	cancelFunc()
 }
 
-func Handshake(ctx context.Context, grpcClient server.SecretFeederSvcClient, id string) ([]byte, error) {
+func Handshake(ctx context.Context, grpcClient server2.SecretFeederSvcClient, id string) ([]byte, error) {
 	prv0, _ := crypto.NewPrvKey()
 	pub0 := prv0.PublicKey
 	pubBytes := crypto.CompressPubkey(&pub0)
-	reqReg0 := &server.ReqHandshake{
+	reqReg0 := &server2.ReqHandshake{
 		Id:  id,
 		Pub: pubBytes,
 	}

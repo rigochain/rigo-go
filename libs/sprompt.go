@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	bytes2 "github.com/rigochain/rigo-go/types/bytes"
+	rbytes "github.com/rigochain/rigo-go/types/bytes"
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"os/signal"
@@ -12,7 +12,7 @@ import (
 )
 
 func ClearCredential(c []byte) {
-	bytes2.ClearBytes(c)
+	rbytes.ClearBytes(c)
 }
 
 func ReadCredential(prompt string) []byte {
