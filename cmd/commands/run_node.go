@@ -5,6 +5,7 @@ import (
 	"fmt"
 	cfg "github.com/rigochain/rigo-go/cmd/config"
 	"github.com/rigochain/rigo-go/libs"
+	"github.com/rigochain/rigo-go/libs/sfeeder/client"
 	"github.com/rigochain/rigo-go/node"
 	"github.com/rigochain/rigo-go/sfeeder/client"
 	"github.com/rigochain/rigo-go/types/crypto"
