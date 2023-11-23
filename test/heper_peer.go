@@ -73,7 +73,7 @@ func (peer *PeerMock) IDAddress() (string, error) {
 	return fmt.Sprintf("%s@127.0.0.1:%d", ni.ID(), na.Port), nil
 }
 
-func (peer *PeerMock) SetPeers(other *PeerMock) {
+func (peer *PeerMock) SetPersistentPeer(other *PeerMock) {
 	peer.Config.P2P.PersistentPeers, _ = other.IDAddress()
 }
 
@@ -82,7 +82,7 @@ func (peer *PeerMock) SetPass(pass []byte) {
 }
 
 func (peer *PeerMock) Init() error {
-	return commands.InitFilesWith(peer.ChainID, peer.Config, peer.Pass)
+	return commands.InitFilesWith(peer.ChainID, peer.Config, 500, peer.Pass)
 }
 
 func (peer *PeerMock) Start() error {
@@ -93,6 +93,10 @@ func (peer *PeerMock) Start() error {
 		logger = tmlog.NewTMJSONLogger(tmlog.NewSyncWriter(os.Stdout))
 	}
 	logger, err := tmflags.ParseLogLevel(peer.Config.LogLevel, logger, tmcfg.DefaultLogLevel)
+
+	peer.Config.RPC.MaxSubscriptionClients = 501
+	peer.Config.RPC.MaxSubscriptionsPerClient = 100
+	peer.Config.RPC.SubscriptionBufferSize = 1000
 
 	peer.nd, err = node.NewRigoNode(peer.Config, peer.Pass, logger)
 	if err != nil {
@@ -148,11 +152,12 @@ func runPeers(n int) {
 		}
 
 		if i > 0 {
+			// use genesis file of peer[0]
 			prevPeer := peers[i-1]
 			if err := _peer.CopyGenesisFrom(prevPeer.Config.GenesisFile()); err != nil {
 				panic(err)
 			}
-			_peer.SetPeers(prevPeer)
+			_peer.SetPersistentPeer(prevPeer)
 		}
 
 		if err := _peer.Start(); err != nil {

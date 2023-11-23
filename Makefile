@@ -46,7 +46,7 @@ BUILD_FLAGS=-a -ldflags "-w -s -X 'github.com/rigochain/rigo-go/cmd/version.GitC
 
 BUILDDIR="./build/$(HOSTOS)"
 
-all: pbm $(TARGETOS) tools
+all: pbm $(TARGETOS) sfeeder
 
 $(TARGETOS):
 	@echo Build rigo for $(@) on $(HOSTOS)
@@ -79,12 +79,13 @@ deploy:
 	@echo Deploy...
 	@sh -c scripts/deploy/deploy.sh
 
-tools:
+sfeeder: dummy
 	@echo "Generate sfeeder.proto"
-	@protoc --go_out=$(GOPATH)/src --go-grpc_out=$(GOPATH)/src -I./libs/sfeeder/protos secret_feeder.proto
+	@protoc --go_out=$(GOPATH)/src --go-grpc_out=$(GOPATH)/src -I./sfeeder/protos secret_feeder.proto
 	@echo "Build SecretFeeder ..."
-	@go build -o $(BUILDDIR)/sfeeder -ldflags "-s -w" ./libs/sfeeder/server/cli/sfeeder.go
-	@go build -o $(BUILDDIR)/sfsh -ldflags "-s -w" ./libs/sfeeder/client/cli/sfsh.go
+	@go build -o $(BUILDDIR)/sfeeder -ldflags "-s -w" ./sfeeder/sfeeder.go
+
+dummy:
 
 check:
 	@echo "OSTYPE: `echo ${OSTYPE}`"

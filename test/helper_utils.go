@@ -71,10 +71,11 @@ func prepareTest(peers []*PeerMock) {
 					if err := w.SyncAccount(rweb3); err != nil {
 						panic(err)
 					}
-					fmt.Println("Init Holder", w.Address(), w.GetBalance())
+					//fmt.Println("Init Holder", w.Address(), w.GetBalance())
 				}
 			}
 		}
+		fmt.Println("Init Holder count", len(wallets))
 	}
 
 	W0 = wallets[0]

@@ -20,6 +20,7 @@ func NewRigoWeb3(provider types.Provider) *RigoWeb3 {
 	}
 	gen, err := rweb3.Genesis()
 	if err != nil {
+		panic(err)
 		return nil
 	}
 	rweb3.chainId = gen.Genesis.ChainID
@@ -31,6 +32,13 @@ func (rweb3 *RigoWeb3) ChainID() string {
 	defer rweb3.mtx.RUnlock()
 
 	return rweb3.chainId
+}
+
+func (rweb3 *RigoWeb3) SetChainID(cid string) {
+	rweb3.mtx.RLock()
+	defer rweb3.mtx.RUnlock()
+
+	rweb3.chainId = cid
 }
 
 func (rweb3 *RigoWeb3) NewRequest(method string, args ...interface{}) (*types.JSONRpcReq, error) {
