@@ -34,6 +34,7 @@ func TestBalanceBug(t *testing.T) {
 
 	// get contract's balance
 	require.NoError(t, deployer.SyncAccount(rweb3))
+	fmt.Println("deployer balance", deployer.GetBalance().Dec())
 	retCall, err := contract.Call("userBalance", []interface{}{contAddr.Array20()}, contAddr, 0, rweb3)
 	require.NoError(t, err)
 
@@ -42,7 +43,7 @@ func TestBalanceBug(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "0", rbal.String())
 
-	// transfer to contract - expect error
+	// transfer to contract - expect error because fallback is reverted.
 	require.NoError(t, deployer.SyncAccount(rweb3))
 	_amt := new(uint256.Int).Div(deployer.GetBalance(), uint256.NewInt(2))
 	ret, err = deployer.TransferCommit(contAddr, bigGas, defGasPrice, _amt, rweb3)
