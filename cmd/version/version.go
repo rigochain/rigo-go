@@ -13,7 +13,7 @@ const (
 var (
 	majorVer  uint64 = 1
 	minorVer  uint64 = 3
-	patchVer  uint64 = 13
+	patchVer  uint64 = 14
 	commitVer uint64 = 1
 
 	// it is changed using ldflags.
