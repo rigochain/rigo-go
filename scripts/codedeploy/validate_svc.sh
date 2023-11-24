@@ -1,7 +1,6 @@
 #!/bin/bash
 
 sleep 10
-
 # set service var
 service=$(hostname | cut -d "-" -f3 | tr -cd '[:alpha:]')
 
