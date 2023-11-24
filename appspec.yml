@@ -9,15 +9,20 @@ file_exists_behavior: OVERWRITE
 hooks:
   ApplicationStop:
     - location: scripts/codedeploy/appstop.sh
-      timeout: 120
+      timeout: 60
       runas: rigo_svc
 
   AfterInstall:
     - location: scripts/codedeploy/replace.sh
-      timeout: 60
+      timeout: 30
       runas: rigo_svc
 
   ApplicationStart:
     - location: scripts/codedeploy/appstart.sh
-      timeout: 120
+      timeout: 30
+      runas: rigo_svc
+
+  ValidateService:
+    - location: scripts/codedeploy/validate_svc.sh
+      timeout: 30
       runas: rigo_svc
