@@ -368,6 +368,9 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
+		// RG-78: Temporarily disable staking/delegating features
+		return xerrors.ErrUnknownTrxType
+
 		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrlertypes.AmountPerPower(), new(uint256.Int))
 		// `ctx.Tx.Amount` MUST be greater than or equal to `AmountPerPower()`
 		//    ==> q.Sign() > 0
