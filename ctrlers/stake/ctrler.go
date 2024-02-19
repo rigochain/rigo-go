@@ -368,9 +368,6 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
-		// RG-78: Temporarily disable staking/delegating features
-		return xerrors.ErrUnknownTrxType
-
 		q, r := new(uint256.Int).DivMod(ctx.Tx.Amount, ctrlertypes.AmountPerPower(), new(uint256.Int))
 		// `ctx.Tx.Amount` MUST be greater than or equal to `AmountPerPower()`
 		//    ==> q.Sign() > 0
@@ -412,6 +409,12 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 			if delegatee == nil {
 				return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
+			}
+
+			// RG-78: check minDelegatorStake
+			minDelegatorPower := ctrlertypes.AmountToPower(ctx.GovHandler.MinDelegatorStake())
+			if minDelegatorPower > 0 && minDelegatorPower > txPower {
+				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: a minimum is %v", ctrler.govParams.MinDelegatorStake())
 			}
 
 			// it's delegating. check minSelfStakeRatio
