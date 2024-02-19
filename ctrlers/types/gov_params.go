@@ -75,14 +75,14 @@ func DefaultGovParams() *GovParams {
 		// hotfix: because reward ledger and appHash is continually updated, block time is not controlled to 3s.
 		// so, reward = original reward / 3 = 4756468797
 		rewardPerPower:          uint256.NewInt(4_756_468_797),   // fons
-		lazyRewardBlocks:        2592000,                         // = 60 * 60 * 24 * 30 => 30 days
-		lazyApplyingBlocks:      259200,                          // = 60 * 60 * 24 * 3 => 3 days
+		lazyRewardBlocks:        2592000,                         // = 60 * 60 * 24 * 30 => 30 days * 3(block intervals) => 90days
+		lazyApplyingBlocks:      259200,                          // = 60 * 60 * 24 * 3 => 3 days * 3(block intervals) => 9days
 		gasPrice:                uint256.NewInt(250_000_000_000), // 250e9 = 250 Gfons
 		minTrxGas:               uint64(4000),                    // 4e3 * 25e10 = 1e15 = 0.001 RIGO
 		maxTrxGas:               25_000_000,
 		maxBlockGas:             math.MaxUint64,
-		minVotingPeriodBlocks:   259200,  // = 60 * 60 * 24 * 3 => 3 days
-		maxVotingPeriodBlocks:   2592000, // = 60 * 60 * 24 * 30 => 30 days
+		minVotingPeriodBlocks:   259200,  // = 60 * 60 * 24 * 3 => 3 days* 3(block intervals) => 9days
+		maxVotingPeriodBlocks:   2592000, // = 60 * 60 * 24 * 30 => 30 days * 3(block intervals) => 90days
 		minSelfStakeRatio:       50,      // 50%
 		maxUpdatableStakeRatio:  33,      // 33%
 		maxIndividualStakeRatio: 33,      // 33%
@@ -400,7 +400,11 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 	r.minDelegatorStake, err = stringToUint256(tm.MinDelegatorStake)
 	if err != nil {
 		return err
+	} else if r.minDelegatorStake == nil {
+		// RG-78: If `MinDelegatorStake` is 0, it means  that the `MinDelegatorStake` is not checked.
+		r.minDelegatorStake = uint256.NewInt(0)
 	}
+
 	r.rewardPerPower, err = stringToUint256(tm.RewardPerPower)
 	if err != nil {
 		return err
@@ -460,6 +464,10 @@ func (r *GovParams) MinValidatorStake() *uint256.Int {
 func (r *GovParams) MinDelegatorStake() *uint256.Int {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
+
+	if r.minDelegatorStake == nil {
+		return uint256.NewInt(0)
+	}
 
 	return r.minDelegatorStake
 }
