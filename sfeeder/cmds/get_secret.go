@@ -36,6 +36,22 @@ func getSecret(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Println("Secret:", string(secret))
+	l := len(secret)
+	_secret := make([]byte, l)
+	copy(_secret, secret)
+	if l <= 8 {
+		n := libs.MIN(2, l)
+		_secret = append(_secret[:n], []byte("..")...)
+	} else if l <= 16 {
+		s0 := _secret[:2]
+		s1 := _secret[l-2:]
+		_secret = []byte(fmt.Sprintf("%s..%s", s0, s1))
+	} else {
+		s0 := _secret[:4]
+		s1 := _secret[l-4:]
+		_secret = []byte(fmt.Sprintf("%s..%s", s0, s1))
+	}
+
+	fmt.Println("Secret:", string(_secret))
 	return nil
 }

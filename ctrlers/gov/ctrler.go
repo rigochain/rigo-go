@@ -210,6 +210,11 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		if txpayload.ApplyingHeight < minApplyingHeight || endVotingHeight > txpayload.ApplyingHeight {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyingHeight: must be set equal to or higher than minApplyingHeight. ApplyingHeight:%v, minApplyingHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyingHeight, minApplyingHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
 		}
+
+		// check options
+		if len(txpayload.Options) == 0 || txpayload.Options == nil {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong options: must have at least one value")
+		}
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrap(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))

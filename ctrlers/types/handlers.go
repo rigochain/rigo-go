@@ -18,6 +18,7 @@ type IGovHandler interface {
 	Version() int64
 	MaxValidatorCnt() int64
 	MinValidatorStake() *uint256.Int
+	MinDelegatorStake() *uint256.Int
 	RewardPerPower() *uint256.Int
 	LazyRewardBlocks() int64 // todo: rename LazyrewardBlocks to UnbondingPeriodBlockcs(?)
 	LazyApplyingBlocks() int64

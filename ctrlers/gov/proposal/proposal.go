@@ -146,7 +146,7 @@ func (prop *GovProposal) UpdateMajorOption() *voteOption {
 
 func (prop *GovProposal) updateMajorOption() *voteOption {
 	sort.Sort(powerOrderVoteOptions(prop.Options))
-	if len(prop.Options) > 0 && prop.Options[0] != nil && prop.Options[0].Votes() >= prop.MajorityPower {
+	if prop.Options[0].Votes() >= prop.MajorityPower {
 		prop.MajorOption = prop.Options[0]
 	}
 	return prop.MajorOption

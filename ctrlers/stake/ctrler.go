@@ -411,6 +411,12 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 				return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 			}
 
+			// RG-78: check minDelegatorStake
+			minDelegatorPower := ctrlertypes.AmountToPower(ctx.GovHandler.MinDelegatorStake())
+			if minDelegatorPower > 0 && minDelegatorPower > txPower {
+				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: a minimum is %v", ctrler.govParams.MinDelegatorStake())
+			}
+
 			// it's delegating. check minSelfStakeRatio
 			selfRatio := delegatee.SelfStakeRatio(txPower)
 			if selfRatio < ctx.GovHandler.MinSelfStakeRatio() {
