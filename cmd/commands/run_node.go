@@ -213,10 +213,11 @@ func checkGenesisHash(config *cfg.Config) error {
 func trapSignal(logger log.Logger, cb func()) {
 	var signals = []os.Signal{
 		os.Interrupt,
-		//syscall.SIGINT,
+		syscall.SIGHUP,
+		syscall.SIGINT,
 		//syscall.SIGQUIT,
 		//syscall.SIGABRT,
-		//syscall.SIGKILL,
+		syscall.SIGKILL,
 		syscall.SIGTERM,
 		//syscall.SIGSTOP,
 	}
@@ -225,7 +226,7 @@ func trapSignal(logger log.Logger, cb func()) {
 	signal.Notify(c, signals...)
 	go func() {
 		for sig := range c {
-			logger.Info("signal trapped", "msg", log.NewLazySprintf("captured %v, exiting...", sig))
+			logger.Info("signal trapped", "msg", log.NewLazySprintf("captured %v, exiting...", sig.String()))
 			if cb != nil {
 				cb()
 			}

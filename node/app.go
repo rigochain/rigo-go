@@ -95,6 +95,9 @@ func (ctrler *RigoApp) Start() error {
 }
 
 func (ctrler *RigoApp) Stop() error {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	ctrler.txExecutor.Stop()
 	if err := ctrler.acctCtrler.Close(); err != nil {
 		return err
@@ -103,6 +106,9 @@ func (ctrler *RigoApp) Stop() error {
 		return err
 	}
 	if err := ctrler.govCtrler.Close(); err != nil {
+		return err
+	}
+	if err := ctrler.vmCtrler.Close(); err != nil {
 		return err
 	}
 	if err := ctrler.metaDB.Close(); err != nil {
