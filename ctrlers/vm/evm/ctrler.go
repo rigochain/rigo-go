@@ -99,6 +99,9 @@ func (ctrler *EVMCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	if ctrler.lastBlockHeight+1 != ctx.Height() {
 		return nil, xerrors.ErrBeginBlock.Wrapf("wrong block height - expected: %v, actual: %v", ctrler.lastBlockHeight+1, ctx.Height())
 	}
@@ -318,6 +321,9 @@ func (ctrler *EVMCtrler) EndBlock(context *ctrlertypes.BlockContext) ([]abcitype
 }
 
 func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	rootHash, err := ctrler.stateDBWrapper.Commit(true)
 	if err != nil {
 		panic(err)
@@ -345,6 +351,9 @@ func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
 }
 
 func (ctrler *EVMCtrler) Close() xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	if ctrler.metadb != nil {
 		if err := ctrler.metadb.Close(); err != nil {
 			return xerrors.From(err)
@@ -352,7 +361,14 @@ func (ctrler *EVMCtrler) Close() xerrors.XError {
 		ctrler.metadb = nil
 	}
 
-	return xerrors.From(ctrler.stateDBWrapper.Close())
+	if ctrler.stateDBWrapper != nil {
+		if err := ctrler.stateDBWrapper.Close(); err != nil {
+			return xerrors.From(err)
+		}
+		ctrler.stateDBWrapper = nil
+	}
+
+	return nil
 }
 
 func (ctrler *EVMCtrler) ImmutableStateAt(height int64) (*StateDBWrapper, xerrors.XError) {
