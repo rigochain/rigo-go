@@ -14,7 +14,7 @@ var (
 	majorVer  uint64 = 1
 	minorVer  uint64 = 3
 	patchVer  uint64 = 18
-	commitVer uint64 = 1
+	commitVer uint64 = 0
 
 	// it is changed using ldflags.
 	//  ex) -ldflags "... -X 'github.com/rigochain/rigo-go/cmd/version.GitCommit=$(LVER)'"
