@@ -1,7 +1,6 @@
 package types
 
 import (
-	rtypes "github.com/rigochain/rigo-go/types"
 	bytes2 "github.com/rigochain/rigo-go/types/bytes"
 	"github.com/rigochain/rigo-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -67,9 +66,10 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 	if txctx.Sender == nil {
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("address: %v", tx.From)
 	}
-	if !rtypes.IsZeroAddress(tx.To) {
-		txctx.Receiver = txctx.AcctHandler.FindOrNewAccount(tx.To, txctx.Exec)
+	// RG-91:  Also find the account object with the destination address 0x0.
+	txctx.Receiver = txctx.AcctHandler.FindOrNewAccount(tx.To, txctx.Exec)
+	if txctx.Receiver == nil {
+		return nil, xerrors.ErrNotFoundAccount.Wrapf("address: %v", tx.To)
 	}
-
 	return txctx, nil
 }

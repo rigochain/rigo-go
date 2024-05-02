@@ -13,8 +13,9 @@ import (
 )
 
 type caseObj struct {
-	txctx *ctrlertypes.TrxContext
-	err   xerrors.XError
+	name     string
+	txctx    *ctrlertypes.TrxContext
+	expected xerrors.XError
 }
 
 var (
@@ -22,14 +23,26 @@ var (
 	govParams = ctrlertypes.DefaultGovParams()
 )
 
+func Test_DestZeroAddr(t *testing.T) {
+	w0 := web3.NewWallet(nil)
+
+	tx0 := web3.NewTrxTransfer(w0.Address(), types.ZeroAddress(), 0, uint64(99_999), govParams.GasPrice(), uint256.NewInt(0))
+	_, _, _ = w0.SignTrxRLP(tx0, "tx_executor_test_chain")
+	txctx0 := makeTrxCtx(tx0, 1)
+	require.NotNil(t, txctx0.Sender)
+	require.Equal(t, txctx0.Sender.Address, w0.Address())
+	require.NotNil(t, txctx0.Receiver)
+	require.Equal(t, txctx0.Receiver.Address, types.ZeroAddress())
+}
+
 func Test_commonValidation(t *testing.T) {
 	for i, c := range cases {
 		xerr := testCommonValidation(c.txctx)
-		if c.err != nil {
+		if c.expected != nil {
 			require.Error(t, xerr, fmt.Sprintf("case #%d", i))
-			require.Equal(t, c.err.Code(), xerr.Code(), fmt.Sprintf("case #%d", i))
+			require.Equal(t, c.expected.Code(), xerr.Code(), fmt.Sprintf("case[%d] %s", i, c.name))
 		} else { // success
-			require.NoError(t, xerr, fmt.Sprintf("case #%d", i))
+			require.NoError(t, xerr, fmt.Sprintf("case[%d] %s", i, c.name))
 		}
 	}
 }
@@ -43,62 +56,76 @@ func init() {
 	tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, uint64(99_999), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx := makeTrxCtx(tx, 1)
-	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidGas})
+	cases = append(cases, &caseObj{"Small Gas", txctx, xerrors.ErrInvalidGas})
 
 	//
 	// Wrong GasPrice
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), uint256.NewInt(10_000_000_001), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
-	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidGasPrice})
+	cases = append(cases, &caseObj{"Wrong GasPrice", txctx, xerrors.ErrInvalidGasPrice})
 
 	//
 	// Wrong Signature - sign with proto encoding
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxProto(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
-	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidTrxSig})
+	cases = append(cases, &caseObj{"Wrong Signature - sign with proto encoding", txctx, xerrors.ErrInvalidTrxSig})
 
 	//
 	// Wrong Signature - no signature
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	txctx = makeTrxCtx(tx, 1)
-	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidTrxSig})
+	cases = append(cases, &caseObj{"Wrong Signature - no signature", txctx, xerrors.ErrInvalidTrxSig})
 
 	//
 	// Wrong Signature - other's signature
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w1.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
-	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidTrxSig})
+	cases = append(cases, &caseObj{"Wrong Signature - other's signature", txctx, xerrors.ErrInvalidTrxSig})
 
 	//
 	// Wrong Signature - wrong chainId
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain_wrong")
 	txctx = makeTrxCtx(tx, 1)
-	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidTrxSig})
+	cases = append(cases, &caseObj{"Wrong Signature - wrong chainId", txctx, xerrors.ErrInvalidTrxSig})
 
 	//
 	// Invalid nonce
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 1, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
-	cases = append(cases, &caseObj{txctx, xerrors.ErrInvalidNonce})
+	cases = append(cases, &caseObj{"Invalid nonce", txctx, xerrors.ErrInvalidNonce})
 
 	//
 	// Insufficient fund
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1001))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
-	cases = append(cases, &caseObj{txctx, xerrors.ErrInsufficientFund})
+	cases = append(cases, &caseObj{"Insufficient fund", txctx, xerrors.ErrInsufficientFund})
+
+	//
+	// To nil address
+	tx = web3.NewTrxTransfer(w0.Address(), nil, 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
+	txctx = makeTrxCtx(tx, 1)
+	cases = append(cases, &caseObj{"To nil address", txctx, xerrors.ErrInvalidAddress})
+
+	//
+	// To Zero Address
+	tx = web3.NewTrxTransfer(w0.Address(), types.ZeroAddress(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
+	txctx = makeTrxCtx(tx, 1)
+	cases = append(cases, &caseObj{"To Zero Address", txctx, nil})
 
 	//
 	// Success
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain")
 	txctx = makeTrxCtx(tx, 1)
-	cases = append(cases, &caseObj{txctx, nil})
+	cases = append(cases, &caseObj{"Success", txctx, nil})
 }
 
 func makeTrxCtx(tx *ctrlertypes.Trx, height int64) *ctrlertypes.TrxContext {
@@ -106,6 +133,7 @@ func makeTrxCtx(tx *ctrlertypes.Trx, height int64) *ctrlertypes.TrxContext {
 	txctx, _ := ctrlertypes.NewTrxContext(bz, height, time.Now().UnixMilli(), true, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
 		_txctx.GovHandler = govParams
 		_txctx.AcctHandler = &acctHandlerMock{}
+		_txctx.TrxAcctHandler = &acctHandlerMock{}
 		_txctx.ChainID = "tx_executor_test_chain"
 		return nil
 	})
@@ -120,6 +148,14 @@ func testCommonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 }
 
 type acctHandlerMock struct{}
+
+func (a *acctHandlerMock) ValidateTrx(context *ctrlertypes.TrxContext) xerrors.XError {
+	return nil
+}
+
+func (a *acctHandlerMock) ExecuteTrx(context *ctrlertypes.TrxContext) xerrors.XError {
+	return nil
+}
 
 func (a *acctHandlerMock) FindOrNewAccount(address types.Address, b bool) *ctrlertypes.Account {
 	return a.FindAccount(address, b)
@@ -152,4 +188,5 @@ func (a *acctHandlerMock) SetAccountCommittable(account *ctrlertypes.Account, b 
 	panic("implement me")
 }
 
+var _ ctrlertypes.ITrxHandler = (*acctHandlerMock)(nil)
 var _ ctrlertypes.IAccountHandler = (*acctHandlerMock)(nil)
